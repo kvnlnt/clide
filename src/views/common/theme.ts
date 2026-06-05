@@ -24,6 +24,20 @@ export const theme = {
       lg: "18px",
     },
   },
+  formSubmissionCard: {
+    bg: "#1f1f1f",
+    bgHover: "#333333",
+    border: "#333333",
+    padding: "10px",
+    label: {
+      text: "#e5e7eb",
+      fontSize: "16px",
+    },
+    body: {
+      text: "#9ca3af",
+      fontSize: "14px",
+    },
+  },
   text: {
     primary: "#e5e7eb",
     secondary: "#9ca3af",
@@ -34,34 +48,11 @@ export const theme = {
       lg: "20px",
     },
   },
-  card: {
-    bg: "#1f1f1f",
-    border: "#333333",
-  },
   page: {
     header: {
       bg: "#1f1f1f",
       text: "#e5e7eb",
       fontSize: "24px",
     },
-  },
-  table: {
-    header: {
-      bg: "#1f1f1f",
-      text: "#e5e7eb",
-      fontSize: "14px",
-    },
-    body: {
-      bg: "#282829",
-      text: "#e5e7eb",
-      fontSize: "16px",
-    },
-    footer: {
-      bg: "#1f1f1f",
-      text: "#e5e7eb",
-      fontSize: "14px",
-    },
-    border: "#333333",
-    padding: "4px",
   },
 } as const;

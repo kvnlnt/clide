@@ -1,4 +1,5 @@
 import { actions } from "../common/actions";
+import { components } from "../common/components";
 import { state } from "../common/states";
 import { tag, trait } from "../common/templates";
 import { theme } from "../common/theme";
@@ -6,83 +7,54 @@ import { theme } from "../common/theme";
 export function UI() {
   return tag.div(
     trait.style("display", "flex"),
-    trait.style("justifyContent", "center"),
-    trait.style("alignItems", "center"),
+    trait.style("justifyContent", "flexStart"),
+    trait.style("alignItems", "flexStart"),
     trait.style("flexDirection", "column"),
     trait.style("height", "100vh"),
     trait.style("maxHeight", "100vh"),
-    trait.style("overflow", "hidden"),
+    // trait.style("overflow", "hidden"),
     trait.style("backgroundColor", theme.box.bg),
     trait.style("color", theme.text.primary),
     trait.style("border", `1px solid red`, state.devModeState.$test(true)),
-    // header
-    tag.div(
+    trait.style("width", "100vw"),
+    trait.style("padding", theme.box.space.lg),
+    trait.style("gap", theme.box.space.lg),
+    // form selector
+    tag.form(
       trait.style("display", "flex"),
-      trait.style("flexDirection", "row"),
-      trait.style("flexWrap", "wrap"),
-      trait.style("alignItems", "center"),
-      trait.style("backgroundColor", theme.page.header.bg),
-      trait.style("color", theme.page.header.text),
-      trait.style("width", "100%"),
-      trait.style("padding", theme.box.space.md),
-      trait.style("height", "fit-content"),
-      trait.style("border", `1px solid red`, state.devModeState.$test(true)),
-      trait.style("listStyle", "none"),
-      trait.style("margin", "0"),
-      trait.style("gap", theme.box.space.md),
-      trait.html(
-        () => [
-          ...state.folderListState
+      trait.evt("submit", (e: any) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        const choice = formData.get("choice");
+        actions.loadForm(choice as string);
+      }),
+      tag.input(
+        trait.attr("list", "options"),
+        trait.attr("name", "choice"),
+        trait.attr("placeholder", "Type or select..."),
+        trait.style("width", "100vw"),
+      ),
+      tag.datalist(
+        trait.attr("id", "options"),
+        trait.html(() =>
+          state.formsCollection
             .val()
-            .map((f) =>
-              tag.button(
-                trait.style("backgroundColor", theme.button.bg),
-                trait.style("border", `1px solid ${theme.button.text}`),
-                trait.style("color", theme.button.text),
-                trait.style("fontSize", theme.button.fontSize.sm),
-                trait.style("padding", theme.box.space.sm),
-                trait.style("borderRadius", theme.box.radius.sm),
-                trait.style("cursor", "pointer"),
-                trait.text(f),
+            .map((form) =>
+              tag.option(
+                trait.attr("value", form.label),
+                trait.text(form.description),
               ),
             ),
-          tag.input(
-            trait.attr("type", "file"),
-            trait.attr("webkitdirectory", "true"),
-            trait.evt("change", (e: any) => {
-              // actions.println("Selected folders:");
-              // const files = event.target.files;
-              // actions.println(files);
-              if (!e.target.files.length) return;
-              const folder = e.target.files[0].webkitRelativePath.split("/")[0];
-              actions.println("Picked folder:" + folder);
-              e.target.value = ""; // reset after handling toolkit doesn't trigger change event if the same folder is selected again
-            }),
-            trait.style("backgroundColor", theme.button.bg),
-            trait.style("border", `1px solid ${theme.button.text}`),
-            trait.style("color", theme.button.text),
-            trait.style("fontSize", theme.button.fontSize.sm),
-            trait.style("padding", theme.box.space.sm),
-            trait.text("Add Folder"),
-          ),
-        ],
-        state.folderListState,
+        ),
       ),
     ),
-    // body
+    // form submissions
     tag.div(
       trait.style("display", "flex"),
       trait.style("flexDirection", "column"),
-      trait.style("flex", "1"),
-      trait.style("overflow", "scroll"),
-      trait.style("width", "100%"),
-      // scripts
-      tag.div(
-        trait.style("display", "grid"),
-        trait.style("width", "100%"),
-        trait.style("gridTemplateColumns", "repeat(auto-fit, minmax(200px, 1fr))"),
-        trait.style("gap", theme.box.space.md),
-        trait.style("border", `1px solid red`, state.devModeState.$test(true)),
+      trait.style("gap", "10px"),
+      trait.html(() =>
+        state.formSubmissionCollection.val().map(components.formSubmissionCard),
       ),
     ),
   );

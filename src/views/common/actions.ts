@@ -1,5 +1,6 @@
 import { Electroview } from "electrobun/view";
 import { RPCType, ScriptType } from "../../common/types";
+import { state } from "./states";
 
 const electroview = new Electroview({
   rpc: Electroview.defineRPC<RPCType>({
@@ -9,6 +10,17 @@ const electroview = new Electroview({
     },
   }),
 });
+
+function loadForm(formLabel: string) {
+  const form = state.formsCollection.val().find((f) => f.label === formLabel);
+  if (!form) {
+    electroview.rpc?.request.println("Form not found");
+    return;
+  }
+  electroview.rpc?.request.println(
+    `Loading form: ${form.label}\nDescription: ${form.description}`,
+  );
+}
 
 async function launchScript(i: ScriptType) {
   await electroview.rpc?.request.launchWin({
@@ -27,4 +39,4 @@ function println(message: string) {
   electroview.rpc?.request.println(message);
 }
 
-export const actions = { launchScript, println };
+export const actions = { launchScript, println, loadForm };
