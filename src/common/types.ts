@@ -4,12 +4,14 @@ export type FormType = {
   label: string;
   description: string;
   fields: {
-    label: string;
-    placeholder: string;
-    validation: {
-      required: boolean;
+    [key: string]: {
+      label: string;
+      placeholder: string;
+      validation: {
+        required: boolean;
+      };
     };
-  }[];
+  };
 };
 
 export type FormSubmissionType = {

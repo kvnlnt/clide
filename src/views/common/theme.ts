@@ -31,11 +31,38 @@ export const theme = {
     padding: "10px",
     label: {
       text: "#e5e7eb",
-      fontSize: "16px",
+      fontSize: "14px",
     },
     body: {
       text: "#9ca3af",
       fontSize: "14px",
+    },
+  },
+  input: {
+    bg: "#1f1f1f",
+    text: "#e5e7eb",
+    border: "#333333",
+    fontSize: {
+      sm: "14px",
+      md: "16px",
+      lg: "18px",
+    },
+    padding: "10px",
+  },
+  modal: {
+    backdrop: "rgba(0, 0, 0, 0.5)",
+    bg: "#1f1f1f",
+    header: {
+      text: "#e5e7eb",
+      fontSize: "14px",
+    },
+    body: {
+      text: "#9ca3af",
+      fontSize: "16px",
+    },
+    actions: {
+      text: "#e5e7eb",
+      fontSize: "16px",
     },
   },
   text: {

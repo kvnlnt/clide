@@ -2,6 +2,7 @@ import {
   Template,
   useAttributeTrait,
   useEventTrait,
+  useFocusTrait,
   useInnerHTMLTrait,
   useInputEventTrait,
   useInputValueTrait,
@@ -19,4 +20,5 @@ export const [tag, trait] = Template({
   html: useInnerHTMLTrait,
   input: useInputEventTrait,
   value: useInputValueTrait,
+  focus: useFocusTrait,
 });

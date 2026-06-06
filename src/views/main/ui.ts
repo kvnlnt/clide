@@ -1,5 +1,6 @@
 import { actions } from "../common/actions";
 import { components } from "../common/components";
+import { features } from "../common/features";
 import { state } from "../common/states";
 import { tag, trait } from "../common/templates";
 import { theme } from "../common/theme";
@@ -33,18 +34,21 @@ export function UI() {
         trait.attr("name", "choice"),
         trait.attr("placeholder", "Type or select..."),
         trait.style("width", "100vw"),
+        trait.style("backgroundColor", theme.input.bg),
+        trait.style("color", theme.input.text),
+        trait.style("border", `1px solid ${theme.input.border}`),
+        trait.style("fontSize", theme.input.fontSize.md),
+        trait.style("padding", theme.input.padding),
+        trait.input("input", state.formSearchInput.set),
+        trait.value(state.formSearchInput.$val),
+        trait.focus([state.formSearchInput.$test("")], [state.formSearchInput]),
       ),
       tag.datalist(
         trait.attr("id", "options"),
         trait.html(() =>
           state.formsCollection
             .val()
-            .map((form) =>
-              tag.option(
-                trait.attr("value", form.label),
-                trait.text(form.description),
-              ),
-            ),
+            .map((form) => tag.option(trait.attr("value", form.label), trait.text(form.description))),
         ),
       ),
     ),
@@ -53,8 +57,9 @@ export function UI() {
       trait.style("display", "flex"),
       trait.style("flexDirection", "column"),
       trait.style("gap", "10px"),
-      trait.html(() =>
-        state.formSubmissionCollection.val().map(components.formSubmissionCard),
+      trait.html(
+        () => state.formSubmissionCollection.val().map(components.formSubmissionCard),
+        state.formSubmissionCollection,
       ),
     ),
   );
@@ -62,5 +67,7 @@ export function UI() {
 
 document.addEventListener("DOMContentLoaded", () => {
   const root = document.getElementById("app");
-  if (root) root.append(UI());
+  if (root) {
+    root.append(features.FormModal(), UI());
+  }
 });
