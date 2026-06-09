@@ -2,8 +2,8 @@ import type { ElectrobunConfig } from "electrobun";
 
 export default {
   app: {
-    name: "vanilla-vite",
-    identifier: "vanillavite.electrobun.dev",
+    name: "electrobun-vanilla-rpc",
+    identifier: "vanillarpc.electrobun.dev",
     version: "0.0.1",
   },
   build: {
