@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import type { FormDefinition, FormMeta, RepeatInterval, RunRecord } from "../types/forms";
 import FormCardBody from "./FormCardBody";
-import FormCardCollapsed from "./FormCardCollapsed";
 import FormCardFooter from "./FormCardFooter";
 import FormCardHeader from "./FormCardHeader";
 import ScheduleSubForm from "./ScheduleSubForm";
@@ -68,24 +67,7 @@ export default function FormCard({
   const setValue = (id: string, value: unknown) => setValues((prev) => ({ ...prev, [id]: value }));
 
   const shouldExpand = run.status === "idle" || running ? true : expanded;
-
-  if (!shouldExpand) {
-    return (
-      <FormCardCollapsed
-        meta={meta}
-        run={run}
-        summary={summarize(form, run.inputs, run)}
-        onExpand={() => setExpanded(true)}
-        onPin={onPin}
-        onSchedule={() => {
-          setExpanded(true);
-          setShowSchedule(true);
-        }}
-        onRerun={onRerun}
-        onDelete={onDelete}
-      />
-    );
-  }
+  const toggleable = !(run.status === "idle" || running);
 
   const submitPayload = () => ({
     ...values,
@@ -101,6 +83,10 @@ export default function FormCard({
       <FormCardHeader
         meta={meta}
         form={form}
+        run={run}
+        summary={summarize(form, run.inputs, run)}
+        expanded={shouldExpand}
+        onToggle={toggleable ? () => setExpanded((e) => !e) : undefined}
         aiPrompt={aiPrompt}
         onAiPromptChange={setAiPrompt}
         disabled={!editable}
@@ -114,30 +100,35 @@ export default function FormCard({
           else if (!editable) setExpanded(false);
         }}
       />
-      <div className="h-px bg-clide-border" />
-      <FormCardBody form={form} values={values} onChange={setValue} disabled={!editable} />
 
-      {showSchedule && editable && (
-        <div className="px-4 pb-2">
-          <ScheduleSubForm
-            onSchedule={(at, repeat) => {
-              onSchedule(submitPayload(), at, repeat);
-              setShowSchedule(false);
-            }}
-            onCancel={() => setShowSchedule(false)}
-          />
-        </div>
-      )}
-
-      {(editable || running) && (
+      {shouldExpand && (
         <>
           <div className="h-px bg-clide-border" />
-          <FormCardFooter
-            status={run.status}
-            canSubmit={canSubmit}
-            onSubmit={() => onSubmit(submitPayload())}
-            onCancel={onCancel}
-          />
+          <FormCardBody form={form} values={values} onChange={setValue} disabled={!editable} />
+
+          {showSchedule && editable && (
+            <div className="px-4 pb-2">
+              <ScheduleSubForm
+                onSchedule={(at, repeat) => {
+                  onSchedule(submitPayload(), at, repeat);
+                  setShowSchedule(false);
+                }}
+                onCancel={() => setShowSchedule(false)}
+              />
+            </div>
+          )}
+
+          {(editable || running) && (
+            <>
+              <div className="h-px bg-clide-border" />
+              <FormCardFooter
+                status={run.status}
+                canSubmit={canSubmit}
+                onSubmit={() => onSubmit(submitPayload())}
+                onCancel={onCancel}
+              />
+            </>
+          )}
         </>
       )}
     </div>

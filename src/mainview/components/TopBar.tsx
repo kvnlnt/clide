@@ -1,4 +1,4 @@
-import { Ellipsis, LayoutGrid, List, ListFilter, PanelLeft, Search } from "lucide-react";
+import { Ellipsis, LayoutGrid, List, ListFilter, PanelLeft } from "lucide-react";
 import { useApp } from "../context/AppContext";
 
 export default function TopBar() {
@@ -24,9 +24,6 @@ export default function TopBar() {
       </button>
 
       <div className="flex shrink-0 items-center gap-4">
-        <button className={iconBtn} onClick={openSelector} title="Search forms">
-          <Search size={20} />
-        </button>
         <button className={iconBtn} onClick={toggleSidebar} title="Toggle sidebar">
           <PanelLeft size={20} />
         </button>

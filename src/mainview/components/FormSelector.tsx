@@ -5,12 +5,13 @@ import { useFormSearch } from "../hooks/useFormSearch";
 import FormSelectorRow from "./FormSelectorRow";
 
 export default function FormSelector() {
-  const { forms, recentSlugs, addFormDraft, addNewFormDraft, closeSelector } = useApp();
+  const { forms, recentSlugs, addFormDraft, addNewFormDraft, closeSelector, activeProject } = useApp();
+  const projectForms = activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms;
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const results = useFormSearch(forms, query, recentSlugs);
+  const results = useFormSearch(projectForms, query, recentSlugs);
   const createIndex = results.length; // "Create new form" sits after results.
   const total = results.length + 1;
 

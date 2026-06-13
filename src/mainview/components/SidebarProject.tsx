@@ -1,5 +1,3 @@
-import { ChevronRight } from "lucide-react";
-
 interface SidebarProjectProps {
   name: string;
   active: boolean;
@@ -22,7 +20,6 @@ export default function SidebarProject({ name, active, badgeCount, badgeColor, o
         active ? "clide-active-row" : "hover:bg-white/[0.03]"
       }`}
     >
-      <ChevronRight size={18} className={active ? "text-white" : "text-white/40"} />
       <span className={`flex-1 truncate text-[14px] ${active ? "font-bold text-white" : "text-white/60"}`}>{name}</span>
       {badgeCount > 0 && (
         <span
