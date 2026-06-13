@@ -1,0 +1,140 @@
+import { readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import type { FieldType, FormDefinition, FormField, FormFolder, FormMeta, OutputType } from "../../shared/types";
+import { listProjects } from "../config";
+import { ensureProjectDirs, projectFormsDir } from "../paths";
+
+/** slug -> absolute project path, rebuilt on each listForms(). */
+const slugIndex = new Map<string, string>();
+
+/** Resolve which project folder a given form slug lives in. */
+export function resolveFormProject(slug: string): string | null {
+  return slugIndex.get(slug) ?? null;
+}
+
+const FIELD_TYPES: FieldType[] = ["text", "textarea", "select", "multicheck", "number", "file", "date"];
+const OUTPUT_TYPES: OutputType[] = ["text", "table", "image", "audio", "video", "json"];
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function validateMeta(raw: unknown, slug: string, projectName: string): FormMeta | null {
+  if (!isObject(raw)) return null;
+  if (typeof raw.name !== "string") {
+    return null;
+  }
+  return {
+    name: raw.name,
+    slug: typeof raw.slug === "string" ? raw.slug : slug,
+    description: typeof raw.description === "string" ? raw.description : "",
+    project: projectName,
+    tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === "string") : [],
+    interpreter:
+      raw.interpreter === "python3" ||
+      raw.interpreter === "node" ||
+      raw.interpreter === "bun" ||
+      raw.interpreter === "bash"
+        ? raw.interpreter
+        : "bash",
+    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date().toISOString(),
+    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
+  };
+}
+
+function validateField(raw: unknown): FormField | null {
+  if (!isObject(raw)) return null;
+  if (typeof raw.id !== "string" || typeof raw.label !== "string") return null;
+  const type = FIELD_TYPES.includes(raw.type as FieldType) ? (raw.type as FieldType) : "text";
+  return {
+    id: raw.id,
+    label: raw.label,
+    type,
+    placeholder: typeof raw.placeholder === "string" ? raw.placeholder : undefined,
+    required: raw.required === true,
+    options: Array.isArray(raw.options) ? raw.options.filter((o): o is string => typeof o === "string") : undefined,
+    argTemplate: typeof raw.argTemplate === "string" ? raw.argTemplate : undefined,
+  };
+}
+
+function validateForm(raw: unknown): FormDefinition | null {
+  if (!isObject(raw)) return null;
+  if (!Array.isArray(raw.fields)) return null;
+  const fields = raw.fields.map(validateField).filter((f): f is FormField => f !== null);
+  const outputType = OUTPUT_TYPES.includes(raw.outputType as OutputType) ? (raw.outputType as OutputType) : "text";
+  return {
+    fields,
+    aiPromptField: raw.aiPromptField === true,
+    outputType,
+    scriptFile: typeof raw.scriptFile === "string" ? raw.scriptFile : "script.sh",
+  };
+}
+
+async function readJson(path: string): Promise<unknown | null> {
+  try {
+    const file = Bun.file(path);
+    if (!(await file.exists())) return null;
+    return JSON.parse(await file.text());
+  } catch {
+    return null;
+  }
+}
+
+export async function loadFormFolder(
+  projectPath: string,
+  slug: string,
+  projectName: string,
+): Promise<FormFolder | null> {
+  const dir = join(projectFormsDir(projectPath), slug);
+  const metaRaw = await readJson(join(dir, "meta.json"));
+  const formRaw = await readJson(join(dir, "form.json"));
+  const meta = validateMeta(metaRaw, slug, projectName);
+  const form = validateForm(formRaw);
+  if (!meta || !form) {
+    console.warn(`[forms] Skipping malformed form folder: ${slug}`);
+    return null;
+  }
+  return { meta, form, projectPath };
+}
+
+/** Scan every registered project's forms directory and return all valid forms. */
+export async function listForms(): Promise<FormFolder[]> {
+  const projects = await listProjects();
+  slugIndex.clear();
+  const folders: FormFolder[] = [];
+
+  for (const project of projects) {
+    ensureProjectDirs(project.path);
+    const formsDir = projectFormsDir(project.path);
+    let entries: string[];
+    try {
+      entries = readdirSync(formsDir);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.startsWith(".")) continue;
+      let isDir = false;
+      try {
+        isDir = statSync(join(formsDir, entry)).isDirectory();
+      } catch {
+        isDir = false;
+      }
+      if (!isDir) continue;
+      const folder = await loadFormFolder(project.path, entry, project.name);
+      if (folder) {
+        slugIndex.set(folder.meta.slug, project.path);
+        folders.push(folder);
+      }
+    }
+  }
+
+  folders.sort((a, b) => a.meta.name.localeCompare(b.meta.name));
+  return folders;
+}
+
+/** Distinct project names across all forms, alphabetically sorted. */
+export function projectsFromForms(forms: FormFolder[]): string[] {
+  const set = new Set(forms.map((f) => f.meta.project).filter(Boolean));
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}

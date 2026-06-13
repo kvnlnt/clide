@@ -1,0 +1,150 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useApp } from "../context/AppContext";
+import { api } from "../rpc";
+import type { GridCardSize, ProjectLayout, RunRecord } from "../types/forms";
+import GridCard from "./GridCard";
+
+const SIZE_CYCLE: GridCardSize[] = ["small", "medium", "large"];
+
+export default function GridView() {
+  const { forms, activeProject, runs, submitRun, addFormDraft, setViewMode } = useApp();
+
+  const projectSlug = activeProject ?? "all";
+
+  const projectForms = useMemo(
+    () => (activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms),
+    [forms, activeProject],
+  );
+
+  const [order, setOrder] = useState<string[]>([]);
+  const [sizes, setSizes] = useState<Record<string, GridCardSize>>({});
+  const [dragging, setDragging] = useState<string | null>(null);
+
+  // Load persisted layout whenever the project or its form set changes.
+  useEffect(() => {
+    let cancelled = false;
+    void api.getLayout(projectSlug).then((layout) => {
+      if (cancelled) return;
+      const slugs = projectForms.map((f) => f.meta.slug);
+      const ordered = layout.cards
+        .sort((a, b) => a.position - b.position)
+        .map((c) => c.formSlug)
+        .filter((s) => slugs.includes(s));
+      const missing = slugs.filter((s) => !ordered.includes(s));
+      setOrder([...ordered, ...missing]);
+      const sizeMap: Record<string, GridCardSize> = {};
+      for (const c of layout.cards) sizeMap[c.formSlug] = c.size;
+      setSizes(sizeMap);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectSlug, projectForms]);
+
+  const lastRunBySlug = useMemo(() => {
+    const m = new Map<string, RunRecord>();
+    for (const run of runs) {
+      if (!m.has(run.formSlug)) m.set(run.formSlug, run);
+    }
+    return m;
+  }, [runs]);
+
+  const pinnedSlugs = useMemo(() => {
+    const set = new Set<string>();
+    for (const run of runs) if (run.pinned) set.add(run.formSlug);
+    return set;
+  }, [runs]);
+
+  const persist = useCallback(
+    (nextOrder: string[], nextSizes: Record<string, GridCardSize>) => {
+      const layout: ProjectLayout = {
+        cards: nextOrder.map((slug, i) => ({
+          formSlug: slug,
+          size: nextSizes[slug] ?? "small",
+          position: i,
+        })),
+      };
+      void api.saveLayout(projectSlug, layout);
+    },
+    [projectSlug],
+  );
+
+  // Pinned forms float to the first row.
+  const displayOrder = useMemo(() => {
+    const present = order.filter((s) => projectForms.some((f) => f.meta.slug === s));
+    return [...present].sort((a, b) => {
+      const pa = pinnedSlugs.has(a) ? 0 : 1;
+      const pb = pinnedSlugs.has(b) ? 0 : 1;
+      return pa - pb;
+    });
+  }, [order, projectForms, pinnedSlugs]);
+
+  const handleDrop = (targetSlug: string) => {
+    if (!dragging || dragging === targetSlug) return;
+    const next = [...order];
+    const from = next.indexOf(dragging);
+    const to = next.indexOf(targetSlug);
+    if (from === -1 || to === -1) return;
+    next.splice(from, 1);
+    next.splice(to, 0, dragging);
+    setOrder(next);
+    persist(next, sizes);
+    setDragging(null);
+  };
+
+  const cycleSize = (slug: string) => {
+    const current = sizes[slug] ?? "small";
+    const next = SIZE_CYCLE[(SIZE_CYCLE.indexOf(current) + 1) % SIZE_CYCLE.length];
+    const nextSizes = { ...sizes, [slug]: next };
+    setSizes(nextSizes);
+    persist(order, nextSizes);
+  };
+
+  const openForm = (slug: string) => {
+    addFormDraft(slug);
+    setViewMode("list");
+  };
+
+  const quickRun = (slug: string) => {
+    const folder = projectForms.find((f) => f.meta.slug === slug);
+    const hasRequired = folder?.form.fields.some((f) => f.required);
+    if (hasRequired) {
+      openForm(slug);
+    } else {
+      void submitRun(slug, {});
+      setViewMode("list");
+    }
+  };
+
+  return (
+    <div className="clide-scroll flex-1 overflow-y-auto p-6">
+      {displayOrder.length === 0 ? (
+        <div className="flex h-full items-center justify-center text-[14px] italic text-white/30">
+          No forms in this project
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-3">
+          {displayOrder.map((slug) => {
+            const folder = projectForms.find((f) => f.meta.slug === slug);
+            if (!folder) return null;
+            return (
+              <GridCard
+                key={slug}
+                form={folder}
+                size={sizes[slug] ?? "small"}
+                lastRun={lastRunBySlug.get(slug)}
+                pinned={pinnedSlugs.has(slug)}
+                onOpen={() => openForm(slug)}
+                onQuickRun={() => quickRun(slug)}
+                onCycleSize={() => cycleSize(slug)}
+                onDragStart={() => setDragging(slug)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => handleDrop(slug)}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
