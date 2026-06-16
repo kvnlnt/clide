@@ -1,7 +1,11 @@
 {
-  "name": "electrobun-react-tailwind-vite",
+  "name": "clide",
   "version": "1.0.0",
-  "description": "Electrobun app with React, Tailwind CSS, and Vite HMR",
+  "description": "CLIDE — Command Line Integration Development Environment",
+  "private": true,
+  "author": "Kevin Lint <Lint Trap Media>",
+  "license": "UNLICENSED",
+  "copyright": "Copyright (c) 2026 Kevin Lint and Lint Trap Media. All Rights Reserved.",
   "scripts": {
     "start": "vite build && electrobun dev",
     "dev": "electrobun dev --watch",

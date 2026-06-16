@@ -759,7 +759,7 @@ function buildHtml(): string {
   <footer class="footer">
     <div class="container">
       <p class="footer-text">
-        &copy; ${year} ${SITE.name} &mdash;
+        &copy; ${year} Kevin Lint &amp; Lint Trap Media. All rights reserved. &mdash;
         <a href="${SITE.repoUrl}" target="_blank" rel="noopener noreferrer">GitHub</a>
       </p>
     </div>
