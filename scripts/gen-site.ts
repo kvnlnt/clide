@@ -55,7 +55,7 @@ const SITE = {
   description:
     "CLIDE stands for Command Line Integration Development Environment. It is a desktop app that turns shell scripts into clean, fillable forms. " +
     "Run your tools without touching the terminal — just fill out the form and hit Send.",
-  repoUrl: "https://github.com/linttrapmedia/clide",
+  repoUrl: "https://github.com/kvnlnt/clide",
   features: [
     {
       icon: ICONS.terminal,
