@@ -778,6 +778,8 @@ await mkdir(outDir, { recursive: true });
 const files: { name: string; content: string }[] = [
   { name: "index.html", content: buildHtml() },
   { name: "styles.css", content: css },
+  // Tell GitHub Pages to serve files as-is (skip Jekyll processing).
+  { name: ".nojekyll", content: "" },
 ];
 
 for (const file of files) {
