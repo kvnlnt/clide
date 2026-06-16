@@ -3,7 +3,6 @@ import { useThread } from "../hooks/useThread";
 import type { RunRecord } from "../types/forms";
 import FormCard from "./FormCard";
 import NewFormCard from "./NewFormCard";
-import OutputBlock from "./output/OutputBlock";
 import ThreadDateGroup from "./ThreadDateGroup";
 import ThreadEmpty from "./ThreadEmpty";
 
@@ -28,35 +27,27 @@ export default function Thread() {
   const renderRun = (run: RunRecord) => {
     const folder = formsBySlug.get(run.formSlug);
     if (!folder) return null;
-    const showOutput = run.status === "running" || run.status === "success" || run.status === "error";
     return (
-      <div key={run.id} className="flex flex-col gap-2">
-        <FormCard
-          run={run}
-          form={folder.form}
-          meta={folder.meta}
-          onSubmit={(values) => void submitRun(run.formSlug, values)}
-          onCancel={() => void cancelRun(run.id)}
-          onSchedule={(values, at, repeat) => void scheduleRun(run.formSlug, values, at, repeat)}
-          onPin={() => void setPinned(run.id, !run.pinned)}
-          onDelete={() => void deleteRun(run.id)}
-          onRerun={() => void rerun(run)}
-        />
-        {showOutput && (
-          <OutputBlock
-            runId={run.id}
-            outputType={folder.form.outputType}
-            status={run.status}
-            chunks={chunks[run.id] ?? []}
-          />
-        )}
-      </div>
+      <FormCard
+        key={run.id}
+        run={run}
+        form={folder.form}
+        meta={folder.meta}
+        outputType={folder.form.outputType}
+        chunks={chunks[run.id] ?? []}
+        onSubmit={(values) => void submitRun(run.formSlug, values)}
+        onCancel={() => void cancelRun(run.id)}
+        onSchedule={(values, at, repeat) => void scheduleRun(run.formSlug, values, at, repeat)}
+        onPin={() => void setPinned(run.id, !run.pinned)}
+        onDelete={() => void deleteRun(run.id)}
+        onRerun={() => void rerun(run)}
+      />
     );
   };
 
   return (
     <div className="clide-scroll flex-1 overflow-y-auto">
-      <div className="mx-auto flex max-w-3xl flex-col gap-3 px-6 py-5">
+      <div className="flex flex-col gap-3 px-6 py-5">
         {isEmpty ? (
           <div className="h-[60vh]">
             <ThreadEmpty />

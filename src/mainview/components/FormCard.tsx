@@ -1,14 +1,17 @@
 import { useMemo, useState } from "react";
-import type { FormDefinition, FormMeta, RepeatInterval, RunRecord } from "../types/forms";
+import type { FormDefinition, FormMeta, OutputChunk, OutputType, RepeatInterval, RunRecord } from "../types/forms";
 import FormCardBody from "./FormCardBody";
 import FormCardFooter from "./FormCardFooter";
 import FormCardHeader from "./FormCardHeader";
 import ScheduleSubForm from "./ScheduleSubForm";
+import OutputBlock from "./output/OutputBlock";
 
 export interface FormCardProps {
   run: RunRecord;
   form: FormDefinition;
   meta: FormMeta;
+  outputType?: OutputType;
+  chunks?: OutputChunk[];
   defaultExpanded?: boolean;
   onSubmit: (values: Record<string, unknown>) => void;
   onCancel: () => void;
@@ -42,6 +45,8 @@ export default function FormCard({
   run,
   form,
   meta,
+  outputType,
+  chunks,
   defaultExpanded,
   onSubmit,
   onCancel,
@@ -53,11 +58,14 @@ export default function FormCard({
 }: FormCardProps) {
   const editable = run.status === "idle";
   const running = run.status === "running" || run.status === "pending";
+  const hasSubmittedTabs =
+    run.status === "running" || run.status === "pending" || run.status === "success" || run.status === "error";
 
   const [values, setValues] = useState<Record<string, unknown>>(run.inputs);
   const [aiPrompt, setAiPrompt] = useState("");
   const [showSchedule, setShowSchedule] = useState(false);
   const [expanded, setExpanded] = useState(defaultExpanded ?? (run.status === "idle" || running));
+  const [activeTab, setActiveTab] = useState<"results" | "submitted">("results");
 
   const canSubmit = useMemo(
     () => form.fields.every((f) => !f.required || isFilled(values[f.id])),
@@ -99,12 +107,29 @@ export default function FormCard({
           if (run.status === "idle" && onDismiss) onDismiss();
           else if (!editable) setExpanded(false);
         }}
+        showTabs={hasSubmittedTabs}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
 
       {shouldExpand && (
         <>
           <div className="h-px bg-clide-border" />
-          <FormCardBody form={form} values={values} onChange={setValue} disabled={!editable} />
+          {hasSubmittedTabs ? (
+            <>
+              {activeTab === "results" ? (
+                outputType ? (
+                  <OutputBlock runId={run.id} outputType={outputType} status={run.status} chunks={chunks ?? []} />
+                ) : (
+                  <div className="px-4 py-3 text-[13px] text-white/40">No results.</div>
+                )
+              ) : (
+                <FormCardBody form={form} values={run.inputs} onChange={() => {}} disabled />
+              )}
+            </>
+          ) : (
+            <FormCardBody form={form} values={values} onChange={setValue} disabled={!editable} />
+          )}
 
           {showSchedule && editable && (
             <div className="px-4 pb-2">

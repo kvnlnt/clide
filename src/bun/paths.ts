@@ -24,6 +24,11 @@ export function projectsRegistryPath(): string {
   return join(appDataDir(), "projects.json");
 }
 
+/** JSON file storing global AI settings (e.g. Ollama base URL). */
+export function aiSettingsPath(): string {
+  return join(appDataDir(), "ai-settings.json");
+}
+
 /** Base directory under which auto-created projects (e.g. "Default") are stored. */
 export function defaultProjectsDir(): string {
   return join(appDataDir(), "projects");

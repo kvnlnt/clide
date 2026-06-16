@@ -1,6 +1,7 @@
 import { Electroview } from "electrobun/view";
 import type {
   AIProvider,
+  AISettings,
   ClideRPC,
   CreateFormInput,
   CreateFormResult,
@@ -92,8 +93,18 @@ export const api = {
     }
   },
 
-  async removeProject(path: string): Promise<void> {
-    await request()?.removeProject({ path });
+  async renameProject(path: string, name: string): Promise<{ ok: boolean; project?: Project; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.renameProject({ path, name });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async removeProject(path: string, deleteFiles = false): Promise<void> {
+    await request()?.removeProject({ path, deleteFiles });
   },
 
   async listForms(): Promise<FormFolder[]> {
@@ -216,5 +227,19 @@ export const api = {
 
   async saveLayout(projectSlug: string, layout: ProjectLayout): Promise<void> {
     await request()?.saveLayout({ projectSlug, layout });
+  },
+
+  async getAISettings(): Promise<AISettings> {
+    const r = request();
+    if (!r) return { ollamaBaseUrl: "http://localhost:11434" };
+    try {
+      return await r.getAISettings({});
+    } catch {
+      return { ollamaBaseUrl: "http://localhost:11434" };
+    }
+  },
+
+  async saveAISettings(settings: AISettings): Promise<void> {
+    await request()?.saveAISettings(settings);
   },
 };

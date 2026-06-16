@@ -3,13 +3,15 @@ import { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import SidebarFooter from "./SidebarFooter";
 import SidebarProject from "./SidebarProject";
+import SidebarProjectSettings from "./SidebarProjectSettings";
 
 export default function Sidebar() {
-  const { forms, projects, runs, activeProject, setActiveProject, createProject } = useApp();
+  const { forms, projects, projectMeta, runs, activeProject, setActiveProject, createProject } = useApp();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [path, setPath] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [editingPath, setEditingPath] = useState<string | null>(null);
 
   const submitNewProject = async () => {
     const trimmed = name.trim();
@@ -51,6 +53,13 @@ export default function Sidebar() {
     }
     return map;
   }, [runs, slugToProject]);
+
+  // Map registered project names to their folder paths (for rename/delete).
+  const nameToPath = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of projectMeta) m.set(p.name, p.path);
+    return m;
+  }, [projectMeta]);
 
   return (
     <aside className="flex w-[250px] shrink-0 flex-col p-2.5">
@@ -114,15 +123,22 @@ export default function Sidebar() {
             const c = counts.get(project);
             const badgeCount = c ? c.active || c.error : 0;
             const badgeColor = c && c.active > 0 ? "green" : "red";
+            const projectPath = nameToPath.get(project) ?? null;
             return (
-              <SidebarProject
-                key={project}
-                name={project}
-                active={activeProject === project}
-                badgeCount={badgeCount}
-                badgeColor={badgeColor}
-                onClick={() => setActiveProject(activeProject === project ? null : project)}
-              />
+              <div key={project}>
+                <SidebarProject
+                  name={project}
+                  active={activeProject === project}
+                  badgeCount={badgeCount}
+                  badgeColor={badgeColor}
+                  canEdit={projectPath !== null}
+                  onClick={() => setActiveProject(activeProject === project ? null : project)}
+                  onOpenSettings={() => setEditingPath((cur) => (cur === projectPath ? null : projectPath))}
+                />
+                {projectPath !== null && editingPath === projectPath && (
+                  <SidebarProjectSettings path={projectPath} name={project} onClose={() => setEditingPath(null)} />
+                )}
+              </div>
             );
           })}
         </nav>

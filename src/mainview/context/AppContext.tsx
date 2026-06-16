@@ -14,6 +14,7 @@ interface AppState {
   forms: FormFolder[];
   formsBySlug: Map<string, FormFolder>;
   projects: string[];
+  projectMeta: Project[];
   runs: RunRecord[];
   chunks: Record<string, OutputChunk[]>;
   drafts: DraftCard[];
@@ -23,18 +24,23 @@ interface AppState {
   sidebarOpen: boolean;
   viewMode: ViewMode;
   selectorOpen: boolean;
+  settingsOpen: boolean;
 
   setActiveProject: (p: string | null) => void;
   toggleSidebar: () => void;
   setViewMode: (m: ViewMode) => void;
   openSelector: () => void;
   closeSelector: () => void;
+  openSettings: () => void;
+  closeSettings: () => void;
 
   addFormDraft: (formSlug: string) => void;
   addNewFormDraft: () => void;
   removeDraft: (id: string) => void;
 
   createProject: (name: string, path?: string) => Promise<{ ok: boolean; error?: string }>;
+  renameProject: (path: string, name: string) => Promise<{ ok: boolean; error?: string }>;
+  deleteProject: (path: string, deleteFiles?: boolean) => Promise<void>;
 
   submitRun: (formSlug: string, inputs: Record<string, unknown>) => Promise<void>;
   scheduleRun: (
@@ -72,6 +78,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const draftSeq = useRef(0);
 
@@ -146,6 +153,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const toggleSidebar = useCallback(() => setSidebarOpen((s) => !s), []);
   const openSelector = useCallback(() => setSelectorOpen(true), []);
   const closeSelector = useCallback(() => setSelectorOpen(false), []);
+  const openSettings = useCallback(() => setSettingsOpen(true), []);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
   const removeDraft = useCallback((id: string) => {
     setDrafts((prev) => prev.filter((d) => d.id !== id));
@@ -174,6 +183,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { ok: res.ok, error: res.error };
     },
     [refreshProjects],
+  );
+
+  const renameProject = useCallback(
+    async (path: string, name: string) => {
+      const res = await api.renameProject(path, name);
+      if (res.ok) {
+        await refreshProjects();
+        await refreshForms();
+        if (res.project) {
+          setActiveProject((cur) => {
+            const old = projectList.find((p) => p.path === path)?.name;
+            return cur && cur === old ? res.project!.name : cur;
+          });
+        }
+      }
+      return { ok: res.ok, error: res.error };
+    },
+    [refreshProjects, refreshForms, projectList],
+  );
+
+  const deleteProject = useCallback(
+    async (path: string, deleteFiles = false) => {
+      const removed = projectList.find((p) => p.path === path);
+      await api.removeProject(path, deleteFiles);
+      await refreshProjects();
+      await refreshForms();
+      await refreshRuns();
+      setActiveProject((cur) => (cur && removed && cur === removed.name ? null : cur));
+    },
+    [projectList, refreshProjects, refreshForms, refreshRuns],
   );
 
   const submitRun = useCallback(async (formSlug: string, inputs: Record<string, unknown>) => {
@@ -229,6 +268,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     forms,
     formsBySlug,
     projects,
+    projectMeta: projectList,
     runs,
     chunks,
     drafts,
@@ -237,15 +277,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     sidebarOpen,
     viewMode,
     selectorOpen,
+    settingsOpen,
     setActiveProject,
     toggleSidebar,
     setViewMode,
     openSelector,
     closeSelector,
+    openSettings,
+    closeSettings,
     addFormDraft,
     addNewFormDraft,
     removeDraft,
     createProject,
+    renameProject,
+    deleteProject,
     submitRun,
     scheduleRun,
     cancelRun,

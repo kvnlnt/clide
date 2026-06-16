@@ -83,7 +83,7 @@ export default function TableOutput({ text, maxHeight }: TableOutputProps) {
   return (
     <div className="clide-scroll overflow-auto" style={maxHeight ? { maxHeight } : undefined}>
       <table className="w-full border-collapse text-[13px]">
-        <thead className="sticky top-0 bg-clide-panel">
+        <thead className="sticky top-0 bg-clide-bg">
           <tr>
             {data.columns.map((col, i) => (
               <th

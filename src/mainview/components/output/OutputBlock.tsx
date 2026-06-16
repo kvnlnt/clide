@@ -110,7 +110,7 @@ export default function OutputBlock({ runId, outputType, status, chunks }: Outpu
   }
 
   return (
-    <div className="overflow-hidden rounded-[5px] border border-clide-border bg-clide-surface">
+    <div className="overflow-hidden rounded-[5px] border border-clide-border bg-clide-bg">
       <OutputToolbar
         label={label}
         expanded={expanded}

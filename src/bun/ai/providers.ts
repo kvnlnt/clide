@@ -1,5 +1,6 @@
 import type { AIProvider } from "../../shared/types";
 import { DEFAULT_MODEL } from "../../shared/types";
+import { getOllamaBaseUrl } from "./aiSettings";
 import { getCredential } from "./credentials";
 
 export interface CompletionRequest {
@@ -83,7 +84,8 @@ async function completeOpenAI(req: CompletionRequest, model: string): Promise<st
 }
 
 async function completeOllama(req: CompletionRequest, model: string): Promise<string> {
-  const res = await fetch("http://localhost:11434/api/generate", {
+  const baseUrl = await getOllamaBaseUrl();
+  const res = await fetch(`${baseUrl}/api/generate`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({

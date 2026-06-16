@@ -1,12 +1,13 @@
 import FormSelector from "./components/FormSelector";
 import GridView from "./components/GridView";
+import SettingsPanel from "./components/SettingsPanel";
 import Sidebar from "./components/Sidebar";
 import Thread from "./components/Thread";
 import TopBar from "./components/TopBar";
 import { AppProvider, useApp } from "./context/AppContext";
 
 function Workspace() {
-  const { sidebarOpen, viewMode, selectorOpen } = useApp();
+  const { sidebarOpen, viewMode, selectorOpen, settingsOpen, closeSettings } = useApp();
 
   return (
     <div className="flex h-screen bg-clide-bg text-white">
@@ -15,6 +16,7 @@ function Workspace() {
         <TopBar />
         {viewMode === "list" ? <Thread /> : <GridView />}
         {selectorOpen && <FormSelector />}
+        {settingsOpen && <SettingsPanel onClose={closeSettings} />}
       </div>
     </div>
   );

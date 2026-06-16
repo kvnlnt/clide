@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { basename, isAbsolute, join } from "node:path";
 import type { Project } from "../shared/types";
 import { appDataDir, defaultProjectsDir, ensureDir, ensureProjectDirs, projectsRegistryPath } from "./paths";
@@ -15,10 +15,10 @@ function isValid(p: unknown): p is Project {
   );
 }
 
-function uniqueName(base: string): string {
+function uniqueName(base: string, exclude?: string): string {
   let name = base || "Project";
   let i = 2;
-  while (projects.some((p) => p.name === name)) {
+  while (projects.some((p) => p.name === name && p.path !== exclude)) {
     name = `${base} (${i++})`;
   }
   return name;
@@ -85,10 +85,30 @@ export async function addProject(name: string, path?: string): Promise<Project> 
   return project;
 }
 
-export async function removeProject(path: string): Promise<void> {
+export async function removeProject(path: string, deleteFiles = false): Promise<void> {
   if (!loaded) await loadProjects();
   projects = projects.filter((p) => p.path !== path);
   await save();
+  if (deleteFiles) {
+    try {
+      rmSync(path, { recursive: true, force: true });
+    } catch (err) {
+      console.warn(`[projects] Failed to delete files for ${path}:`, err);
+    }
+  }
+}
+
+/** Rename a project's display name (the on-disk folder path is unchanged). */
+export async function renameProject(path: string, newName: string): Promise<Project> {
+  if (!loaded) await loadProjects();
+  const trimmed = newName.trim();
+  if (!trimmed) throw new Error("Project name cannot be empty.");
+  const target = projects.find((p) => p.path === path);
+  if (!target) throw new Error("Project not found.");
+  target.name = uniqueName(trimmed, path);
+  projects = [...projects];
+  await save();
+  return target;
 }
 
 export async function resolveProjectByName(name: string): Promise<Project | null> {

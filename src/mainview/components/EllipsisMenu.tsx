@@ -1,6 +1,7 @@
 import { Ellipsis } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import FormCardMenu from "./FormCardMenu";
+import PortalPopover from "./PortalPopover";
 
 interface EllipsisMenuProps {
   pinned: boolean;
@@ -13,9 +14,12 @@ interface EllipsisMenuProps {
 
 export default function EllipsisMenu({ pinned, onPin, onSchedule, onRerun, onDelete, size = 16 }: EllipsisMenuProps) {
   const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
   return (
-    <div className="relative">
+    <>
       <button
+        ref={buttonRef}
         className="text-white/40 transition-colors hover:text-white"
         onClick={(e) => {
           e.stopPropagation();
@@ -24,7 +28,12 @@ export default function EllipsisMenu({ pinned, onPin, onSchedule, onRerun, onDel
       >
         <Ellipsis size={size} />
       </button>
-      {open && (
+      <PortalPopover
+        open={open}
+        anchorRef={buttonRef}
+        onClose={() => setOpen(false)}
+        className="w-40 overflow-hidden rounded-md border border-clide-border bg-clide-panel py-1 shadow-xl"
+      >
         <FormCardMenu
           pinned={pinned}
           onPin={onPin}
@@ -33,7 +42,7 @@ export default function EllipsisMenu({ pinned, onPin, onSchedule, onRerun, onDel
           onDelete={onDelete}
           onClose={() => setOpen(false)}
         />
-      )}
-    </div>
+      </PortalPopover>
+    </>
   );
 }

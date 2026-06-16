@@ -10,7 +10,7 @@ interface OutputToolbarProps {
 
 export default function OutputToolbar({ label, expanded, onToggleExpand, onCopy, onOpenExternal }: OutputToolbarProps) {
   return (
-    <div className="flex items-center justify-between border-b border-clide-border px-3 py-1.5">
+    <div className="flex items-center justify-between border-b border-clide-border bg-clide-bg px-3 py-1.5">
       <span className="text-[11px] uppercase tracking-wide text-clide-muted">{label}</span>
       <div className="flex items-center gap-2 text-white/40">
         {onCopy && (

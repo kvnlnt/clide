@@ -1,9 +1,18 @@
 import { ApplicationMenu, BrowserView, BrowserWindow, Updater } from "electrobun/bun";
 import { extname } from "node:path";
 import type { ClideRPC, OutputChunk, Project, RunStatusUpdate } from "../shared/types";
+import { loadAISettings, saveAISettings as persistAISettings } from "./ai/aiSettings";
 import { hasCredential, saveCredential } from "./ai/credentials";
 import { generateForm, runDependencyCheck } from "./ai/formGenerator";
-import { addProject, listProjects, loadProjects, projectPaths, removeProject, resolveProjectByName } from "./config";
+import {
+  addProject,
+  listProjects,
+  loadProjects,
+  projectPaths,
+  removeProject,
+  renameProject,
+  resolveProjectByName,
+} from "./config";
 import { deleteRun as dbDeleteRun, getAllRuns, getRun, getRunHistory, indexRuns, setPinned } from "./db/history";
 import { readLayout, writeLayout } from "./forms/layout";
 import { listForms, loadFormFolder, resolveFormProject } from "./forms/loader";
@@ -125,7 +134,7 @@ async function readOutputFile(runId: string): Promise<{ mime: string; base64: st
 // RPC definition.
 // ---------------------------------------------------------------------------
 const rpc = BrowserView.defineRPC<ClideRPC>({
-  maxRequestTime: 120_000,
+  maxRequestTime: 600_000,
   handlers: {
     requests: {
       listProjects: async () => await listProjects(),
@@ -140,8 +149,19 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
-      removeProject: async ({ path }) => {
-        await removeProject(path);
+      renameProject: async ({ path, name }) => {
+        try {
+          const project = await renameProject(path, name);
+          await pushProjectsChanged();
+          await pushFormsChanged();
+          return { ok: true, project };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      removeProject: async ({ path, deleteFiles }) => {
+        await removeProject(path, deleteFiles === true);
         await pushProjectsChanged();
         await pushFormsChanged();
       },
@@ -233,6 +253,12 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         const project = await pathForProjectName(projectSlug);
         if (!project) return;
         await writeLayout(project.path, projectSlug, layout);
+      },
+
+      getAISettings: async () => await loadAISettings(),
+
+      saveAISettings: async (settings) => {
+        await persistAISettings(settings);
       },
     },
     messages: {

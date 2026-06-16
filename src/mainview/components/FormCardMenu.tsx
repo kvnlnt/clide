@@ -1,5 +1,4 @@
 import { AlarmClock, Pin, RotateCw, Trash2 } from "lucide-react";
-import { useEffect, useRef } from "react";
 
 interface FormCardMenuProps {
   pinned: boolean;
@@ -11,23 +10,10 @@ interface FormCardMenuProps {
 }
 
 export default function FormCardMenu({ pinned, onPin, onSchedule, onRerun, onDelete, onClose }: FormCardMenuProps) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
-
   const item = "flex w-full items-center gap-2 px-3 py-1.5 text-[13px] text-white/80 hover:bg-white/5 text-left";
 
   return (
-    <div
-      ref={ref}
-      className="absolute right-0 top-6 z-30 w-40 overflow-hidden rounded-md border border-clide-border bg-clide-panel py-1 shadow-xl"
-    >
+    <div>
       <button
         className={item}
         onClick={() => {
