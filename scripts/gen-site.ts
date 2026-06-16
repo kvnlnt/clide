@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * scripts/gen-site.ts
- * Generates the CLIDE marketing website into the www/ folder.
+ * Generates the CLIDE marketing website into the docs/ folder.
  * Run with: bun run gen:site
  */
 
@@ -772,7 +772,7 @@ function buildHtml(): string {
 // ---------------------------------------------------------------------------
 // Write output
 // ---------------------------------------------------------------------------
-const outDir = join(import.meta.dir, "..", "www");
+const outDir = join(import.meta.dir, "..", "docs");
 await mkdir(outDir, { recursive: true });
 
 const files: { name: string; content: string }[] = [

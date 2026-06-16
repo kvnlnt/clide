@@ -69,7 +69,7 @@ When you run `bun run dev` (without HMR):
 The marketing website is generated from a self-contained script:
 
 ```bash
-# Generate the static site into www/
+# Generate the static site into docs/
 bun run gen:site
 
 # Open the generated site
