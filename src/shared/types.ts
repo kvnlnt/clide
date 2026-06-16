@@ -4,11 +4,30 @@ import type { RPCSchema } from "electrobun/bun";
 // Domain types — shared between the Bun main process and the React renderer.
 // ---------------------------------------------------------------------------
 
-export type FieldType = "text" | "textarea" | "select" | "multicheck" | "number" | "file" | "date";
+export type FieldType =
+  | "text"
+  | "textarea"
+  | "select"
+  | "multicheck"
+  | "number"
+  | "file"
+  | "date";
 
-export type OutputType = "text" | "table" | "image" | "audio" | "video" | "json";
+export type OutputType =
+  | "text"
+  | "table"
+  | "image"
+  | "audio"
+  | "video"
+  | "json";
 
-export type RunStatus = "idle" | "pending" | "running" | "success" | "error" | "scheduled";
+export type RunStatus =
+  | "idle"
+  | "pending"
+  | "running"
+  | "success"
+  | "error"
+  | "scheduled";
 
 export type Interpreter = "bash" | "python3" | "node" | "bun";
 
@@ -115,9 +134,21 @@ export interface CreateFormInput {
 
 /** Suggested models per provider (users may also type a custom model name). */
 export const AI_MODELS: Record<AIProvider, string[]> = {
-  claude: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest", "claude-3-opus-latest"],
+  claude: [
+    "claude-3-5-sonnet-latest",
+    "claude-3-5-haiku-latest",
+    "claude-3-opus-latest",
+  ],
   openai: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
-  ollama: ["llama3.1", "llama3.2", "mistral", "qwen2.5", "qwen2.5-coder", "codellama", "deepseek-r1"],
+  ollama: [
+    "llama3.1",
+    "llama3.2",
+    "mistral",
+    "qwen2.5",
+    "qwen2.5-coder",
+    "codellama",
+    "deepseek-r1",
+  ],
 };
 
 export interface AISettings {
@@ -171,7 +202,10 @@ export type ClideRPC = {
         params: { path: string; name: string };
         response: { ok: boolean; project?: Project; error?: string };
       };
-      removeProject: { params: { path: string; deleteFiles?: boolean }; response: void };
+      removeProject: {
+        params: { path: string; deleteFiles?: boolean };
+        response: void;
+      };
       listForms: { params: Record<string, never>; response: FormFolder[] };
       getRunHistory: {
         params: { formSlug: string; limit: number };
@@ -215,6 +249,10 @@ export type ClideRPC = {
       };
       getAISettings: { params: Record<string, never>; response: AISettings };
       saveAISettings: { params: AISettings; response: void };
+      chooseDirectory: {
+        params: { startingFolder?: string };
+        response: { path: string | null };
+      };
     };
     messages: {
       logToBun: { msg: string };

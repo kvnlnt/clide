@@ -37,7 +37,10 @@ function emit<K extends keyof EventMap>(key: K, payload: EventMap[K]): void {
   for (const l of listeners[key]) l(payload);
 }
 
-export function on<K extends keyof EventMap>(key: K, listener: Listener<K>): () => void {
+export function on<K extends keyof EventMap>(
+  key: K,
+  listener: Listener<K>,
+): () => void {
   listeners[key].add(listener);
   return () => listeners[key].delete(listener);
 }
@@ -61,7 +64,10 @@ let electroview: Electroview<typeof rpcDef> | null = null;
 try {
   electroview = new Electroview({ rpc: rpcDef });
 } catch (err) {
-  console.warn("[rpc] Electroview unavailable (running outside Electrobun?)", err);
+  console.warn(
+    "[rpc] Electroview unavailable (running outside Electrobun?)",
+    err,
+  );
 }
 
 function request(): typeof rpcDef.request | null {
@@ -83,7 +89,10 @@ export const api = {
     }
   },
 
-  async addProject(name: string, path?: string): Promise<{ ok: boolean; project?: Project; error?: string }> {
+  async addProject(
+    name: string,
+    path?: string,
+  ): Promise<{ ok: boolean; project?: Project; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
@@ -93,7 +102,10 @@ export const api = {
     }
   },
 
-  async renameProject(path: string, name: string): Promise<{ ok: boolean; project?: Project; error?: string }> {
+  async renameProject(
+    path: string,
+    name: string,
+  ): Promise<{ ok: boolean; project?: Project; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
@@ -137,7 +149,10 @@ export const api = {
     }
   },
 
-  async runForm(formSlug: string, inputs: Record<string, unknown>): Promise<string | null> {
+  async runForm(
+    formSlug: string,
+    inputs: Record<string, unknown>,
+  ): Promise<string | null> {
     const r = request();
     if (!r) return null;
     try {
@@ -152,7 +167,9 @@ export const api = {
     await request()?.cancelRun({ runId });
   },
 
-  async readOutputFile(runId: string): Promise<{ mime: string; base64: string } | null> {
+  async readOutputFile(
+    runId: string,
+  ): Promise<{ mime: string; base64: string } | null> {
     const r = request();
     if (!r) return null;
     try {
@@ -241,5 +258,16 @@ export const api = {
 
   async saveAISettings(settings: AISettings): Promise<void> {
     await request()?.saveAISettings(settings);
+  },
+
+  async chooseDirectory(startingFolder?: string): Promise<string | null> {
+    const r = request();
+    if (!r) return null;
+    try {
+      const res = await r.chooseDirectory({ startingFolder });
+      return res.path;
+    } catch {
+      return null;
+    }
   },
 };

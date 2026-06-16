@@ -1,4 +1,5 @@
 import { useApp } from "../context/AppContext";
+import type { RunGroup } from "../hooks/useThread";
 import { useThread } from "../hooks/useThread";
 import type { RunRecord } from "../types/forms";
 import FormCard from "./FormCard";
@@ -24,23 +25,26 @@ export default function Thread() {
 
   const isEmpty = drafts.length === 0 && visibleRuns.length === 0;
 
-  const renderRun = (run: RunRecord) => {
-    const folder = formsBySlug.get(run.formSlug);
+  const renderGroup = (group: RunGroup) => {
+    const folder = formsBySlug.get(group.formSlug);
     if (!folder) return null;
+    const latestRun = group.runs[0];
     return (
       <FormCard
-        key={run.id}
-        run={run}
+        key={group.key}
+        runs={group.runs}
         form={folder.form}
         meta={folder.meta}
         outputType={folder.form.outputType}
-        chunks={chunks[run.id] ?? []}
-        onSubmit={(values) => void submitRun(run.formSlug, values)}
-        onCancel={() => void cancelRun(run.id)}
-        onSchedule={(values, at, repeat) => void scheduleRun(run.formSlug, values, at, repeat)}
-        onPin={() => void setPinned(run.id, !run.pinned)}
-        onDelete={() => void deleteRun(run.id)}
-        onRerun={() => void rerun(run)}
+        chunks={chunks}
+        onSubmit={(values) => void submitRun(group.formSlug, values)}
+        onCancel={() => void cancelRun(latestRun.id)}
+        onSchedule={(values, at, repeat) =>
+          void scheduleRun(group.formSlug, values, at, repeat)
+        }
+        onPin={() => void setPinned(latestRun.id, !latestRun.pinned)}
+        onDelete={(runId) => void deleteRun(runId)}
+        onRerun={() => void rerun(latestRun)}
       />
     );
   };
@@ -56,9 +60,17 @@ export default function Thread() {
           <>
             {drafts.map((draft) => {
               if (draft.kind === "new-form") {
-                return <NewFormCard key={draft.id} draftId={draft.id} defaultProject={activeProject ?? ""} />;
+                return (
+                  <NewFormCard
+                    key={draft.id}
+                    draftId={draft.id}
+                    defaultProject={activeProject ?? ""}
+                  />
+                );
               }
-              const folder = draft.formSlug ? formsBySlug.get(draft.formSlug) : undefined;
+              const folder = draft.formSlug
+                ? formsBySlug.get(draft.formSlug)
+                : undefined;
               if (!folder || !draft.formSlug) return null;
               const slug = draft.formSlug;
               const synthetic: RunRecord = {
@@ -77,7 +89,7 @@ export default function Thread() {
               return (
                 <FormCard
                   key={draft.id}
-                  run={synthetic}
+                  runs={[synthetic]}
                   form={folder.form}
                   meta={folder.meta}
                   defaultExpanded
@@ -101,7 +113,7 @@ export default function Thread() {
             {groups.map((group) => (
               <div key={group.label} className="flex flex-col gap-2">
                 <ThreadDateGroup label={group.label} />
-                {group.runs.map(renderRun)}
+                {group.items.map(renderGroup)}
               </div>
             ))}
           </>

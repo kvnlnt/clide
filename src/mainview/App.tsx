@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import FormSelector from "./components/FormSelector";
 import GridView from "./components/GridView";
 import SettingsPanel from "./components/SettingsPanel";
@@ -7,7 +8,25 @@ import TopBar from "./components/TopBar";
 import { AppProvider, useApp } from "./context/AppContext";
 
 function Workspace() {
-  const { sidebarOpen, viewMode, selectorOpen, settingsOpen, closeSettings } = useApp();
+  const {
+    sidebarOpen,
+    viewMode,
+    selectorOpen,
+    settingsOpen,
+    closeSettings,
+    openSelector,
+  } = useApp();
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        openSelector();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [openSelector]);
 
   return (
     <div className="flex h-screen bg-clide-bg text-white">

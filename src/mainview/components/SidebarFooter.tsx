@@ -1,4 +1,4 @@
-import { Ellipsis, Headphones } from "lucide-react";
+import { Ellipsis } from "lucide-react";
 import { useApp } from "../context/AppContext";
 
 export default function SidebarFooter() {
@@ -11,10 +11,13 @@ export default function SidebarFooter() {
         </span>
       </div>
       <div className="flex items-center gap-3 text-white/40">
-        <button className="transition-colors hover:text-white">
+        {/* TODO: <button className="transition-colors hover:text-white">
           <Headphones size={18} />
-        </button>
-        <button className="transition-colors hover:text-white" onClick={openSettings}>
+        </button> */}
+        <button
+          className="transition-colors hover:text-white"
+          onClick={openSettings}
+        >
           <Ellipsis size={18} />
         </button>
       </div>

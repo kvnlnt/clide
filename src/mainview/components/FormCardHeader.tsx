@@ -6,6 +6,8 @@ interface FormCardHeaderProps {
   meta: FormMeta;
   form: FormDefinition;
   run: RunRecord;
+  /** When the card represents multiple grouped runs, show a count badge. */
+  runCount?: number;
   summary: string;
   expanded: boolean;
   onToggle?: () => void;
@@ -25,13 +27,17 @@ interface FormCardHeaderProps {
 
 function formatTime(iso: string | null): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export default function FormCardHeader({
   meta,
   form,
   run,
+  runCount,
   summary,
   expanded,
   onToggle,
@@ -67,9 +73,20 @@ export default function FormCardHeader({
         <StatusIcon status={run.status} pinned={pinned} size={18} />
       </span>
 
-      <span className="shrink-0 text-[12px] font-medium text-white">{meta.name}</span>
+      <span className="shrink-0 text-[12px] font-medium text-white">
+        {meta.name}
+      </span>
+      {runCount && runCount > 1 && (
+        <span className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-white/40 bg-white/10">
+          {runCount}
+        </span>
+      )}
 
-      {!expanded && <span className="min-w-0 flex-1 truncate text-[12px] text-clide-muted">{summary}</span>}
+      {!expanded && (
+        <span className="min-w-0 flex-1 truncate text-[12px] text-clide-muted">
+          {summary}
+        </span>
+      )}
 
       {expanded && form.aiPromptField && (
         <input
@@ -83,14 +100,21 @@ export default function FormCardHeader({
       )}
 
       <div className="ml-auto flex items-center gap-3">
-        {!expanded && time && <span className="shrink-0 text-[12px] text-white/40">{time}</span>}
+        {!expanded && time && (
+          <span className="shrink-0 text-[12px] text-white/40">{time}</span>
+        )}
 
         {expanded && showTabs && onTabChange && (
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="flex items-center gap-1"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               type="button"
               className={`rounded-[3px] px-2.5 py-1 text-[12px] font-bold transition-colors ${
-                activeTab === "results" ? "bg-white/10 text-white" : "text-white/50 hover:text-white"
+                activeTab === "results"
+                  ? "bg-white/10 text-white"
+                  : "text-white/50 hover:text-white"
               }`}
               onClick={() => onTabChange("results")}
             >
@@ -99,7 +123,9 @@ export default function FormCardHeader({
             <button
               type="button"
               className={`rounded-[3px] px-2.5 py-1 text-[12px] font-bold transition-colors ${
-                activeTab === "submitted" ? "bg-white/10 text-white" : "text-white/50 hover:text-white"
+                activeTab === "submitted"
+                  ? "bg-white/10 text-white"
+                  : "text-white/50 hover:text-white"
               }`}
               onClick={() => onTabChange("submitted")}
             >
@@ -109,7 +135,13 @@ export default function FormCardHeader({
         )}
 
         <div onClick={(e) => e.stopPropagation()}>
-          <EllipsisMenu pinned={pinned} onPin={onPin} onSchedule={onSchedule} onRerun={onRerun} onDelete={onDelete} />
+          <EllipsisMenu
+            pinned={pinned}
+            onPin={onPin}
+            onSchedule={onSchedule}
+            onRerun={onRerun}
+            onDelete={onDelete}
+          />
         </div>
       </div>
     </div>

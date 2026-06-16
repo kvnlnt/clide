@@ -37,19 +37,22 @@ Each form belongs to exactly one **project**, recorded as a `project` field in `
 
 ## Ticket index
 
-All implementation tickets are complete and archived in [`tickets/done/`](done/).
+Completed implementation tickets are archived in [`tickets/done/`](done/). Open tickets live at the top level of [`tickets/`](.).
 
-| #   | Ticket            | Description                                         | Status  |
-| --- | ----------------- | --------------------------------------------------- | ------- |
-| 01  | App Shell         | Electrobun window, IPC bridge, dev/prod config      | ✅ Done |
-| 02  | Data Layer        | Filesystem watcher, form loader, run history SQLite | ✅ Done |
-| 03  | Sidebar           | Project nav, form lists, badge counts               | ✅ Done |
-| 04  | Top Bar           | Breadcrumb, command input, view toggles             | ✅ Done |
-| 05  | Form Card         | Expanded/collapsed form component, all states       | ✅ Done |
-| 06  | Thread            | Main scrollable thread, grouping, ordering          | ✅ Done |
-| 07  | Execution Engine  | Script runner, streaming output, status FSM         | ✅ Done |
-| 08  | Output Components | Table, image, audio/video, raw text viewers         | ✅ Done |
-| 09  | Form Selector     | Autocomplete command palette for picking forms      | ✅ Done |
-| 10  | New Form Creator  | AI-powered form + script generation flow            | ✅ Done |
-| 11  | Pin & Schedule    | Pin forms, scheduled runs, alarm states             | ✅ Done |
-| 12  | Grid View         | Customizable grid layout alternative to thread      | ✅ Done |
+| #   | Ticket              | Description                                                     | Status  |
+| --- | ------------------- | --------------------------------------------------------------- | ------- |
+| 01  | App Shell           | Electrobun window, IPC bridge, dev/prod config                  | ✅ Done |
+| 02  | Data Layer          | Filesystem watcher, form loader, run history SQLite             | ✅ Done |
+| 03  | Sidebar             | Project nav, form lists, badge counts                           | ✅ Done |
+| 04  | Top Bar             | Breadcrumb, command input, view toggles                         | ✅ Done |
+| 05  | Form Card           | Expanded/collapsed form component, all states                   | ✅ Done |
+| 06  | Thread              | Main scrollable thread, grouping, ordering                      | ✅ Done |
+| 07  | Execution Engine    | Script runner, streaming output, status FSM                     | ✅ Done |
+| 08  | Output Components   | Table, image, audio/video, raw text viewers                     | ✅ Done |
+| 09  | Form Selector       | Autocomplete command palette for picking forms                  | ✅ Done |
+| 10  | New Form Creator    | AI-powered form + script generation flow                        | ✅ Done |
+| 11  | Pin & Schedule      | Pin forms, scheduled runs, alarm states                         | ✅ Done |
+| 12  | Grid View           | Customizable grid layout alternative to thread                  | ✅ Done |
+| 13  | Grouped Submissions | Combine consecutive same-form runs into one card with accordion | ✅ Done |
+| 14  | Project Dir Picker  | Native directory chooser for project creation folder path       | ✅ Done |
+| 15  | Marketing Website   | Auto-generate a basic static site into www/ via a script        | ✅ Done |

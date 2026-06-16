@@ -1,7 +1,21 @@
-import { ApplicationMenu, BrowserView, BrowserWindow, Updater } from "electrobun/bun";
+import {
+  ApplicationMenu,
+  BrowserView,
+  BrowserWindow,
+  Updater,
+  openFileDialog,
+} from "electrobun/bun";
 import { extname } from "node:path";
-import type { ClideRPC, OutputChunk, Project, RunStatusUpdate } from "../shared/types";
-import { loadAISettings, saveAISettings as persistAISettings } from "./ai/aiSettings";
+import type {
+  ClideRPC,
+  OutputChunk,
+  Project,
+  RunStatusUpdate,
+} from "../shared/types";
+import {
+  loadAISettings,
+  saveAISettings as persistAISettings,
+} from "./ai/aiSettings";
 import { hasCredential, saveCredential } from "./ai/credentials";
 import { generateForm, runDependencyCheck } from "./ai/formGenerator";
 import {
@@ -13,7 +27,14 @@ import {
   renameProject,
   resolveProjectByName,
 } from "./config";
-import { deleteRun as dbDeleteRun, getAllRuns, getRun, getRunHistory, indexRuns, setPinned } from "./db/history";
+import {
+  deleteRun as dbDeleteRun,
+  getAllRuns,
+  getRun,
+  getRunHistory,
+  indexRuns,
+  setPinned,
+} from "./db/history";
 import { readLayout, writeLayout } from "./forms/layout";
 import { listForms, loadFormFolder, resolveFormProject } from "./forms/loader";
 import { seedExampleProjects } from "./forms/seed";
@@ -48,7 +69,12 @@ async function projectForSlug(slug: string): Promise<Project | null> {
   const resolved = resolveFormProject(slug);
   if (!resolved) return null;
   const projects = await listProjects();
-  return projects.find((p) => p.path === resolved) ?? { path: resolved, name: resolved };
+  return (
+    projects.find((p) => p.path === resolved) ?? {
+      path: resolved,
+      name: resolved,
+    }
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -58,7 +84,11 @@ let mainWindow: BrowserWindow | null = null;
 
 function sendToView(name: string, payload: unknown): void {
   try {
-    const send = (mainWindow?.webview?.rpc as { send?: Record<string, (p: unknown) => void> } | undefined)?.send;
+    const send = (
+      mainWindow?.webview?.rpc as
+        | { send?: Record<string, (p: unknown) => void> }
+        | undefined
+    )?.send;
     send?.[name]?.(payload);
   } catch (err) {
     console.warn(`[rpc] Failed to send ${name}:`, err);
@@ -99,15 +129,23 @@ const MIME: Record<string, string> = {
   ".webm": "video/webm",
 };
 
-async function readOutputFile(runId: string): Promise<{ mime: string; base64: string } | null> {
+async function readOutputFile(
+  runId: string,
+): Promise<{ mime: string; base64: string } | null> {
   const run = getRun(runId);
   if (!run || !run.outputPath) return null;
   const project = await projectForSlug(run.formSlug);
-  const folder = project ? await loadFormFolder(project.path, run.formSlug, project.name) : null;
+  const folder = project
+    ? await loadFormFolder(project.path, run.formSlug, project.name)
+    : null;
   const outputType = folder?.form.outputType ?? "text";
 
   try {
-    if (outputType === "image" || outputType === "audio" || outputType === "video") {
+    if (
+      outputType === "image" ||
+      outputType === "audio" ||
+      outputType === "video"
+    ) {
       // The captured output contains the file path printed by the script.
       const printed = (await Bun.file(run.outputPath).text()).trim();
       const path = printed.split("\n").pop()?.trim() ?? printed;
@@ -184,7 +222,13 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
       runForm: async ({ formSlug, inputs }) => {
         const project = await projectForSlug(formSlug);
         if (!project) throw new Error(`Form not found: ${formSlug}`);
-        return await startRun(project.path, project.name, formSlug, inputs, emitters);
+        return await startRun(
+          project.path,
+          project.name,
+          formSlug,
+          inputs,
+          emitters,
+        );
       },
 
       cancelRun: ({ runId }) => {
@@ -208,7 +252,9 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
             };
           }
           // Resolve (or create) the destination project folder.
-          const project = (await resolveProjectByName(input.project)) ?? (await addProject(input.project));
+          const project =
+            (await resolveProjectByName(input.project)) ??
+            (await addProject(input.project));
           const generated = await generateForm(input);
           const missing = await runDependencyCheck(generated);
           if (missing) {
@@ -236,10 +282,21 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         dbDeleteRun(runId);
       },
 
-      scheduleRun: async ({ formSlug, inputs, scheduledAt, repeatInterval }) => {
+      scheduleRun: async ({
+        formSlug,
+        inputs,
+        scheduledAt,
+        repeatInterval,
+      }) => {
         const project = await projectForSlug(formSlug);
         if (!project) throw new Error(`Form not found: ${formSlug}`);
-        const runId = schedule(project.path, formSlug, inputs, scheduledAt, repeatInterval);
+        const runId = schedule(
+          project.path,
+          formSlug,
+          inputs,
+          scheduledAt,
+          repeatInterval,
+        );
         return { runId };
       },
 
@@ -260,6 +317,17 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
       saveAISettings: async (settings) => {
         await persistAISettings(settings);
       },
+
+      chooseDirectory: async ({ startingFolder }) => {
+        const paths = await openFileDialog({
+          startingFolder: startingFolder ?? "~/",
+          canChooseDirectory: true,
+          canChooseFiles: false,
+          allowsMultipleSelection: false,
+        });
+        const first = paths.find((p) => p.trim().length > 0) ?? null;
+        return { path: first };
+      },
     },
     messages: {
       logToBun: ({ msg }) => console.log("[view]", msg),
@@ -273,7 +341,8 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
 await initScheduler((projectPath, runId, formSlug, inputs) => {
   void (async () => {
     const projects = await listProjects();
-    const name = projects.find((p) => p.path === projectPath)?.name ?? projectPath;
+    const name =
+      projects.find((p) => p.path === projectPath)?.name ?? projectPath;
     void startRun(projectPath, name, formSlug, inputs, emitters, runId);
   })();
 });
@@ -289,7 +358,9 @@ async function getMainViewUrl(): Promise<string> {
       console.log(`HMR enabled: Using Vite dev server at ${DEV_SERVER_URL}`);
       return DEV_SERVER_URL;
     } catch {
-      console.log("Vite dev server not running. Run 'bun run dev:hmr' for HMR support.");
+      console.log(
+        "Vite dev server not running. Run 'bun run dev:hmr' for HMR support.",
+      );
     }
   }
   return "views://mainview/index.html";
@@ -298,7 +369,11 @@ async function getMainViewUrl(): Promise<string> {
 ApplicationMenu.setApplicationMenu([
   {
     label: "CLIDE",
-    submenu: [{ label: "About CLIDE", role: "showHelp" }, { type: "separator" }, { label: "Quit CLIDE", role: "quit" }],
+    submenu: [
+      { label: "About CLIDE", role: "showHelp" },
+      { type: "separator" },
+      { label: "Quit CLIDE", role: "quit" },
+    ],
   },
   {
     label: "Edit",
