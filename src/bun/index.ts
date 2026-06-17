@@ -5,7 +5,7 @@ import {
   Updater,
   Utils,
 } from "electrobun/bun";
-import { extname } from "node:path";
+import { extname, join } from "node:path";
 import type {
   ClideRPC,
   OutputChunk,
@@ -40,6 +40,7 @@ import { listForms, loadFormFolder, resolveFormProject } from "./forms/loader";
 import { seedExampleProjects } from "./forms/seed";
 import { watchForms } from "./forms/watcher";
 import { writeForm } from "./forms/writer";
+import { formDir } from "./paths";
 import { cancelRun, startRun, type RunEmitters } from "./runner/execute";
 import { disposeScheduler, initScheduler, schedule } from "./scheduler";
 
@@ -168,6 +169,23 @@ async function readOutputFile(
   }
 }
 
+async function readFormScript(
+  formSlug: string,
+): Promise<{ script: string; extension: string } | null> {
+  const project = await projectForSlug(formSlug);
+  if (!project) return null;
+  const folder = await loadFormFolder(project.path, formSlug, project.name);
+  if (!folder) return null;
+  try {
+    const scriptPath = join(formDir(project.path, formSlug), folder.form.scriptFile);
+    const script = await Bun.file(scriptPath).text();
+    const extension = extname(folder.form.scriptFile).replace(/^\./, "");
+    return { script, extension };
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // RPC definition.
 // ---------------------------------------------------------------------------
@@ -236,6 +254,8 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
       },
 
       readOutputFile: async ({ runId }) => await readOutputFile(runId),
+
+      getFormScript: async ({ formSlug }) => await readFormScript(formSlug),
 
       saveCredentials: async ({ provider, key }) => {
         await saveCredential(provider, key);
@@ -327,6 +347,11 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         });
         const first = paths.find((p) => p.trim().length > 0) ?? null;
         return { path: first };
+      },
+
+      openFolder: async ({ path }) => {
+        const ok = Utils.openPath(path);
+        return { ok };
       },
     },
     messages: {

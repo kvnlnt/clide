@@ -1,6 +1,13 @@
+import { Code, LucideFile, Upload } from "lucide-react";
 import type { FormDefinition, FormMeta, RunRecord } from "../types/forms";
 import EllipsisMenu from "./EllipsisMenu";
 import StatusIcon from "./statusIcon";
+
+const TABS = [
+  { id: "results", label: "Results", icon: LucideFile },
+  { id: "submitted", label: "Submitted", icon: Upload },
+  { id: "code", label: "Code", icon: Code },
+] as const;
 
 interface FormCardHeaderProps {
   meta: FormMeta;
@@ -21,8 +28,8 @@ interface FormCardHeaderProps {
   onDelete: () => void;
   onUndo: () => void;
   showTabs?: boolean;
-  activeTab?: "results" | "submitted";
-  onTabChange?: (tab: "results" | "submitted") => void;
+  activeTab?: "results" | "submitted" | "code";
+  onTabChange?: (tab: "results" | "submitted" | "code") => void;
 }
 
 function formatTime(iso: string | null): string {
@@ -70,7 +77,7 @@ export default function FormCardHeader({
       onClick={onToggle}
     >
       <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-        <StatusIcon status={run.status} pinned={pinned} size={18} />
+        <StatusIcon status={run.status} pinned={pinned} mode="dot" />
       </span>
 
       <span className="shrink-0 text-[12px] font-medium text-white">
@@ -109,28 +116,22 @@ export default function FormCardHeader({
             className="flex items-center gap-1"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              type="button"
-              className={`rounded-[3px] px-2.5 py-1 text-[12px] font-bold transition-colors ${
-                activeTab === "results"
-                  ? "bg-white/10 text-white"
-                  : "text-white/50 hover:text-white"
-              }`}
-              onClick={() => onTabChange("results")}
-            >
-              Results
-            </button>
-            <button
-              type="button"
-              className={`rounded-[3px] px-2.5 py-1 text-[12px] font-bold transition-colors ${
-                activeTab === "submitted"
-                  ? "bg-white/10 text-white"
-                  : "text-white/50 hover:text-white"
-              }`}
-              onClick={() => onTabChange("submitted")}
-            >
-              Submitted
-            </button>
+            {TABS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                title={label}
+                aria-label={label}
+                className={`flex items-center rounded-[3px] p-1.5 transition-colors ${
+                  activeTab === id
+                    ? "bg-white/10 text-white"
+                    : "text-white/50 hover:text-white"
+                }`}
+                onClick={() => onTabChange(id)}
+              >
+                <Icon size={14} />
+              </button>
+            ))}
           </div>
         )}
 

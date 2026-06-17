@@ -1,4 +1,4 @@
-import { Folder, Plus } from "lucide-react";
+import { FolderOpen, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
@@ -23,21 +23,36 @@ export default function Sidebar() {
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [browsing, setBrowsing] = useState(false);
 
+  const resetForm = () => {
+    setName("");
+    setPath("");
+    setError(null);
+    setAdding(false);
+  };
+
   const submitNewProject = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
       setError("Name required");
       return;
     }
-    const res = await createProject(trimmed, path.trim() || undefined);
+    if (!path) {
+      setError("Choose a folder");
+      return;
+    }
+    const res = await createProject(trimmed, path);
     if (res.ok) {
-      setName("");
-      setPath("");
-      setError(null);
-      setAdding(false);
+      resetForm();
     } else {
       setError(res.error ?? "Failed to create project");
     }
+  };
+
+  const chooseFolder = async () => {
+    setBrowsing(true);
+    const picked = await api.chooseDirectory(path || undefined);
+    setBrowsing(false);
+    if (picked) setPath(picked);
   };
 
   // Map each form slug to its project so we can attribute runs to projects.
@@ -99,49 +114,65 @@ export default function Sidebar() {
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") void submitNewProject();
-                if (e.key === "Escape") setAdding(false);
+                if (e.key === "Escape") resetForm();
               }}
               placeholder="Project name"
               className="rounded-md border border-clide-border bg-clide-surface px-2 py-1 text-[13px] text-white placeholder:text-white/30 focus:border-white/30 focus:outline-none"
             />
-            <div className="flex items-center gap-1">
-              <input
-                value={path}
-                onChange={(e) => setPath(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void submitNewProject();
-                  if (e.key === "Escape") setAdding(false);
-                }}
-                placeholder="Folder path (optional)"
-                className="min-w-0 flex-1 rounded-md border border-clide-border bg-clide-surface px-2 py-1 text-[12px] text-white placeholder:text-white/30 focus:border-white/30 focus:outline-none"
-              />
+
+            {path ? (
+              <div className="flex items-center gap-1.5 rounded-md border border-clide-border bg-clide-surface px-2 py-1">
+                <FolderOpen size={13} className="shrink-0 text-white/40" />
+                <div className="min-w-0 flex-1 leading-tight">
+                  <div className="truncate text-[12px] text-white" title={path}>
+                    {path.split("/").filter(Boolean).pop() ?? path}
+                  </div>
+                  <div className="truncate text-[11px] text-white/30" title={path}>
+                    {path}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={browsing}
+                  onClick={() => void chooseFolder()}
+                  className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-40"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
                 disabled={browsing}
-                onClick={async () => {
-                  setBrowsing(true);
-                  const picked = await api.chooseDirectory(
-                    path.trim() || undefined,
-                  );
-                  setBrowsing(false);
-                  if (picked) setPath(picked);
-                }}
-                className="shrink-0 flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[12px] text-white hover:bg-white/20 disabled:opacity-40"
+                onClick={() => void chooseFolder()}
+                className="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-clide-border bg-clide-surface px-2 py-1.5 text-[12px] text-white/60 hover:border-white/30 hover:text-white disabled:opacity-40"
               >
-                <Folder size={12} />
-                Browse
+                <FolderOpen size={13} />
+                Choose folder…
               </button>
-            </div>
+            )}
+
+            {path && (
+              <button
+                type="button"
+                onClick={() => void api.openFolder(path)}
+                className="self-start text-[11px] text-white/40 hover:text-white/70 hover:underline"
+              >
+                Show containing folder
+              </button>
+            )}
+
             {error && <span className="text-[11px] text-red-400">{error}</span>}
             <div className="flex gap-1.5">
               <button
                 onClick={() => void submitNewProject()}
-                className="flex-1 rounded-md bg-white/10 px-2 py-1 text-[12px] font-medium text-white hover:bg-white/20"
+                disabled={!name.trim() || !path}
+                className="flex-1 rounded-md bg-white/10 px-2 py-1 text-[12px] font-medium text-white hover:bg-white/20 disabled:opacity-40"
               >
                 Create
               </button>
               <button
-                onClick={() => setAdding(false)}
+                onClick={resetForm}
                 className="rounded-md px-2 py-1 text-[12px] text-white/50 hover:bg-white/5"
               >
                 Cancel

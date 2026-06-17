@@ -179,6 +179,18 @@ export const api = {
     }
   },
 
+  async getFormScript(
+    formSlug: string,
+  ): Promise<{ script: string; extension: string } | null> {
+    const r = request();
+    if (!r) return null;
+    try {
+      return await r.getFormScript({ formSlug });
+    } catch {
+      return null;
+    }
+  },
+
   async saveCredentials(provider: AIProvider, key: string): Promise<void> {
     await request()?.saveCredentials({ provider, key });
   },
@@ -268,6 +280,17 @@ export const api = {
       return res.path;
     } catch {
       return null;
+    }
+  },
+
+  async openFolder(path: string): Promise<boolean> {
+    const r = request();
+    if (!r) return false;
+    try {
+      const res = await r.openFolder({ path });
+      return res.ok;
+    } catch {
+      return false;
     }
   },
 };

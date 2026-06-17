@@ -56,3 +56,5 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 13  | Grouped Submissions | Combine consecutive same-form runs into one card with accordion | ✅ Done |
 | 14  | Project Dir Picker  | Native directory chooser for project creation folder path       | ✅ Done |
 | 15  | Marketing Website   | Auto-generate a basic static site into www/ via a script        | ✅ Done |
+| 16  | Project Mgmt Cleanup | New-vs-existing folder choice, picker-only path, safer delete, show folder | ✅ Done |
+| 17  | Projects Live Anywhere | Folder-picker-only creation, show picked path, required fields + Create enablement | ✅ Done |

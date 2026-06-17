@@ -1,14 +1,36 @@
-import { AlarmClock, Check, Loader, Pin, X } from "lucide-react";
+import { AlarmClock, Check, Circle, Loader, X } from "lucide-react";
 import type { RunStatus } from "../types/forms";
 
 interface StatusIconProps {
   status: RunStatus;
   pinned?: boolean;
   size?: number;
+  mode?: "default" | "dot";
 }
 
-export default function StatusIcon({ status, pinned, size = 18 }: StatusIconProps) {
-  if (pinned) return <Pin size={size} className="text-white/60" />;
+export default function StatusIcon({
+  status,
+  pinned,
+  size = 18,
+  mode = "default",
+}: StatusIconProps) {
+  if (mode === "dot") {
+    return (
+      <Circle
+        size={8}
+        fill="currentColor"
+        className={
+          status === "success"
+            ? "text-green-400"
+            : status === "error"
+              ? "text-red-400"
+              : status === "scheduled"
+                ? "text-orange-400"
+                : "text-white/60"
+        }
+      />
+    );
+  }
   switch (status) {
     case "running":
     case "pending":
@@ -20,6 +42,8 @@ export default function StatusIcon({ status, pinned, size = 18 }: StatusIconProp
     case "scheduled":
       return <AlarmClock size={size} className="text-orange-400" />;
     default:
-      return <span style={{ width: size, height: size }} className="inline-block" />;
+      return (
+        <span style={{ width: size, height: size }} className="inline-block" />
+      );
   }
 }

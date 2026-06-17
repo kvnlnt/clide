@@ -224,6 +224,10 @@ export type ClideRPC = {
         params: { runId: string };
         response: { mime: string; base64: string } | null;
       };
+      getFormScript: {
+        params: { formSlug: string };
+        response: { script: string; extension: string } | null;
+      };
       saveCredentials: {
         params: { provider: AIProvider; key: string };
         response: void;
@@ -252,6 +256,10 @@ export type ClideRPC = {
       chooseDirectory: {
         params: { startingFolder?: string };
         response: { path: string | null };
+      };
+      openFolder: {
+        params: { path: string };
+        response: { ok: boolean };
       };
     };
     messages: {

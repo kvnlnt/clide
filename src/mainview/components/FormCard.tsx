@@ -12,6 +12,7 @@ import FormCardFooter from "./FormCardFooter";
 import FormCardHeader from "./FormCardHeader";
 import ScheduleSubForm from "./ScheduleSubForm";
 import SubmissionAccordion from "./SubmissionAccordion";
+import CodeOutput from "./output/CodeOutput";
 import OutputBlock from "./output/OutputBlock";
 
 export interface FormCardProps {
@@ -93,9 +94,9 @@ export default function FormCard({
   const [expanded, setExpanded] = useState(
     defaultExpanded ?? (run.status === "idle" || running),
   );
-  const [activeTab, setActiveTab] = useState<"results" | "submitted">(
-    "results",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "results" | "submitted" | "code"
+  >("results");
 
   const canSubmit = useMemo(
     () => form.fields.every((f) => !f.required || isFilled(values[f.id])),
@@ -149,16 +150,22 @@ export default function FormCard({
           <div className="h-px bg-clide-border" />
 
           {isGrouped ? (
-            // Grouped: show accordion — each run is independently expandable.
-            <SubmissionAccordion
-              runs={runs}
-              form={form}
-              outputType={outputType}
-              chunks={chunks}
-              activeTab={activeTab}
-            />
+            activeTab === "code" ? (
+              <div className="px-4 py-3">
+                <CodeOutput formSlug={run.formSlug} />
+              </div>
+            ) : (
+              // Grouped: show accordion — each run is independently expandable.
+              <SubmissionAccordion
+                runs={runs}
+                form={form}
+                outputType={outputType}
+                chunks={chunks}
+                activeTab={activeTab}
+              />
+            )
           ) : hasSubmittedTabs ? (
-            // Single completed run: Results / Submitted tabs.
+            // Single completed run: Results / Submitted / Code tabs.
             <>
               {activeTab === "results" ? (
                 outputType ? (
@@ -173,6 +180,10 @@ export default function FormCard({
                     No results.
                   </div>
                 )
+              ) : activeTab === "code" ? (
+                <div className="px-4 py-3">
+                  <CodeOutput formSlug={run.formSlug} />
+                </div>
               ) : (
                 <FormCardBody
                   form={form}
