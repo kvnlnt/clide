@@ -3,7 +3,7 @@ import {
   BrowserView,
   BrowserWindow,
   Updater,
-  openFileDialog,
+  Utils,
 } from "electrobun/bun";
 import { extname } from "node:path";
 import type {
@@ -319,7 +319,7 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
       },
 
       chooseDirectory: async ({ startingFolder }) => {
-        const paths = await openFileDialog({
+        const paths = await Utils.openFileDialog({
           startingFolder: startingFolder ?? "~/",
           canChooseDirectory: true,
           canChooseFiles: false,

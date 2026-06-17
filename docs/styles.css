@@ -63,6 +63,16 @@ a { color: inherit; }
 
 .nav-links a:hover { color: #e8a020; }
 
+.nav-github {
+  display: inline-flex;
+  align-items: center;
+}
+
+.nav-github svg {
+  width: 18px;
+  height: 18px;
+}
+
 /* Mobile menu toggle (CSS-only, no JS) */
 .nav-toggle { display: none; }
 
