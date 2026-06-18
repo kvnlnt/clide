@@ -177,7 +177,10 @@ async function readFormScript(
   const folder = await loadFormFolder(project.path, formSlug, project.name);
   if (!folder) return null;
   try {
-    const scriptPath = join(formDir(project.path, formSlug), folder.form.scriptFile);
+    const scriptPath = join(
+      formDir(project.path, formSlug),
+      folder.form.scriptFile,
+    );
     const script = await Bun.file(scriptPath).text();
     const extension = extname(folder.form.scriptFile).replace(/^\./, "");
     return { script, extension };
@@ -345,8 +348,8 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           canChooseFiles: false,
           allowsMultipleSelection: false,
         });
-        const first = paths.find((p) => p.trim().length > 0) ?? null;
-        return { path: first };
+        const path = paths.find((p) => p.trim().length > 0) ?? null;
+        return path;
       },
 
       openFolder: async ({ path }) => {

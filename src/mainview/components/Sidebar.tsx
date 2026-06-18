@@ -49,8 +49,10 @@ export default function Sidebar() {
   };
 
   const chooseFolder = async () => {
+    api.log("choosefolder:1,called with path=" + path);
     setBrowsing(true);
     const picked = await api.chooseDirectory(path || undefined);
+    api.log(`choosefolder:2, picked=${picked}`);
     setBrowsing(false);
     if (picked) setPath(picked);
   };
@@ -127,7 +129,10 @@ export default function Sidebar() {
                   <div className="truncate text-[12px] text-white" title={path}>
                     {path.split("/").filter(Boolean).pop() ?? path}
                   </div>
-                  <div className="truncate text-[11px] text-white/30" title={path}>
+                  <div
+                    className="truncate text-[11px] text-white/30"
+                    title={path}
+                  >
                     {path}
                   </div>
                 </div>
@@ -141,6 +146,26 @@ export default function Sidebar() {
                 </button>
               </div>
             ) : (
+              // <input
+              //   type="file"
+              //   className="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-clide-border bg-clide-surface px-2 py-1.5 text-[12px] text-white/60 hover:border-white/30 hover:text-white disabled:opacity-40"
+              //   {...({ webkitdirectory: "", directory: "" } as any)}
+              //   multiple
+              //   onClick={(e) => {
+              //     const input = e.target as HTMLInputElement;
+              //     input.value = "";
+              //     setPath("");
+              //   }}
+              //   onChange={(e) => {
+              //     const input = e.target as HTMLInputElement;
+              //     if (input.files && input.files.length > 0) {
+              //       const folderPath =
+              //         input.files[0].webkitRelativePath.split("/")[0];
+              //       setPath(folderPath);
+              //       chooseFolder();
+              //     }
+              //   }}
+              // />
               <button
                 type="button"
                 disabled={browsing}

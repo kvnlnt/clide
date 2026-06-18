@@ -255,7 +255,7 @@ export type ClideRPC = {
       saveAISettings: { params: AISettings; response: void };
       chooseDirectory: {
         params: { startingFolder?: string };
-        response: { path: string | null };
+        response: string | null;
       };
       openFolder: {
         params: { path: string };

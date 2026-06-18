@@ -49,6 +49,7 @@ export function on<K extends keyof EventMap>(
 // Electroview RPC setup.
 // ---------------------------------------------------------------------------
 const rpcDef = Electroview.defineRPC<ClideRPC>({
+  maxRequestTime: 5000,
   handlers: {
     requests: {},
     messages: {
@@ -72,6 +73,10 @@ try {
 
 function request(): typeof rpcDef.request | null {
   return electroview?.rpc?.request ?? null;
+}
+
+function send(): typeof rpcDef.send | null {
+  return electroview?.rpc?.send ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -277,8 +282,9 @@ export const api = {
     if (!r) return null;
     try {
       const res = await r.chooseDirectory({ startingFolder });
-      return res.path;
-    } catch {
+      return res;
+    } catch (err) {
+      api.log(`chooseDirectory error: ${err}`);
       return null;
     }
   },
@@ -292,5 +298,9 @@ export const api = {
     } catch {
       return false;
     }
+  },
+
+  log(msg: string): void {
+    send()?.logToBun({ msg });
   },
 };

@@ -1,11 +1,11 @@
-import { Code, LucideFile, Upload } from "lucide-react";
+import { Braces, Code, Eye } from "lucide-react";
 import type { FormDefinition, FormMeta, RunRecord } from "../types/forms";
 import EllipsisMenu from "./EllipsisMenu";
 import StatusIcon from "./statusIcon";
 
 const TABS = [
-  { id: "results", label: "Results", icon: LucideFile },
-  { id: "submitted", label: "Submitted", icon: Upload },
+  { id: "results", label: "Results", icon: Eye },
+  { id: "submitted", label: "Submitted", icon: Braces },
   { id: "code", label: "Code", icon: Code },
 ] as const;
 
