@@ -19,7 +19,11 @@ export function appDataDir(): string {
   }
 }
 
-/** JSON file listing the user's registered project folders. */
+/**
+ * JSON file listing the absolute paths of the user's registered project
+ * folders. A project's own config (name, etc.) lives inside the folder itself
+ * at `.clide/config.json` (see config.ts), not here.
+ */
 export function projectsRegistryPath(): string {
   return join(appDataDir(), "projects.json");
 }
@@ -52,6 +56,16 @@ export function ensureDir(dir: string): void {
 // run history, and outputs.
 // ---------------------------------------------------------------------------
 
+/** Per-project config directory, kept inside the project folder itself. */
+export function projectConfigDir(projectPath: string): string {
+  return join(projectPath, ".clide");
+}
+
+/** JSON file holding a project's own config (display name, etc.). */
+export function projectConfigPath(projectPath: string): string {
+  return join(projectConfigDir(projectPath), "config.json");
+}
+
 export function projectFormsDir(projectPath: string): string {
   return join(projectPath, "forms");
 }
@@ -80,6 +94,7 @@ export function runDir(projectPath: string, runId: string): string {
 export function ensureProjectDirs(projectPath: string): void {
   for (const dir of [
     projectPath,
+    projectConfigDir(projectPath),
     projectFormsDir(projectPath),
     projectRunsDir(projectPath),
     projectLayoutsDir(projectPath),

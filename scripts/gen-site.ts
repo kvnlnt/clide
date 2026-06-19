@@ -53,10 +53,11 @@ const ICONS = {
 // ---------------------------------------------------------------------------
 const SITE = {
   name: "CLIDE",
-  tagline: "Harness your power.",
+  tagline: "Run Free",
   description:
-    "CLIDE stands for Command Line Integration Development Environment. It is a desktop app that turns shell scripts into clean, fillable forms. " +
-    "Run your tools without touching the terminal  just fill out the form and hit Send.",
+    "Turn your computer into an <b>automation workhorse</b> — no coding required. CLIDE wraps shell scripts, SSH commands, web APIs, and AI models into clean forms and workflows. Run anything, anywhere — no syntax, no servers, no SaaS lock-in.",
+  // "CLIDE stands for Command Line Integration Development Environment. It is a desktop app that turns shell scripts into clean, fillable forms. " +
+  // "Run your tools without touching the terminal  just fill out the form and hit Send.",
   siteUrl: "https://clide.tools",
   repoUrl: "https://github.com/kvnlnt/clide",
   features: [

@@ -25,6 +25,7 @@ interface AppState {
   viewMode: ViewMode;
   selectorOpen: boolean;
   settingsOpen: boolean;
+  newProjectOpen: boolean;
 
   setActiveProject: (p: string | null) => void;
   toggleSidebar: () => void;
@@ -33,6 +34,8 @@ interface AppState {
   closeSelector: () => void;
   openSettings: () => void;
   closeSettings: () => void;
+  openNewProject: () => void;
+  closeNewProject: () => void;
 
   addFormDraft: (formSlug: string) => void;
   addNewFormDraft: () => void;
@@ -79,6 +82,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
 
   const draftSeq = useRef(0);
 
@@ -155,6 +159,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const closeSelector = useCallback(() => setSelectorOpen(false), []);
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const openNewProject = useCallback(() => setNewProjectOpen(true), []);
+  const closeNewProject = useCallback(() => setNewProjectOpen(false), []);
 
   const removeDraft = useCallback((id: string) => {
     setDrafts((prev) => prev.filter((d) => d.id !== id));
@@ -278,6 +284,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     viewMode,
     selectorOpen,
     settingsOpen,
+    newProjectOpen,
     setActiveProject,
     toggleSidebar,
     setViewMode,
@@ -285,6 +292,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     closeSelector,
     openSettings,
     closeSettings,
+    openNewProject,
+    closeNewProject,
     addFormDraft,
     addNewFormDraft,
     removeDraft,

@@ -284,7 +284,6 @@ export const api = {
       const res = await r.chooseDirectory({ startingFolder });
       return res;
     } catch (err) {
-      api.log(`chooseDirectory error: ${err}`);
       return null;
     }
   },

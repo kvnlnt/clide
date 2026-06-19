@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import FormSelector from "./components/FormSelector";
 import GridView from "./components/GridView";
+import NewProjectModal from "./components/NewProjectModal";
 import SettingsPanel from "./components/SettingsPanel";
 import Sidebar from "./components/Sidebar";
 import Thread from "./components/Thread";
@@ -13,7 +14,9 @@ function Workspace() {
     viewMode,
     selectorOpen,
     settingsOpen,
+    newProjectOpen,
     closeSettings,
+    closeNewProject,
     openSelector,
   } = useApp();
 
@@ -36,6 +39,7 @@ function Workspace() {
         {viewMode === "list" ? <Thread /> : <GridView />}
         {selectorOpen && <FormSelector />}
         {settingsOpen && <SettingsPanel onClose={closeSettings} />}
+        {newProjectOpen && <NewProjectModal onClose={closeNewProject} />}
       </div>
     </div>
   );
