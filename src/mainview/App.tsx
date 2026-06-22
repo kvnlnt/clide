@@ -1,3 +1,4 @@
+import { Maximize, Minimize, PanelLeft, X } from "lucide-react";
 import { useEffect } from "react";
 import FormSelector from "./components/FormSelector";
 import GridView from "./components/GridView";
@@ -18,6 +19,7 @@ function Workspace() {
     closeSettings,
     closeNewProject,
     openSelector,
+    toggleSidebar,
   } = useApp();
 
   useEffect(() => {
@@ -32,14 +34,33 @@ function Workspace() {
   }, [openSelector]);
 
   return (
-    <div className="flex h-screen bg-clide-bg text-white">
-      {sidebarOpen && <Sidebar />}
-      <div className="relative flex min-w-0 flex-1 flex-col">
-        <TopBar />
-        {viewMode === "list" ? <Thread /> : <GridView />}
-        {selectorOpen && <FormSelector />}
-        {settingsOpen && <SettingsPanel onClose={closeSettings} />}
-        {newProjectOpen && <NewProjectModal onClose={closeNewProject} />}
+    <div className="flex h-screen flex-col bg-clide-bg text-white rounded-[15px]">
+      <header className="h-5 electrobun-webkit-app-region-drag">
+        <span className="window-controls electrobun-webkit-app-region-no-drag">
+          <button onClick={toggleSidebar} title="Toggle sidebar">
+            <PanelLeft size={15} />
+          </button>
+          <button>
+            <Minimize size={15} />
+          </button>
+          <button>
+            <Maximize size={15} />
+          </button>
+          <button>
+            <X size={15} />
+          </button>
+        </span>
+      </header>
+      <div className="flex h-screen text-white">
+        {sidebarOpen && <Sidebar />}
+
+        <div className="relative flex min-w-0 flex-1 flex-col">
+          <TopBar />
+          {viewMode === "list" ? <Thread /> : <GridView />}
+          {selectorOpen && <FormSelector />}
+          {settingsOpen && <SettingsPanel onClose={closeSettings} />}
+          {newProjectOpen && <NewProjectModal onClose={closeNewProject} />}
+        </div>
       </div>
     </div>
   );

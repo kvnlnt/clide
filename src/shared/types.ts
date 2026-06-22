@@ -263,7 +263,7 @@ export type ClideRPC = {
       };
     };
     messages: {
-      logToBun: { msg: string };
+      logToBun: { msg: string; type?: "info" | "warn" | "error" | "debug" };
     };
   }>;
   webview: RPCSchema<{

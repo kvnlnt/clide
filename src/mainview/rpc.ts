@@ -284,6 +284,7 @@ export const api = {
       const res = await r.chooseDirectory({ startingFolder });
       return res;
     } catch (err) {
+      api.log(`Error choosing directory: ${err}`, "error");
       return null;
     }
   },
@@ -299,7 +300,7 @@ export const api = {
     }
   },
 
-  log(msg: string): void {
-    send()?.logToBun({ msg });
+  log(msg: string, type?: "info" | "warn" | "error" | "debug"): void {
+    send()?.logToBun({ msg, type });
   },
 };

@@ -18,7 +18,6 @@ body,
 }
 
 body {
-  background: var(--bg);
   color: #fff;
   font-family:
     "Inter",
@@ -52,5 +51,9 @@ body {
 
 /* Selected sidebar row radial highlight (from Figma). */
 .clide-active-row {
-  background: radial-gradient(circle at 30% 50%, rgba(86, 86, 86, 0.5), rgba(86, 86, 86, 0.2));
+  background: radial-gradient(
+    circle at 30% 50%,
+    rgba(86, 86, 86, 0.5),
+    rgba(86, 86, 86, 0.2)
+  );
 }

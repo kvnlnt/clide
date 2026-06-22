@@ -1,0 +1,1 @@
+- Have the forms emit and subscribe to an event bus (have the event bus work like "tags"? and be passively handled in the background, how do we handle async/sync then?)

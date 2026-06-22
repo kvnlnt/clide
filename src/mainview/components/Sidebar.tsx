@@ -1,9 +1,9 @@
 import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
+import ProjectSettingsModal from "./ProjectSettingsModal";
 import SidebarFooter from "./SidebarFooter";
 import SidebarProject from "./SidebarProject";
-import SidebarProjectSettings from "./SidebarProjectSettings";
 
 export default function Sidebar() {
   const {
@@ -14,6 +14,8 @@ export default function Sidebar() {
     activeProject,
     setActiveProject,
     openNewProject,
+    toggleSidebar,
+    sidebarOpen,
   } = useApp();
   const [editingPath, setEditingPath] = useState<string | null>(null);
 
@@ -52,6 +54,13 @@ export default function Sidebar() {
     return m;
   }, [projectMeta]);
 
+  // The project currently being edited (resolved from path back to name).
+  const editingProject = useMemo(() => {
+    if (!editingPath) return null;
+    const meta = projectMeta.find((p) => p.path === editingPath);
+    return meta ? { path: meta.path, name: meta.name } : null;
+  }, [editingPath, projectMeta]);
+
   return (
     <aside className="flex w-[250px] shrink-0 flex-col p-2.5">
       <div className="flex flex-1 flex-col overflow-hidden rounded-[5px] bg-clide-panel">
@@ -77,30 +86,22 @@ export default function Sidebar() {
             const badgeColor = c && c.active > 0 ? "green" : "red";
             const projectPath = nameToPath.get(project) ?? null;
             return (
-              <div key={project}>
-                <SidebarProject
-                  name={project}
-                  active={activeProject === project}
-                  badgeCount={badgeCount}
-                  badgeColor={badgeColor}
-                  canEdit={projectPath !== null}
-                  onClick={() =>
-                    setActiveProject(activeProject === project ? null : project)
-                  }
-                  onOpenSettings={() =>
-                    setEditingPath((cur) =>
-                      cur === projectPath ? null : projectPath,
-                    )
-                  }
-                />
-                {projectPath !== null && editingPath === projectPath && (
-                  <SidebarProjectSettings
-                    path={projectPath}
-                    name={project}
-                    onClose={() => setEditingPath(null)}
-                  />
-                )}
-              </div>
+              <SidebarProject
+                key={project}
+                name={project}
+                active={activeProject === project}
+                badgeCount={badgeCount}
+                badgeColor={badgeColor}
+                canEdit={projectPath !== null}
+                onClick={() =>
+                  setActiveProject(activeProject === project ? null : project)
+                }
+                onOpenSettings={() =>
+                  setEditingPath((cur) =>
+                    cur === projectPath ? null : projectPath,
+                  )
+                }
+              />
             );
           })}
         </nav>
@@ -108,6 +109,13 @@ export default function Sidebar() {
           <SidebarFooter />
         </div>
       </div>
+      {editingProject && (
+        <ProjectSettingsModal
+          path={editingProject.path}
+          name={editingProject.name}
+          onClose={() => setEditingPath(null)}
+        />
+      )}
     </aside>
   );
 }

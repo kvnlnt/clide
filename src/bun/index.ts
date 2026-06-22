@@ -193,7 +193,7 @@ async function readFormScript(
 // RPC definition.
 // ---------------------------------------------------------------------------
 const rpc = BrowserView.defineRPC<ClideRPC>({
-  maxRequestTime: 600_000,
+  maxRequestTime: 60000,
   handlers: {
     requests: {
       listProjects: async () => await listProjects(),
@@ -348,7 +348,7 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           canChooseFiles: false,
           allowsMultipleSelection: false,
         });
-        const path = paths.find((p) => p.trim().length > 0) ?? null;
+        const path = paths?.[0] ?? null;
         return path;
       },
 
@@ -358,7 +358,24 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
       },
     },
     messages: {
-      logToBun: ({ msg }) => console.log("[view]", msg),
+      logToBun: ({ msg, type }) => {
+        switch (type) {
+          case "info":
+            console.info(`[view] ${msg}`);
+            break;
+          case "warn":
+            console.warn(`[view] ${msg}`);
+            break;
+          case "error":
+            console.error(`[view] ${msg}`);
+            break;
+          case "debug":
+            console.debug(`[view] ${msg}`);
+            break;
+          default:
+            console.log(`[view] ${msg}`);
+        }
+      },
     },
   },
 });
@@ -428,6 +445,8 @@ mainWindow = new BrowserWindow({
     x: 200,
     y: 120,
   },
+  titleBarStyle: "hidden",
+  transparent: true,
   rpc,
 });
 
