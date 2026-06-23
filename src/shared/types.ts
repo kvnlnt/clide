@@ -193,6 +193,8 @@ export interface ScheduleInput {
 export type ClideRPC = {
   bun: RPCSchema<{
     requests: {
+      closeWindow: { params: null; response: void };
+      minimizeWindow: { params: null; response: void };
       listProjects: { params: Record<string, never>; response: Project[] };
       addProject: {
         params: { name: string; path?: string };

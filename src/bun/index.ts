@@ -196,6 +196,14 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
   maxRequestTime: 60000,
   handlers: {
     requests: {
+      closeWindow: async () => {
+        await mainWindow?.close();
+      },
+
+      minimizeWindow: async () => {
+        await mainWindow?.minimize();
+      },
+
       listProjects: async () => await listProjects(),
 
       addProject: async ({ name, path }) => {

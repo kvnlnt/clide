@@ -1,4 +1,3 @@
-import { Minus, PanelLeft, X } from "lucide-react";
 import { useEffect } from "react";
 import FormSelector from "./components/FormSelector";
 import GridView from "./components/GridView";
@@ -6,7 +5,7 @@ import NewProjectModal from "./components/NewProjectModal";
 import SettingsPanel from "./components/SettingsPanel";
 import Sidebar from "./components/Sidebar";
 import Thread from "./components/Thread";
-import TopBar from "./components/TopBar";
+import WindowControls from "./components/WindowControls";
 import { AppProvider, useApp } from "./context/AppContext";
 
 function Workspace() {
@@ -34,35 +33,18 @@ function Workspace() {
   }, [openSelector]);
 
   return (
-    <div className="flex h-screen flex-col bg-clide-bg text-white rounded-[15px]">
-      <header className="flex electrobun-webkit-app-region-drag px-3 pt-3">
-        <span className="window-controls electrobun-webkit-app-region-no-drag flex gap-1">
-          <button className="text-white/30 transition-colors hover:text-white" onClick={() => window.close()}>
-            <X size={15} />
-          </button>
-          <button className="text-white/30 transition-colors hover:text-white" onClick={() => window.minimize()}>
-            <Minus size={15} />
-          </button>
-
-          <button
-            onClick={toggleSidebar}
-            title="Toggle sidebar"
-            className="text-white/30 transition-colors hover:text-white"
-          >
-            <PanelLeft size={15} />
-          </button>
-        </span>
+    <div className="flex h-screen flex-col bg-clide-bg text-white rounded-[15px] p-2.5 gap-2.5 border border-white/10">
+      <header className="flex electrobun-webkit-app-region-drag">
+        <WindowControls />
       </header>
       <div className="flex h-screen text-white">
-        {sidebarOpen && <Sidebar />}
-
         <div className="relative flex min-w-0 flex-1 flex-col">
-          <TopBar />
           {viewMode === "list" ? <Thread /> : <GridView />}
           {selectorOpen && <FormSelector />}
           {settingsOpen && <SettingsPanel onClose={closeSettings} />}
           {newProjectOpen && <NewProjectModal onClose={closeNewProject} />}
         </div>
+        {sidebarOpen && <Sidebar />}
       </div>
     </div>
   );

@@ -84,6 +84,26 @@ function send(): typeof rpcDef.send | null {
 // unavailable (e.g. when the view is opened in a plain browser tab).
 // ---------------------------------------------------------------------------
 export const api = {
+  async closeWindow(): Promise<void> {
+    const r = request();
+    if (!r) return;
+    try {
+      await r.closeWindow(null);
+    } catch {
+      return;
+    }
+  },
+
+  async minimizeWindow(): Promise<void> {
+    const r = request();
+    if (!r) return;
+    try {
+      await r.minimizeWindow(null);
+    } catch {
+      return;
+    }
+  },
+
   async listProjects(): Promise<Project[]> {
     const r = request();
     if (!r) return [];

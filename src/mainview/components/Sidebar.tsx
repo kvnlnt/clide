@@ -1,4 +1,3 @@
-import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import ProjectSettingsModal from "./ProjectSettingsModal";
@@ -13,9 +12,6 @@ export default function Sidebar() {
     runs,
     activeProject,
     setActiveProject,
-    openNewProject,
-    toggleSidebar,
-    sidebarOpen,
   } = useApp();
   const [editingPath, setEditingPath] = useState<string | null>(null);
 
@@ -62,19 +58,9 @@ export default function Sidebar() {
   }, [editingPath, projectMeta]);
 
   return (
-    <aside className="flex w-[250px] shrink-0 flex-col p-2.5">
-      <div className="flex flex-1 flex-col overflow-hidden rounded-[5px] bg-clide-panel">
-        <div className="flex items-center justify-between px-3 py-3">
-          <span className="text-[15px] font-bold text-white">CLIDE</span>
-          <button
-            onClick={openNewProject}
-            title="Add project"
-            className="flex h-6 w-6 items-center justify-center rounded-md text-white/50 hover:bg-white/10 hover:text-white"
-          >
-            <Plus size={16} />
-          </button>
-        </div>
-        <nav className="clide-scroll flex-1 overflow-y-auto px-1.5">
+    <aside className="flex w-auto max-w-[250px] min-w-[200px] shrink-0 flex-col">
+      <div className="flex flex-1 flex-col overflow-hidden rounded-[10px] bg-clide-panel">
+        <nav className="clide-scroll flex-1 overflow-y-auto p-1.5">
           {projects.length === 0 && (
             <div className="px-2 py-2 text-[13px] text-white/30">
               No projects yet
