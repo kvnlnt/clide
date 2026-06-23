@@ -1,4 +1,4 @@
-import { Maximize, Minimize, PanelLeft, X } from "lucide-react";
+import { Minus, PanelLeft, X } from "lucide-react";
 import { useEffect } from "react";
 import FormSelector from "./components/FormSelector";
 import GridView from "./components/GridView";
@@ -35,19 +35,21 @@ function Workspace() {
 
   return (
     <div className="flex h-screen flex-col bg-clide-bg text-white rounded-[15px]">
-      <header className="h-5 electrobun-webkit-app-region-drag">
-        <span className="window-controls electrobun-webkit-app-region-no-drag">
-          <button onClick={toggleSidebar} title="Toggle sidebar">
-            <PanelLeft size={15} />
-          </button>
-          <button>
-            <Minimize size={15} />
-          </button>
-          <button>
-            <Maximize size={15} />
-          </button>
-          <button>
+      <header className="flex electrobun-webkit-app-region-drag px-3 pt-3">
+        <span className="window-controls electrobun-webkit-app-region-no-drag flex gap-1">
+          <button className="text-white/30 transition-colors hover:text-white" onClick={() => window.close()}>
             <X size={15} />
+          </button>
+          <button className="text-white/30 transition-colors hover:text-white" onClick={() => window.minimize()}>
+            <Minus size={15} />
+          </button>
+
+          <button
+            onClick={toggleSidebar}
+            title="Toggle sidebar"
+            className="text-white/30 transition-colors hover:text-white"
+          >
+            <PanelLeft size={15} />
           </button>
         </span>
       </header>
