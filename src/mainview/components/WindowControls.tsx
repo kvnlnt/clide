@@ -35,7 +35,6 @@ export default function WindowControls() {
           <Minus size={10} />
         </button>
       </div>
-
       <button
         className="flex gap-2 text-white/30 transition-colors hover:text-white flex items-center justify-center rounded-full"
         onClick={openSelector}
