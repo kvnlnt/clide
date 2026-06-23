@@ -20,7 +20,7 @@ export default function WindowControls() {
     viewMode,
   } = useApp();
   return (
-    <div className="window-controls flex gap-1 justify-between w-full placeitems-center">
+    <div className="window-controls flex gap-1 justify-between w-full placeitems-center transition-colors rounded-[15px] cursor-move">
       <div className="flex p-1.5 gap-2">
         <button
           className="text-black bg-red-600/30 hover:bg-red-600 rounded-full h-4 w-4 flex items-center justify-center transition-colors"
@@ -41,13 +41,13 @@ export default function WindowControls() {
         onClick={openSelector}
       >
         <Search size={15} />
-        {activeProject ? activeProject : "CLIDE"}
+        <span className="text-sm">
+          {activeProject ? activeProject : "CLIDE"}
+        </span>
       </button>
       <div className="flex p-1.5 gap-3 justify-end">
         <button
-          className={
-            "text-white/30 transition-colors hover:text-white flex items-center justify-center rounded-full"
-          }
+          className="text-white/30 transition-colors hover:text-white flex items-center justify-center rounded-full"
           onClick={() => setViewMode(viewMode === "list" ? "grid" : "list")}
           title="Toggle view"
         >

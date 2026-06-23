@@ -18,7 +18,6 @@ function Workspace() {
     closeSettings,
     closeNewProject,
     openSelector,
-    toggleSidebar,
   } = useApp();
 
   useEffect(() => {
