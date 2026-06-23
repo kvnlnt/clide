@@ -9,9 +9,9 @@ export default {
       },
       colors: {
         clide: {
-          bg: "#141414",
-          surface: "#0a0a0a",
-          panel: "#222121",
+          bg: "#151212",
+          surface: "#0f0d0d",
+          panel: "#1e1c1c",
           border: "#3d3c3c",
           muted: "#575757",
         },
