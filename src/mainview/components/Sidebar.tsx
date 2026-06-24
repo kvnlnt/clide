@@ -5,14 +5,7 @@ import SidebarFooter from "./SidebarFooter";
 import SidebarProject from "./SidebarProject";
 
 export default function Sidebar() {
-  const {
-    forms,
-    projects,
-    projectMeta,
-    runs,
-    activeProject,
-    setActiveProject,
-  } = useApp();
+  const { forms, projects, projectMeta, runs, activeProject, setActiveProject } = useApp();
   const [editingPath, setEditingPath] = useState<string | null>(null);
 
   // Map each form slug to its project so we can attribute runs to projects.
@@ -29,11 +22,7 @@ export default function Sidebar() {
       const project = slugToProject.get(run.formSlug);
       if (!project) continue;
       const entry = map.get(project) ?? { active: 0, error: 0 };
-      if (
-        run.status === "running" ||
-        run.status === "pending" ||
-        run.status === "scheduled"
-      ) {
+      if (run.status === "running" || run.status === "pending" || run.status === "scheduled") {
         entry.active += 1;
       } else if (run.status === "error") {
         entry.error += 1;
@@ -59,13 +48,9 @@ export default function Sidebar() {
 
   return (
     <aside className="flex w-auto max-w-[250px] min-w-[200px] shrink-0 flex-col">
-      <div className="flex flex-1 flex-col overflow-hidden rounded-[10px] bg-clide-panel">
+      <div className="flex flex-1 flex-col overflow-hidden rounded-[10px] border border-white/10">
         <nav className="clide-scroll flex-1 overflow-y-auto p-1.5">
-          {projects.length === 0 && (
-            <div className="px-2 py-2 text-[13px] text-white/30">
-              No projects yet
-            </div>
-          )}
+          {projects.length === 0 && <div className="px-2 py-2 text-[13px] text-white/30">No projects yet</div>}
           {projects.map((project) => {
             const c = counts.get(project);
             const badgeCount = c ? c.active || c.error : 0;
@@ -79,14 +64,8 @@ export default function Sidebar() {
                 badgeCount={badgeCount}
                 badgeColor={badgeColor}
                 canEdit={projectPath !== null}
-                onClick={() =>
-                  setActiveProject(activeProject === project ? null : project)
-                }
-                onOpenSettings={() =>
-                  setEditingPath((cur) =>
-                    cur === projectPath ? null : projectPath,
-                  )
-                }
+                onClick={() => setActiveProject(activeProject === project ? null : project)}
+                onOpenSettings={() => setEditingPath((cur) => (cur === projectPath ? null : projectPath))}
               />
             );
           })}
