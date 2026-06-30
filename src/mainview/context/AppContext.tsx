@@ -44,6 +44,7 @@ interface AppState {
   createProject: (name: string, path?: string) => Promise<{ ok: boolean; error?: string }>;
   renameProject: (path: string, name: string) => Promise<{ ok: boolean; error?: string }>;
   deleteProject: (path: string, deleteFiles?: boolean) => Promise<void>;
+  deleteForm: (projectPath: string, slug: string) => Promise<{ ok: boolean; error?: string }>;
 
   submitRun: (formSlug: string, inputs: Record<string, unknown>) => Promise<void>;
   scheduleRun: (
@@ -221,6 +222,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [projectList, refreshProjects, refreshForms, refreshRuns],
   );
 
+  const deleteForm = useCallback(
+    async (projectPath: string, slug: string) => {
+      const res = await api.deleteForm(projectPath, slug);
+      if (res.ok) await refreshForms();
+      return res;
+    },
+    [refreshForms],
+  );
+
   const submitRun = useCallback(async (formSlug: string, inputs: Record<string, unknown>) => {
     const runId = await api.runForm(formSlug, inputs);
     if (!runId) return;
@@ -300,6 +310,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     createProject,
     renameProject,
     deleteProject,
+    deleteForm,
     submitRun,
     scheduleRun,
     cancelRun,

@@ -1,5 +1,6 @@
 import { ApplicationMenu, BrowserView, BrowserWindow, Updater, Utils } from "electrobun/bun";
-import { extname, join } from "node:path";
+import { rmSync } from "node:fs";
+import { extname, join, resolve, sep } from "node:path";
 import type { ClideRPC, OutputChunk, Project, RunStatusUpdate } from "../shared/types";
 import { loadAISettings, saveAISettings as persistAISettings } from "./ai/aiSettings";
 import { hasCredential, saveCredential } from "./ai/credentials";
@@ -19,7 +20,7 @@ import { listForms, loadFormFolder, resolveFormProject } from "./forms/loader";
 import { seedExampleProjects } from "./forms/seed";
 import { watchForms } from "./forms/watcher";
 import { writeForm } from "./forms/writer";
-import { formDir } from "./paths";
+import { formDir, projectFormsDir } from "./paths";
 import { cancelRun, startRun, type RunEmitters } from "./runner/execute";
 import { disposeScheduler, initScheduler, schedule } from "./scheduler";
 
@@ -306,6 +307,21 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
       openFolder: async ({ path }) => {
         const ok = Utils.openPath(path);
         return { ok };
+      },
+
+      deleteForm: async ({ projectPath, slug }) => {
+        try {
+          const dir = formDir(projectPath, slug);
+          const base = projectFormsDir(projectPath);
+          if (!resolve(dir).startsWith(resolve(base) + sep)) {
+            return { ok: false, error: "Invalid form path" };
+          }
+          rmSync(dir, { recursive: true, force: true });
+          await pushFormsChanged();
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
       },
     },
     messages: {

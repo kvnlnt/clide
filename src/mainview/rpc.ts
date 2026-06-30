@@ -301,6 +301,16 @@ export const api = {
     }
   },
 
+  async deleteForm(projectPath: string, slug: string): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.deleteForm({ projectPath, slug });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
   log(msg: string, type?: "info" | "warn" | "error" | "debug"): void {
     send()?.logToBun({ msg, type });
   },

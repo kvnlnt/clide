@@ -263,6 +263,10 @@ export type ClideRPC = {
         params: { path: string };
         response: { ok: boolean };
       };
+      deleteForm: {
+        params: { projectPath: string; slug: string };
+        response: { ok: boolean; error?: string };
+      };
     };
     messages: {
       logToBun: { msg: string; type?: "info" | "warn" | "error" | "debug" };

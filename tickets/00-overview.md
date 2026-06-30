@@ -58,3 +58,4 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 15  | Marketing Website   | Auto-generate a basic static site into www/ via a script        | ✅ Done |
 | 16  | Project Mgmt Cleanup | New-vs-existing folder choice, picker-only path, safer delete, show folder | ✅ Done |
 | 17  | Projects Live Anywhere | Folder-picker-only creation, show picked path, required fields + Create enablement | ✅ Done |
+| 18  | Project Settings Tabs & Forms Manager | Tabbed Project Settings modal; new Forms tab to list/delete project forms | 📋 Open |
