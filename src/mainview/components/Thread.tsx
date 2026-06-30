@@ -51,7 +51,7 @@ export default function Thread() {
 
   return (
     <div className="clide-scroll flex-1 overflow-y-auto">
-      <div className="flex flex-col gap-3 px-6 py-5">
+      <div className="flex flex-col gap-3 pl-1.5 pr-3">
         {isEmpty ? (
           <div className="h-[60vh]">
             <ThreadEmpty />
