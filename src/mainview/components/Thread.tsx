@@ -1,3 +1,4 @@
+import { LayoutGrid, List } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import type { RunGroup } from "../hooks/useThread";
 import { useThread } from "../hooks/useThread";
@@ -20,6 +21,8 @@ export default function Thread() {
     setPinned,
     deleteRun,
     removeDraft,
+    setViewMode,
+    viewMode,
   } = useApp();
   const { groups, visibleRuns } = useThread();
 
@@ -51,6 +54,15 @@ export default function Thread() {
 
   return (
     <div className="clide-scroll flex-1 overflow-y-auto">
+      <div className="flex justify-end p-3">
+        <button
+          className="text-white/30 transition-colors hover:text-white flex items-center justify-center rounded-full"
+          onClick={() => setViewMode(viewMode === "list" ? "grid" : "list")}
+          title="Toggle view"
+        >
+          {viewMode === "list" ? <List size={18} /> : <LayoutGrid size={18} />}
+        </button>
+      </div>
       <div className="flex flex-col gap-3 pl-1.5 pr-3">
         {isEmpty ? (
           <div className="h-[60vh]">
