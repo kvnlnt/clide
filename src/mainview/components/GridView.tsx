@@ -8,23 +8,18 @@ import GridCard from "./GridCard";
 const SIZE_CYCLE: GridCardSize[] = ["small", "medium", "large"];
 
 export default function GridView() {
-  const {
-    forms,
-    activeProject,
-    runs,
-    submitRun,
-    addFormDraft,
-    setViewMode,
-    viewMode,
-  } = useApp();
+  const { forms, activeProject, runs, submitRun, addFormDraft } = useApp();
+
+  // Ticket 20: grid view is retired from the render path and the list/grid
+  // toggle no longer exists in AppContext. Stub it locally so this dead
+  // component stays compilable until grid returns (see ticket 19).
+  const viewMode = "grid" as "list" | "grid";
+  const setViewMode = (_m: "list" | "grid") => {};
 
   const projectSlug = activeProject ?? "all";
 
   const projectForms = useMemo(
-    () =>
-      activeProject
-        ? forms.filter((f) => f.meta.project === activeProject)
-        : forms,
+    () => (activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms),
     [forms, activeProject],
   );
 
@@ -83,9 +78,7 @@ export default function GridView() {
 
   // Pinned forms float to the first row.
   const displayOrder = useMemo(() => {
-    const present = order.filter((s) =>
-      projectForms.some((f) => f.meta.slug === s),
-    );
+    const present = order.filter((s) => projectForms.some((f) => f.meta.slug === s));
     return [...present].sort((a, b) => {
       const pa = pinnedSlugs.has(a) ? 0 : 1;
       const pb = pinnedSlugs.has(b) ? 0 : 1;
@@ -108,8 +101,7 @@ export default function GridView() {
 
   const cycleSize = (slug: string) => {
     const current = sizes[slug] ?? "small";
-    const next =
-      SIZE_CYCLE[(SIZE_CYCLE.indexOf(current) + 1) % SIZE_CYCLE.length];
+    const next = SIZE_CYCLE[(SIZE_CYCLE.indexOf(current) + 1) % SIZE_CYCLE.length];
     const nextSizes = { ...sizes, [slug]: next };
     setSizes(nextSizes);
     persist(order, nextSizes);

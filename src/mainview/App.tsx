@@ -1,49 +1,63 @@
 import { useEffect } from "react";
-import FormSelector from "./components/FormSelector";
-import GridView from "./components/GridView";
+import FormsPanel from "./components/FormsPanel";
+import NewFormModal from "./components/NewFormModal";
 import NewProjectModal from "./components/NewProjectModal";
+import ProjectSettingsModal from "./components/ProjectSettingsModal";
 import SettingsPanel from "./components/SettingsPanel";
 import Sidebar from "./components/Sidebar";
 import Thread from "./components/Thread";
+import WelcomeScreen from "./components/WelcomeScreen";
 import WindowControls from "./components/WindowControls";
 import { AppProvider, useApp } from "./context/AppContext";
 
 function Workspace() {
   const {
     sidebarOpen,
-    viewMode,
-    selectorOpen,
-    settingsOpen,
     newProjectOpen,
-    closeSettings,
+    newFormOpen,
+    activeProject,
+    activePanel,
+    openPanel,
+    closePanel,
+    projectMeta,
     closeNewProject,
-    openSelector,
+    closeNewForm,
   } = useApp();
+
+  const activeProjectMeta = activeProject ? projectMeta.find((p) => p.name === activeProject) : undefined;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
         e.preventDefault();
-        openSelector();
+        openPanel("forms");
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [openSelector]);
+  }, [openPanel]);
 
   return (
-    <div className="flex h-screen flex-col bg-clide-bg text-white rounded-[15px] p-2.5 gap-2.5 border border-white/10">
+    <div className="flex h-screen flex-col bg-clide-bg text-white rounded-[15px] p-2.5 border border-white/10">
       <header className="flex electrobun-webkit-app-region-drag">
         <WindowControls />
       </header>
       <div className="flex h-screen text-white">
-        <div className="relative flex min-w-0 flex-1 flex-col">
-          {viewMode === "list" ? <Thread /> : <GridView />}
-          {selectorOpen && <FormSelector />}
-          {settingsOpen && <SettingsPanel onClose={closeSettings} />}
+        <div className="relative flex min-w-0 flex-1 flex-col border-t border-white/10">
+          {activePanel === null && (activeProject ? <Thread /> : <WelcomeScreen />)}
+          {activePanel === "forms" && <FormsPanel />}
+          {activePanel === "settings" && <SettingsPanel onClose={() => closePanel("settings")} />}
+          {activePanel === "project-settings" && activeProjectMeta && (
+            <ProjectSettingsModal
+              path={activeProjectMeta.path}
+              name={activeProjectMeta.name}
+              onClose={() => closePanel("project-settings")}
+            />
+          )}
           {newProjectOpen && <NewProjectModal onClose={closeNewProject} />}
+          {newFormOpen && <NewFormModal onClose={closeNewForm} />}
         </div>
-        {sidebarOpen && <Sidebar />}
+        {sidebarOpen && activeProject !== null && <Sidebar />}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { join } from "node:path";
-import type { Interpreter, OutputChunk, RunRecord, RunStatusUpdate } from "../../shared/types";
+import type { Interpreter, OutputChunk, RunRecord, RunStatusUpdate, RunTrigger } from "../../shared/types";
 import { createRun, getRun, setOutputPath, updateRunStatus } from "../db/history";
+import { publishRunEvents } from "../events/bus";
 import { loadFormFolder } from "../forms/loader";
 import { formDir } from "../paths";
 import { buildArgs } from "./argBuilder";
@@ -30,6 +31,7 @@ export async function startRun(
   inputs: Record<string, unknown>,
   emitters: RunEmitters,
   existingRunId?: string,
+  triggeredBy?: RunTrigger,
 ): Promise<{ runId: string }> {
   const folder = await loadFormFolder(projectPath, formSlug, projectName);
   if (!folder) {
@@ -48,6 +50,7 @@ export async function startRun(
       inputs,
       status: "running",
       startedAt,
+      triggeredBy: triggeredBy ?? null,
     });
   }
 
@@ -144,6 +147,14 @@ async function execute(
   const status = exitCode === 0 ? "success" : "error";
   updateRunStatus(runId, status, exitCode, finishedAt);
   emitters.emitStatus({ runId, status, exitCode, finishedAt });
+
+  // Fire the form's declared events on the internal bus (ticket 23).
+  if (status === "success") {
+    const emits = folder.form.events?.emits ?? [];
+    if (emits.length > 0) {
+      publishRunEvents({ runId, formSlug }, emits, capture.text, folder.form.outputType);
+    }
+  }
 }
 
 function finishWithError(runId: string, emitters: RunEmitters, message: string): void {

@@ -1,10 +1,8 @@
-import { LayoutGrid, List } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import type { RunGroup } from "../hooks/useThread";
 import { useThread } from "../hooks/useThread";
 import type { RunRecord } from "../types/forms";
 import FormCard from "./FormCard";
-import NewFormCard from "./NewFormCard";
 import ThreadDateGroup from "./ThreadDateGroup";
 import ThreadEmpty from "./ThreadEmpty";
 
@@ -13,7 +11,6 @@ export default function Thread() {
     drafts,
     formsBySlug,
     chunks,
-    activeProject,
     submitRun,
     scheduleRun,
     cancelRun,
@@ -21,8 +18,7 @@ export default function Thread() {
     setPinned,
     deleteRun,
     removeDraft,
-    setViewMode,
-    viewMode,
+    activeViewId,
   } = useApp();
   const { groups, visibleRuns } = useThread();
 
@@ -42,9 +38,7 @@ export default function Thread() {
         chunks={chunks}
         onSubmit={(values) => void submitRun(group.formSlug, values)}
         onCancel={() => void cancelRun(latestRun.id)}
-        onSchedule={(values, at, repeat) =>
-          void scheduleRun(group.formSlug, values, at, repeat)
-        }
+        onSchedule={(values, at, repeat) => void scheduleRun(group.formSlug, values, at, repeat)}
         onPin={() => void setPinned(latestRun.id, !latestRun.pinned)}
         onDelete={(runId) => void deleteRun(runId)}
         onRerun={() => void rerun(latestRun)}
@@ -54,36 +48,16 @@ export default function Thread() {
 
   return (
     <div className="clide-scroll flex-1 overflow-y-auto">
-      <div className="flex justify-end p-3">
-        <button
-          className="text-white/30 transition-colors hover:text-white flex items-center justify-center rounded-full"
-          onClick={() => setViewMode(viewMode === "list" ? "grid" : "list")}
-          title="Toggle view"
-        >
-          {viewMode === "list" ? <List size={18} /> : <LayoutGrid size={18} />}
-        </button>
-      </div>
-      <div className="flex flex-col gap-3 pl-1.5 pr-3">
+      <div className="flex flex-col gap-3 pt-3 pl-1.5 pr-3">
         {isEmpty ? (
           <div className="h-[60vh]">
-            <ThreadEmpty />
+            <ThreadEmpty filtered={activeViewId !== null} />
           </div>
         ) : (
           <>
             {drafts.map((draft) => {
-              if (draft.kind === "new-form") {
-                return (
-                  <NewFormCard
-                    key={draft.id}
-                    draftId={draft.id}
-                    defaultProject={activeProject ?? ""}
-                  />
-                );
-              }
-              const folder = draft.formSlug
-                ? formsBySlug.get(draft.formSlug)
-                : undefined;
-              if (!folder || !draft.formSlug) return null;
+              const folder = formsBySlug.get(draft.formSlug);
+              if (!folder) return null;
               const slug = draft.formSlug;
               const synthetic: RunRecord = {
                 id: draft.id,
@@ -105,6 +79,7 @@ export default function Thread() {
                   form={folder.form}
                   meta={folder.meta}
                   defaultExpanded
+                  autoFill
                   onSubmit={(values) => {
                     void submitRun(slug, values);
                     removeDraft(draft.id);

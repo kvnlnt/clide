@@ -1,4 +1,5 @@
-import { Braces, Code, Eye } from "lucide-react";
+import { Braces, Code, Eye, Zap } from "lucide-react";
+import { useApp } from "../context/AppContext";
 import type { FormDefinition, FormMeta, RunRecord } from "../types/forms";
 import EllipsisMenu from "./EllipsisMenu";
 import StatusIcon from "./statusIcon";
@@ -56,11 +57,20 @@ export default function FormCardHeader({
   onSchedule,
   onRerun,
   onDelete,
-  onUndo,
   showTabs,
   activeTab,
   onTabChange,
 }: FormCardHeaderProps) {
+  const { runs, formsBySlug } = useApp();
+
+  const trigger = run.triggeredBy;
+  let triggerTitle: string | null = null;
+  if (trigger) {
+    const sourceRun = runs.find((r) => r.id === trigger.sourceRunId);
+    const sourceName = sourceRun ? formsBySlug.get(sourceRun.formSlug)?.meta.name : undefined;
+    triggerTitle = `Triggered by ${trigger.event}${sourceName ? ` from ${sourceName}` : ""}`;
+  }
+
   const time =
     run.status === "scheduled" && run.scheduledAt
       ? new Date(run.scheduledAt).toLocaleString([], {
@@ -80,20 +90,17 @@ export default function FormCardHeader({
         <StatusIcon status={run.status} pinned={pinned} mode="dot" />
       </span>
 
-      <span className="shrink-0 text-[12px] font-medium text-white">
-        {meta.name}
-      </span>
-      {runCount && runCount > 1 && (
-        <span className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-white/40 bg-white/10">
-          {runCount}
+      <span className="shrink-0 text-[12px] font-medium text-white">{meta.name}</span>
+      {triggerTitle && (
+        <span className="flex shrink-0 items-center text-amber-300/80" title={triggerTitle}>
+          <Zap size={12} />
         </span>
+      )}
+      {runCount && runCount > 1 && (
+        <span className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-white/40 bg-white/10">{runCount}</span>
       )}
 
-      {!expanded && (
-        <span className="min-w-0 flex-1 truncate text-[12px] text-clide-muted">
-          {summary}
-        </span>
-      )}
+      {!expanded && <span className="min-w-0 flex-1 truncate text-[12px] text-clide-muted">{summary}</span>}
 
       {expanded && form.aiPromptField && (
         <input
@@ -107,15 +114,10 @@ export default function FormCardHeader({
       )}
 
       <div className="ml-auto flex items-center gap-3">
-        {!expanded && time && (
-          <span className="shrink-0 text-[12px] text-white/40">{time}</span>
-        )}
+        {!expanded && time && <span className="shrink-0 text-[12px] text-white/40">{time}</span>}
 
         {expanded && showTabs && onTabChange && (
-          <div
-            className="flex items-center gap-1"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             {TABS.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -123,9 +125,7 @@ export default function FormCardHeader({
                 title={label}
                 aria-label={label}
                 className={`flex items-center rounded-[3px] p-1.5 transition-colors ${
-                  activeTab === id
-                    ? "bg-white/10 text-white"
-                    : "text-white/50 hover:text-white"
+                  activeTab === id ? "bg-white/10 text-white" : "text-white/50 hover:text-white"
                 }`}
                 onClick={() => onTabChange(id)}
               >
@@ -136,13 +136,7 @@ export default function FormCardHeader({
         )}
 
         <div onClick={(e) => e.stopPropagation()}>
-          <EllipsisMenu
-            pinned={pinned}
-            onPin={onPin}
-            onSchedule={onSchedule}
-            onRerun={onRerun}
-            onDelete={onDelete}
-          />
+          <EllipsisMenu pinned={pinned} onPin={onPin} onSchedule={onSchedule} onRerun={onRerun} onDelete={onDelete} />
         </div>
       </div>
     </div>

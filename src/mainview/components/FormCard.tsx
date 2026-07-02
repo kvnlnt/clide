@@ -1,12 +1,6 @@
-import { useMemo, useState } from "react";
-import type {
-  FormDefinition,
-  FormMeta,
-  OutputChunk,
-  OutputType,
-  RepeatInterval,
-  RunRecord,
-} from "../types/forms";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { api } from "../rpc";
+import type { FormDefinition, FormMeta, OutputChunk, OutputType, RepeatInterval, RunRecord } from "../types/forms";
 import FormCardBody from "./FormCardBody";
 import FormCardFooter from "./FormCardFooter";
 import FormCardHeader from "./FormCardHeader";
@@ -26,15 +20,13 @@ export interface FormCardProps {
   defaultExpanded?: boolean;
   onSubmit: (values: Record<string, unknown>) => void;
   onCancel: () => void;
-  onSchedule: (
-    values: Record<string, unknown>,
-    scheduledAt: string,
-    repeat: RepeatInterval,
-  ) => void;
+  onSchedule: (values: Record<string, unknown>, scheduledAt: string, repeat: RepeatInterval) => void;
   onPin: () => void;
   onDelete: (runId: string) => void;
   onRerun: () => void;
   onDismiss?: () => void;
+  /** Fresh draft cards auto-fill their magic fields on mount (ticket 24). */
+  autoFill?: boolean;
 }
 
 function isFilled(value: unknown): boolean {
@@ -43,13 +35,8 @@ function isFilled(value: unknown): boolean {
   return value !== undefined && value !== null;
 }
 
-function summarize(
-  form: FormDefinition,
-  inputs: Record<string, unknown>,
-  run: RunRecord,
-): string {
-  if (run.status === "error")
-    return inputs.__error ? String(inputs.__error) : "Failed";
+function summarize(form: FormDefinition, inputs: Record<string, unknown>, run: RunRecord): string {
+  if (run.status === "error") return inputs.__error ? String(inputs.__error) : "Failed";
   if (run.status === "scheduled" && run.scheduledAt) {
     return `Scheduled for ${new Date(run.scheduledAt).toLocaleString()}`;
   }
@@ -75,6 +62,7 @@ export default function FormCard({
   onDelete,
   onRerun,
   onDismiss,
+  autoFill,
 }: FormCardProps) {
   // The latest (newest) run drives the card-level state.
   const run = runs[0];
@@ -83,28 +71,56 @@ export default function FormCard({
   const editable = run.status === "idle";
   const running = run.status === "running" || run.status === "pending";
   const hasSubmittedTabs =
-    run.status === "running" ||
-    run.status === "pending" ||
-    run.status === "success" ||
-    run.status === "error";
+    run.status === "running" || run.status === "pending" || run.status === "success" || run.status === "error";
 
   const [values, setValues] = useState<Record<string, unknown>>(run.inputs);
   const [aiPrompt, setAiPrompt] = useState("");
   const [showSchedule, setShowSchedule] = useState(false);
-  const [expanded, setExpanded] = useState(
-    defaultExpanded ?? (run.status === "idle" || running),
-  );
-  const [activeTab, setActiveTab] = useState<
-    "results" | "submitted" | "code"
-  >("results");
+  const [expanded, setExpanded] = useState(defaultExpanded ?? (run.status === "idle" || running));
+  const [activeTab, setActiveTab] = useState<"results" | "submitted" | "code">("results");
+
+  // Magic fill on open (ticket 24) — only fresh draft cards.
+  const [filling, setFilling] = useState<Set<string>>(new Set());
+  const [fillFailed, setFillFailed] = useState(false);
+  const touchedRef = useRef<Set<string>>(new Set());
+  const fillRequestedRef = useRef(false);
+
+  useEffect(() => {
+    if (!autoFill || fillRequestedRef.current) return;
+    fillRequestedRef.current = true;
+    const magicFields: Record<string, string> = {};
+    for (const f of form.fields) {
+      if (f.magic?.source === "prompt" && f.magic.prompt) magicFields[f.id] = f.magic.prompt;
+    }
+    const ids = Object.keys(magicFields);
+    if (ids.length === 0) return;
+    setFilling(new Set(ids));
+    void api.fillMagicFields(meta.slug, magicFields).then((result) => {
+      setFilling(new Set());
+      if (result.ok && result.values) {
+        setValues((prev) => {
+          const next = { ...prev };
+          for (const [id, value] of Object.entries(result.values!)) {
+            // Never overwrite values the user typed while the fill was pending.
+            if (!touchedRef.current.has(id)) next[id] = value;
+          }
+          return next;
+        });
+      } else {
+        setFillFailed(true);
+      }
+    });
+  }, [autoFill, form.fields, meta.slug]);
 
   const canSubmit = useMemo(
     () => form.fields.every((f) => !f.required || isFilled(values[f.id])),
     [form.fields, values],
   );
 
-  const setValue = (id: string, value: unknown) =>
+  const setValue = (id: string, value: unknown) => {
+    touchedRef.current.add(id);
     setValues((prev) => ({ ...prev, [id]: value }));
+  };
 
   const shouldExpand = run.status === "idle" || running ? true : expanded;
   const toggleable = !(run.status === "idle" || running);
@@ -176,21 +192,14 @@ export default function FormCard({
                     chunks={chunks[run.id] ?? []}
                   />
                 ) : (
-                  <div className="px-4 py-3 text-[13px] text-white/40">
-                    No results.
-                  </div>
+                  <div className="px-4 py-3 text-[13px] text-white/40">No results.</div>
                 )
               ) : activeTab === "code" ? (
                 <div className="px-4 py-3">
                   <CodeOutput formSlug={run.formSlug} />
                 </div>
               ) : (
-                <FormCardBody
-                  form={form}
-                  values={run.inputs}
-                  onChange={() => {}}
-                  disabled
-                />
+                <FormCardBody form={form} values={run.inputs} onChange={() => {}} disabled />
               )}
             </>
           ) : (
@@ -200,6 +209,8 @@ export default function FormCard({
               values={values}
               onChange={setValue}
               disabled={!editable}
+              filling={filling}
+              fillFailed={fillFailed}
             />
           )}
 

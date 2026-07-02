@@ -5,13 +5,18 @@ import type {
   ClideRPC,
   CreateFormInput,
   CreateFormResult,
+  DraftFormSpecInput,
+  DraftFormSpecResult,
   FormFolder,
+  FormMetaPatch,
   OutputChunk,
   Project,
   ProjectLayout,
   RepeatInterval,
   RunRecord,
   RunStatusUpdate,
+  ThreadView,
+  UIState,
 } from "../shared/types";
 
 // ---------------------------------------------------------------------------
@@ -221,6 +226,29 @@ export const api = {
     }
   },
 
+  async draftFormSpec(input: DraftFormSpecInput): Promise<DraftFormSpecResult> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.draftFormSpec(input);
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async fillMagicFields(
+    formSlug: string,
+    fields: Record<string, string>,
+  ): Promise<{ ok: boolean; values?: Record<string, unknown>; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.fillMagicFields({ formSlug, fields });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
   async setPinned(runId: string, pinned: boolean): Promise<void> {
     await request()?.setPinned({ runId, pinned });
   },
@@ -262,6 +290,34 @@ export const api = {
 
   async saveLayout(projectSlug: string, layout: ProjectLayout): Promise<void> {
     await request()?.saveLayout({ projectSlug, layout });
+  },
+
+  async getViews(project: string): Promise<ThreadView[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.getViews({ project });
+    } catch {
+      return [];
+    }
+  },
+
+  async saveViews(project: string, views: ThreadView[]): Promise<void> {
+    await request()?.saveViews({ project, views });
+  },
+
+  async getUIState(): Promise<UIState> {
+    const r = request();
+    if (!r) return { activeProject: null, activeViewByProject: {}, recentProjects: [] };
+    try {
+      return await r.getUIState({});
+    } catch {
+      return { activeProject: null, activeViewByProject: {}, recentProjects: [] };
+    }
+  },
+
+  async saveUIState(state: UIState): Promise<void> {
+    await request()?.saveUIState(state);
   },
 
   async getAISettings(): Promise<AISettings> {
@@ -306,6 +362,20 @@ export const api = {
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
       return await r.deleteForm({ projectPath, slug });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async updateFormMeta(
+    projectPath: string,
+    slug: string,
+    patch: FormMetaPatch,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.updateFormMeta({ projectPath, slug, patch });
     } catch (err) {
       return { ok: false, error: String(err) };
     }

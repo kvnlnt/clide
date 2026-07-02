@@ -4,7 +4,8 @@ import { extname, join, resolve, sep } from "node:path";
 import type { ClideRPC, OutputChunk, Project, RunStatusUpdate } from "../shared/types";
 import { loadAISettings, saveAISettings as persistAISettings } from "./ai/aiSettings";
 import { hasCredential, saveCredential } from "./ai/credentials";
-import { generateForm, runDependencyCheck } from "./ai/formGenerator";
+import { draftFormSpec, generateForm, generateFormFromSpec, runDependencyCheck } from "./ai/formGenerator";
+import { fillMagicFields } from "./ai/magicFill";
 import {
   addProject,
   listProjects,
@@ -15,14 +16,17 @@ import {
   resolveProjectByName,
 } from "./config";
 import { deleteRun as dbDeleteRun, getAllRuns, getRun, getRunHistory, indexRuns, setPinned } from "./db/history";
+import { rebuildListenerIndex, registerHop, setAutoSubmitHandler } from "./events/bus";
 import { readLayout, writeLayout } from "./forms/layout";
 import { listForms, loadFormFolder, resolveFormProject } from "./forms/loader";
 import { seedExampleProjects } from "./forms/seed";
+import { readViews, writeViews } from "./forms/views";
 import { watchForms } from "./forms/watcher";
 import { writeForm } from "./forms/writer";
 import { formDir, projectFormsDir } from "./paths";
 import { cancelRun, startRun, type RunEmitters } from "./runner/execute";
 import { disposeScheduler, initScheduler, schedule } from "./scheduler";
+import { readUIState, writeUIState } from "./uiState";
 
 const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
@@ -79,6 +83,7 @@ const emitters: RunEmitters = {
 
 async function pushFormsChanged(): Promise<void> {
   const forms = await listForms();
+  rebuildListenerIndex(forms);
   sendToView("onFormsChanged", { forms });
 }
 
@@ -241,7 +246,7 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           }
           // Resolve (or create) the destination project folder.
           const project = (await resolveProjectByName(input.project)) ?? (await addProject(input.project));
-          const generated = await generateForm(input);
+          const generated = input.spec ? await generateFormFromSpec(input, input.spec) : await generateForm(input);
           const missing = await runDependencyCheck(generated);
           if (missing) {
             return {
@@ -255,6 +260,34 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           await pushProjectsChanged();
           await pushFormsChanged();
           return { ok: true, slug };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      draftFormSpec: async (input) => {
+        try {
+          if (!(await hasCredential(input.provider))) {
+            return {
+              ok: false,
+              error: `No credentials saved for ${input.provider}.`,
+            };
+          }
+          const spec = await draftFormSpec(input);
+          return { ok: true, spec };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      fillMagicFields: async ({ formSlug, fields, payload }) => {
+        try {
+          const project = await projectForSlug(formSlug);
+          if (!project) return { ok: false, error: `Form not found: ${formSlug}` };
+          const folder = await loadFormFolder(project.path, formSlug, project.name);
+          if (!folder) return { ok: false, error: `Form not found: ${formSlug}` };
+          const values = await fillMagicFields(folder, fields, payload);
+          return { ok: true, values };
         } catch (err) {
           return { ok: false, error: String(err) };
         }
@@ -285,6 +318,24 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         const project = await pathForProjectName(projectSlug);
         if (!project) return;
         await writeLayout(project.path, projectSlug, layout);
+      },
+
+      getViews: async ({ project }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return [];
+        return await readViews(resolved.path);
+      },
+
+      saveViews: async ({ project, views }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return;
+        await writeViews(resolved.path, views);
+      },
+
+      getUIState: async () => await readUIState(),
+
+      saveUIState: async (state) => {
+        await writeUIState(state);
       },
 
       getAISettings: async () => await loadAISettings(),
@@ -323,6 +374,39 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           return { ok: false, error: String(err) };
         }
       },
+
+      updateFormMeta: async ({ projectPath, slug, patch }) => {
+        try {
+          const dir = formDir(projectPath, slug);
+          const base = projectFormsDir(projectPath);
+          if (!resolve(dir).startsWith(resolve(base) + sep)) {
+            return { ok: false, error: "Invalid form path" };
+          }
+          if (patch.name !== undefined && patch.name.trim() === "") {
+            return { ok: false, error: "Name required" };
+          }
+          const metaPath = join(dir, "meta.json");
+          const file = Bun.file(metaPath);
+          if (!(await file.exists())) {
+            return { ok: false, error: "Form not found" };
+          }
+          const raw = JSON.parse(await file.text()) as Record<string, unknown>;
+          const next = {
+            ...raw,
+            ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
+            ...(patch.description !== undefined ? { description: patch.description } : {}),
+            ...(patch.tags !== undefined ? { tags: patch.tags } : {}),
+            // Slug is identity across runs/history — never patched.
+            slug: typeof raw.slug === "string" ? raw.slug : slug,
+            updatedAt: new Date().toISOString(),
+          };
+          await Bun.write(metaPath, JSON.stringify(next, null, 2));
+          await pushFormsChanged();
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
     },
     messages: {
       logToBun: ({ msg, type }) => {
@@ -355,6 +439,53 @@ await initScheduler((projectPath, runId, formSlug, inputs) => {
     const projects = await listProjects();
     const name = projects.find((p) => p.path === projectPath)?.name ?? projectPath;
     void startRun(projectPath, name, formSlug, inputs, emitters, runId);
+  })();
+});
+
+// ---------------------------------------------------------------------------
+// Event bus — auto-submit forms listening for events emitted by finished runs.
+// ---------------------------------------------------------------------------
+rebuildListenerIndex(await listForms());
+
+setAutoSubmitHandler((event, target) => {
+  void (async () => {
+    try {
+      // Magic fill (ticket 24): fill the listening form's magic fields from the
+      // event payload before submitting. Failure never blocks the pipeline.
+      let inputs: Record<string, unknown> = {};
+      let fillError: string | null = null;
+      const folder = await loadFormFolder(target.projectPath, target.slug, target.projectName);
+      const magicFields: Record<string, string> = {};
+      for (const field of folder?.form.fields ?? []) {
+        if (field.magic?.prompt) magicFields[field.id] = field.magic.prompt;
+      }
+      if (folder && Object.keys(magicFields).length > 0) {
+        try {
+          inputs = await fillMagicFields(folder, magicFields, event.payload);
+        } catch (err) {
+          fillError = String(err);
+        }
+      }
+
+      // Pre-generate the run id so the hop depth is recorded before execution.
+      const runId = crypto.randomUUID();
+      registerHop(runId, event.sourceRunId);
+      await startRun(target.projectPath, target.projectName, target.slug, inputs, emitters, runId, {
+        event: event.name,
+        sourceRunId: event.sourceRunId,
+      });
+      if (fillError) {
+        emitters.emitChunk({
+          runId,
+          type: "stderr",
+          data: `Magic fill failed — submitted with empty values: ${fillError}`,
+          timestamp: Date.now(),
+        });
+      }
+      console.log(`[bus] "${event.name}" from ${event.sourceFormSlug} → auto-submitted ${target.slug} (${runId})`);
+    } catch (err) {
+      console.warn(`[bus] Auto-submit of ${target.slug} for "${event.name}" failed:`, err);
+    }
   })();
 });
 

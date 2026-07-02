@@ -1,14 +1,22 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, on } from "../rpc";
-import type { FormFolder, OutputChunk, Project, RepeatInterval, RunRecord } from "../types/forms";
-
-export type ViewMode = "list" | "grid";
+import type {
+  FormFolder,
+  FormMetaPatch,
+  OutputChunk,
+  Project,
+  RepeatInterval,
+  RunRecord,
+  ThreadView,
+} from "../types/forms";
 
 export interface DraftCard {
   id: string;
-  kind: "form" | "new-form";
-  formSlug?: string;
+  formSlug: string;
 }
+
+/** Closeable panel tabs that render in the tab strip alongside views. */
+export type PanelKind = "forms" | "settings" | "project-settings";
 
 interface AppState {
   forms: FormFolder[];
@@ -21,30 +29,48 @@ interface AppState {
   recentSlugs: string[];
 
   activeProject: string | null;
+  /** Project names by recency of activation, most recent first (persisted). */
+  recentProjects: string[];
   sidebarOpen: boolean;
-  viewMode: ViewMode;
-  selectorOpen: boolean;
-  settingsOpen: boolean;
   newProjectOpen: boolean;
+  newFormOpen: boolean;
+
+  /** Panel tabs currently open in the tab strip (order = display order). */
+  openPanels: PanelKind[];
+  /** The focused panel tab; null means the thread is showing. */
+  activePanel: PanelKind | null;
+  /** Open (or focus, if already open) a panel tab. */
+  openPanel: (kind: PanelKind) => void;
+  /** Close a panel tab; falls back to the thread if it was active. */
+  closePanel: (kind: PanelKind) => void;
+  /** Focus an open panel tab, or null to return to the thread. */
+  focusPanel: (kind: PanelKind | null) => void;
+
+  /** Saved thread views for the active project. "All" is implicit (activeViewId === null). */
+  views: ThreadView[];
+  activeViewId: string | null;
+  setActiveView: (id: string | null) => void;
+  createView: () => ThreadView | null;
+  updateView: (view: ThreadView) => void;
+  deleteView: (id: string) => void;
+  /** Move the dragged view to the position of the target view (drag-sort). */
+  reorderView: (dragId: string, targetId: string) => void;
 
   setActiveProject: (p: string | null) => void;
   toggleSidebar: () => void;
-  setViewMode: (m: ViewMode) => void;
-  openSelector: () => void;
-  closeSelector: () => void;
-  openSettings: () => void;
-  closeSettings: () => void;
   openNewProject: () => void;
   closeNewProject: () => void;
+  openNewForm: () => void;
+  closeNewForm: () => void;
 
   addFormDraft: (formSlug: string) => void;
-  addNewFormDraft: () => void;
   removeDraft: (id: string) => void;
 
   createProject: (name: string, path?: string) => Promise<{ ok: boolean; error?: string }>;
   renameProject: (path: string, name: string) => Promise<{ ok: boolean; error?: string }>;
   deleteProject: (path: string, deleteFiles?: boolean) => Promise<void>;
   deleteForm: (projectPath: string, slug: string) => Promise<{ ok: boolean; error?: string }>;
+  updateFormMeta: (projectPath: string, slug: string, patch: FormMetaPatch) => Promise<{ ok: boolean; error?: string }>;
 
   submitRun: (formSlug: string, inputs: Record<string, unknown>) => Promise<void>;
   scheduleRun: (
@@ -79,13 +105,120 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [recentSlugs, setRecentSlugs] = useState<string[]>([]);
 
   const [activeProject, setActiveProject] = useState<string | null>(null);
+  const [recentProjects, setRecentProjects] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [selectorOpen, setSelectorOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [newFormOpen, setNewFormOpen] = useState(false);
+  const [openPanels, setOpenPanels] = useState<PanelKind[]>([]);
+  const [activePanel, setActivePanel] = useState<PanelKind | null>(null);
+
+  const [views, setViews] = useState<ThreadView[]>([]);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
 
   const draftSeq = useRef(0);
+  /** Last active view per project — restored on project switch, persisted globally. */
+  const viewByProjectRef = useRef<Record<string, string>>({});
+  /** Mirror of recentProjects for synchronous persistence. */
+  const recentsRef = useRef<string[]>([]);
+  /** Guards against persisting UI state before boot restore completes. */
+  const bootedRef = useRef(false);
+  /** True while a project switch is restoring its saved view (skip persist). */
+  const restoringRef = useRef(false);
+
+  // Load the active project's saved views on every project switch, then
+  // restore the last active view for that project (title tab otherwise).
+  useEffect(() => {
+    restoringRef.current = true;
+    setActiveViewId(null);
+    if (!activeProject) {
+      setViews([]);
+      restoringRef.current = false;
+      return;
+    }
+    let cancelled = false;
+    void api.getViews(activeProject).then((v) => {
+      if (cancelled) return;
+      setViews(v);
+      const want = viewByProjectRef.current[activeProject];
+      if (want && v.some((view) => view.id === want && !view.hidden)) {
+        setActiveViewId(want);
+      }
+      restoringRef.current = false;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProject]);
+
+  // Persist UI state (active project, per-project view, project recency) on change.
+  useEffect(() => {
+    if (!bootedRef.current || restoringRef.current) return;
+    if (activeProject) {
+      if (activeViewId) viewByProjectRef.current[activeProject] = activeViewId;
+      else delete viewByProjectRef.current[activeProject];
+      recentsRef.current = [activeProject, ...recentsRef.current.filter((p) => p !== activeProject)].slice(0, 10);
+      setRecentProjects(recentsRef.current);
+    }
+    void api.saveUIState({
+      activeProject,
+      activeViewByProject: { ...viewByProjectRef.current },
+      recentProjects: [...recentsRef.current],
+    });
+  }, [activeProject, activeViewId]);
+
+  const persistViews = useCallback(
+    (next: ThreadView[]) => {
+      setViews(next);
+      if (activeProject) void api.saveViews(activeProject, next);
+    },
+    [activeProject],
+  );
+
+  const setActiveView = useCallback((id: string | null) => {
+    setActiveViewId(id);
+    setActivePanel(null);
+  }, []);
+
+  const createView = useCallback((): ThreadView | null => {
+    if (!activeProject) return null;
+    const view: ThreadView = {
+      id: crypto.randomUUID(),
+      name: `View ${views.length + 1}`,
+      filters: {},
+    };
+    persistViews([...views, view]);
+    setActiveViewId(view.id);
+    return view;
+  }, [activeProject, views, persistViews]);
+
+  const updateView = useCallback(
+    (view: ThreadView) => {
+      persistViews(views.map((v) => (v.id === view.id ? view : v)));
+    },
+    [views, persistViews],
+  );
+
+  const deleteView = useCallback(
+    (id: string) => {
+      persistViews(views.filter((v) => v.id !== id));
+      setActiveViewId((cur) => (cur === id ? null : cur));
+    },
+    [views, persistViews],
+  );
+
+  const reorderView = useCallback(
+    (dragId: string, targetId: string) => {
+      if (dragId === targetId) return;
+      const from = views.findIndex((v) => v.id === dragId);
+      const to = views.findIndex((v) => v.id === targetId);
+      if (from === -1 || to === -1) return;
+      const next = [...views];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved!);
+      persistViews(next);
+    },
+    [views, persistViews],
+  );
 
   const refreshForms = useCallback(async () => {
     const f = await api.listForms();
@@ -102,12 +235,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRuns(r);
   }, []);
 
-  // Initial load.
+  // Initial load. Restores persisted view/recency state once the project list
+  // is known. The active project is intentionally NOT restored — the app
+  // always launches on the welcome screen.
   useEffect(() => {
-    void refreshProjects();
+    void (async () => {
+      const [projects, ui] = await Promise.all([api.listProjects(), api.getUIState()]);
+      setProjectList(projects);
+      viewByProjectRef.current = { ...ui.activeViewByProject };
+      recentsRef.current = ui.recentProjects;
+      setRecentProjects(ui.recentProjects);
+      bootedRef.current = true;
+    })();
     void refreshForms();
     void refreshRuns();
-  }, [refreshProjects, refreshForms, refreshRuns]);
+  }, [refreshForms, refreshRuns]);
 
   // Push subscriptions.
   useEffect(() => {
@@ -156,29 +298,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [projectList, forms]);
 
   const toggleSidebar = useCallback(() => setSidebarOpen((s) => !s), []);
-  const openSelector = useCallback(() => setSelectorOpen(true), []);
-  const closeSelector = useCallback(() => setSelectorOpen(false), []);
-  const openSettings = useCallback(() => setSettingsOpen(true), []);
-  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const openPanel = useCallback((kind: PanelKind) => {
+    setOpenPanels((prev) => (prev.includes(kind) ? prev : [...prev, kind]));
+    setActivePanel(kind);
+  }, []);
+  const closePanel = useCallback((kind: PanelKind) => {
+    setOpenPanels((prev) => prev.filter((k) => k !== kind));
+    setActivePanel((cur) => (cur === kind ? null : cur));
+  }, []);
+  const focusPanel = useCallback((kind: PanelKind | null) => setActivePanel(kind), []);
   const openNewProject = useCallback(() => setNewProjectOpen(true), []);
   const closeNewProject = useCallback(() => setNewProjectOpen(false), []);
+  const openNewForm = useCallback(() => {
+    closePanel("forms");
+    setNewFormOpen(true);
+  }, [closePanel]);
+  const closeNewForm = useCallback(() => setNewFormOpen(false), []);
+
+  // A project-settings tab has nothing to target without an active project.
+  useEffect(() => {
+    if (!activeProject) closePanel("project-settings");
+  }, [activeProject, closePanel]);
 
   const removeDraft = useCallback((id: string) => {
     setDrafts((prev) => prev.filter((d) => d.id !== id));
   }, []);
 
-  const addFormDraft = useCallback((formSlug: string) => {
-    const id = `draft-${draftSeq.current++}`;
-    setDrafts((prev) => [{ id, kind: "form", formSlug }, ...prev]);
-    setRecentSlugs((prev) => [formSlug, ...prev.filter((s) => s !== formSlug)].slice(0, 5));
-    setSelectorOpen(false);
-  }, []);
-
-  const addNewFormDraft = useCallback(() => {
-    const id = `draft-${draftSeq.current++}`;
-    setDrafts((prev) => [{ id, kind: "new-form" }, ...prev]);
-    setSelectorOpen(false);
-  }, []);
+  const addFormDraft = useCallback(
+    (formSlug: string) => {
+      const id = `draft-${draftSeq.current++}`;
+      setDrafts((prev) => [{ id, formSlug }, ...prev]);
+      setRecentSlugs((prev) => [formSlug, ...prev.filter((s) => s !== formSlug)].slice(0, 5));
+      closePanel("forms");
+    },
+    [closePanel],
+  );
 
   const createProject = useCallback(
     async (name: string, path?: string) => {
@@ -225,6 +379,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteForm = useCallback(
     async (projectPath: string, slug: string) => {
       const res = await api.deleteForm(projectPath, slug);
+      if (res.ok) await refreshForms();
+      return res;
+    },
+    [refreshForms],
+  );
+
+  const updateFormMeta = useCallback(
+    async (projectPath: string, slug: string, patch: FormMetaPatch) => {
+      const res = await api.updateFormMeta(projectPath, slug, patch);
       if (res.ok) await refreshForms();
       return res;
     },
@@ -290,27 +453,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     drafts,
     recentSlugs,
     activeProject,
+    recentProjects,
     sidebarOpen,
-    viewMode,
-    selectorOpen,
-    settingsOpen,
     newProjectOpen,
+    newFormOpen,
+    openPanels,
+    activePanel,
+    openPanel,
+    closePanel,
+    focusPanel,
+    views,
+    activeViewId,
+    setActiveView,
+    createView,
+    updateView,
+    deleteView,
+    reorderView,
     setActiveProject,
     toggleSidebar,
-    setViewMode,
-    openSelector,
-    closeSelector,
-    openSettings,
-    closeSettings,
     openNewProject,
     closeNewProject,
+    openNewForm,
+    closeNewForm,
     addFormDraft,
-    addNewFormDraft,
     removeDraft,
     createProject,
     renameProject,
     deleteProject,
     deleteForm,
+    updateFormMeta,
     submitRun,
     scheduleRun,
     cancelRun,

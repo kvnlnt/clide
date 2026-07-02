@@ -8,12 +8,7 @@ interface StatusIconProps {
   mode?: "default" | "dot";
 }
 
-export default function StatusIcon({
-  status,
-  pinned,
-  size = 18,
-  mode = "default",
-}: StatusIconProps) {
+export default function StatusIcon({ status, size = 18, mode = "default" }: StatusIconProps) {
   if (mode === "dot") {
     return (
       <Circle
@@ -42,8 +37,6 @@ export default function StatusIcon({
     case "scheduled":
       return <AlarmClock size={size} className="text-orange-400" />;
     default:
-      return (
-        <span style={{ width: size, height: size }} className="inline-block" />
-      );
+      return <span style={{ width: size, height: size }} className="inline-block" />;
   }
 }

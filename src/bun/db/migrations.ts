@@ -26,6 +26,8 @@ export function migrate(db: Database): void {
     pinned: "ALTER TABLE runs ADD COLUMN pinned INTEGER DEFAULT 0",
     scheduled_at: "ALTER TABLE runs ADD COLUMN scheduled_at TEXT",
     repeat_interval: "ALTER TABLE runs ADD COLUMN repeat_interval TEXT",
+    // Ticket 23: provenance of event-bus auto-submitted runs (JSON RunTrigger).
+    triggered_by: "ALTER TABLE runs ADD COLUMN triggered_by TEXT",
   };
 
   for (const [column, sql] of Object.entries(additions)) {

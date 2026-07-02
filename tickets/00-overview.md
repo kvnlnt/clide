@@ -39,23 +39,34 @@ Each form belongs to exactly one **project**, recorded as a `project` field in `
 
 Completed implementation tickets are archived in [`tickets/done/`](done/). Open tickets live at the top level of [`tickets/`](.).
 
-| #   | Ticket              | Description                                                     | Status  |
-| --- | ------------------- | --------------------------------------------------------------- | ------- |
-| 01  | App Shell           | Electrobun window, IPC bridge, dev/prod config                  | ✅ Done |
-| 02  | Data Layer          | Filesystem watcher, form loader, run history SQLite             | ✅ Done |
-| 03  | Sidebar             | Project nav, form lists, badge counts                           | ✅ Done |
-| 04  | Top Bar             | Breadcrumb, command input, view toggles                         | ✅ Done |
-| 05  | Form Card           | Expanded/collapsed form component, all states                   | ✅ Done |
-| 06  | Thread              | Main scrollable thread, grouping, ordering                      | ✅ Done |
-| 07  | Execution Engine    | Script runner, streaming output, status FSM                     | ✅ Done |
-| 08  | Output Components   | Table, image, audio/video, raw text viewers                     | ✅ Done |
-| 09  | Form Selector       | Autocomplete command palette for picking forms                  | ✅ Done |
-| 10  | New Form Creator    | AI-powered form + script generation flow                        | ✅ Done |
-| 11  | Pin & Schedule      | Pin forms, scheduled runs, alarm states                         | ✅ Done |
-| 12  | Grid View           | Customizable grid layout alternative to thread                  | ✅ Done |
-| 13  | Grouped Submissions | Combine consecutive same-form runs into one card with accordion | ✅ Done |
-| 14  | Project Dir Picker  | Native directory chooser for project creation folder path       | ✅ Done |
-| 15  | Marketing Website   | Auto-generate a basic static site into www/ via a script        | ✅ Done |
-| 16  | Project Mgmt Cleanup | New-vs-existing folder choice, picker-only path, safer delete, show folder | ✅ Done |
-| 17  | Projects Live Anywhere | Folder-picker-only creation, show picked path, required fields + Create enablement | ✅ Done |
-| 18  | Project Settings Tabs & Forms Manager | Tabbed Project Settings modal; new Forms tab to list/delete project forms | 📋 Open |
+| #   | Ticket                                | Description                                                                            | Status        |
+| --- | ------------------------------------- | -------------------------------------------------------------------------------------- | ------------- |
+| 01  | App Shell                             | Electrobun window, IPC bridge, dev/prod config                                         | ✅ Done       |
+| 02  | Data Layer                            | Filesystem watcher, form loader, run history SQLite                                    | ✅ Done       |
+| 03  | Sidebar                               | Project nav, form lists, badge counts                                                  | ✅ Done       |
+| 04  | Top Bar                               | Breadcrumb, command input, view toggles                                                | ✅ Done       |
+| 05  | Form Card                             | Expanded/collapsed form component, all states                                          | ✅ Done       |
+| 06  | Thread                                | Main scrollable thread, grouping, ordering                                             | ✅ Done       |
+| 07  | Execution Engine                      | Script runner, streaming output, status FSM                                            | ✅ Done       |
+| 08  | Output Components                     | Table, image, audio/video, raw text viewers                                            | ✅ Done       |
+| 09  | Form Selector                         | Autocomplete command palette for picking forms                                         | ✅ Done       |
+| 10  | New Form Creator                      | AI-powered form + script generation flow                                               | ✅ Done       |
+| 11  | Pin & Schedule                        | Pin forms, scheduled runs, alarm states                                                | ✅ Done       |
+| 12  | Grid View                             | Customizable grid layout alternative to thread                                         | ✅ Done       |
+| 13  | Grouped Submissions                   | Combine consecutive same-form runs into one card with accordion                        | ✅ Done       |
+| 14  | Project Dir Picker                    | Native directory chooser for project creation folder path                              | ✅ Done       |
+| 15  | Marketing Website                     | Auto-generate a basic static site into www/ via a script                               | ✅ Done       |
+| 16  | Project Mgmt Cleanup                  | New-vs-existing folder choice, picker-only path, safer delete, show folder             | ✅ Done       |
+| 17  | Projects Live Anywhere                | Folder-picker-only creation, show picked path, required fields + Create enablement     | ✅ Done       |
+| 18  | Project Settings Tabs & Forms Manager | Superseded by ticket 21 — forms CRUD now lives in the unified Forms panel (⌘P)         | ❌ Superseded |
+| 19  | Views: Thread Filter Tabs             | Browser-style view tabs in the header; saved per-project filters over the thread       | ✅ Done       |
+| 20  | Remove List/Grid Toggle               | Retire the grid view toggle; thread becomes the only presentation for now              | ✅ Done       |
+| 21  | Header Settings & Forms CRUD          | Settings button moves to header; remove header search gesture; unified forms CRUD flow | ✅ Done       |
+| 22  | Spec-First Form Creation              | 3-box describe step → AI-drafted editable spec (inputs, procedure, outputs, events)    | ✅ Done       |
+| 23  | Internal Event Bus                    | Runs emit events on success; listening forms auto-submit with payload; cycle guard     | ✅ Done       |
+| 24  | Magic Fields Auto-Fill                | AI fills magic fields on form open and from event payloads; always user-editable       | ✅ Done       |
+| 25  | Project Title Tab & Menu              | "All" tab shows active project name; project Forms/Settings menu moves onto it         | ✅ Done       |
+| 26  | Forms & Settings as Tabs              | Forms/Settings/Project-Settings become closeable panel tabs instead of modals          | ✅ Done       |
+| 27  | View-Scoped Pinning                   | Pinned float/bucket only inside saved views; title tab stays chronological             | ✅ Done       |
+| 28  | View Management & Form Picker         | Restart persistence, hide/pin/sort views via manager popover, searchable form picker   | ✅ Done       |
+| 29  | Welcome Screen                        | Branded no-project landing: create/open/recent projects, staggered entrance animation  | ✅ Done       |

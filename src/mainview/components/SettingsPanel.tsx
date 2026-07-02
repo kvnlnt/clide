@@ -50,11 +50,8 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
     "w-full rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30";
 
   return (
-    <div className="absolute inset-0 z-40 flex items-start justify-center bg-black/50 pt-16" onMouseDown={onClose}>
-      <div
-        className="w-[480px] overflow-hidden rounded-lg border border-clide-border bg-clide-panel shadow-2xl"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+    <div className="clide-scroll flex flex-1 justify-center overflow-y-auto p-6">
+      <div className="h-fit w-[480px] overflow-hidden rounded-lg border border-clide-border bg-clide-panel">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-clide-border px-5 py-4">
           <span className="text-[14px] font-bold text-white">Settings</span>

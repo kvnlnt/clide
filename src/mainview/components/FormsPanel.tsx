@@ -1,0 +1,337 @@
+import { FolderOpen, Pencil, Sparkles, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useApp } from "../context/AppContext";
+import { useFormSearch } from "../hooks/useFormSearch";
+import { api } from "../rpc";
+import type { FormFolder } from "../types/forms";
+
+/**
+ * Unified forms CRUD surface for the active project (or all projects when no
+ * project is active): fuzzy search, run, AI-powered create, metadata edit, and
+ * delete — rendered as a panel tab pane. Opened via ⌘P or the project menu on
+ * the title tab.
+ */
+export default function FormsPanel() {
+  const { forms, recentSlugs, addFormDraft, openNewForm, closePanel, activeProject, deleteForm, updateFormMeta } =
+    useApp();
+  const scopedForms = activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms;
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const [editingSlug, setEditingSlug] = useState<string | null>(null);
+  const [confirmingSlug, setConfirmingSlug] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const results = useFormSearch(scopedForms, query, recentSlugs);
+  const createIndex = results.length; // "Create new form" sits after results.
+  const total = results.length + 1;
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    setActive(0);
+  }, [query]);
+
+  const choose = (index: number) => {
+    if (index === createIndex) {
+      openNewForm();
+      return;
+    }
+    const form = results[index];
+    if (form) addFormDraft(form.meta.slug);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive((a) => (a + 1) % total);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((a) => (a - 1 + total) % total);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      choose(active);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      if (query.trim() !== "") setQuery("");
+      else closePanel("forms");
+    }
+  };
+
+  return (
+    <div className="flex flex-1 justify-center overflow-hidden p-6">
+      <div className="flex h-full w-[560px] flex-col overflow-hidden rounded-lg border border-clide-border bg-clide-panel">
+        <div className="flex items-center justify-between border-b border-clide-border px-4 py-3">
+          <span className="text-[13px] font-bold text-white">
+            Forms
+            <span className="ml-2 font-normal text-white/40">{activeProject ?? "All projects"}</span>
+          </span>
+          <button
+            onClick={() => closePanel("forms")}
+            className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
+          >
+            <X size={14} />
+          </button>
+        </div>
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Search forms…"
+          className="w-full bg-clide-bg px-4 py-3 text-[14px] text-white outline-none placeholder:text-white/30"
+        />
+        <div className="clide-scroll flex-1 overflow-y-auto">
+          {results.length === 0 && query.trim() !== "" && (
+            <div className="px-4 py-3 text-[13px] italic text-white/30">No forms match “{query}”</div>
+          )}
+          {results.map((form, i) => (
+            <FormsPanelRow
+              key={form.meta.slug}
+              form={form}
+              active={active === i}
+              showProject={!activeProject}
+              editing={editingSlug === form.meta.slug}
+              confirming={confirmingSlug === form.meta.slug}
+              onSelect={() => choose(i)}
+              onHover={() => setActive(i)}
+              onEdit={() => {
+                setEditingSlug((cur) => (cur === form.meta.slug ? null : form.meta.slug));
+                setConfirmingSlug(null);
+              }}
+              onConfirmDelete={() => {
+                setConfirmingSlug((cur) => (cur === form.meta.slug ? null : form.meta.slug));
+                setEditingSlug(null);
+              }}
+              onCloseEditors={() => {
+                setEditingSlug(null);
+                setConfirmingSlug(null);
+              }}
+              deleteForm={deleteForm}
+              updateFormMeta={updateFormMeta}
+            />
+          ))}
+          <button
+            onClick={() => choose(createIndex)}
+            onMouseEnter={() => setActive(createIndex)}
+            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[14px] ${
+              active === createIndex ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"
+            }`}
+          >
+            <Sparkles size={15} className="text-white/60" />
+            <span className="italic text-white/70">✦ Create new form...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface FormsPanelRowProps {
+  form: FormFolder;
+  active: boolean;
+  showProject: boolean;
+  editing: boolean;
+  confirming: boolean;
+  onSelect: () => void;
+  onHover: () => void;
+  onEdit: () => void;
+  onConfirmDelete: () => void;
+  onCloseEditors: () => void;
+  deleteForm: (projectPath: string, slug: string) => Promise<{ ok: boolean; error?: string }>;
+  updateFormMeta: (
+    projectPath: string,
+    slug: string,
+    patch: { name?: string; description?: string; tags?: string[] },
+  ) => Promise<{ ok: boolean; error?: string }>;
+}
+
+function FormsPanelRow({
+  form,
+  active,
+  showProject,
+  editing,
+  confirming,
+  onSelect,
+  onHover,
+  onEdit,
+  onConfirmDelete,
+  onCloseEditors,
+  deleteForm,
+  updateFormMeta,
+}: FormsPanelRowProps) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const remove = async () => {
+    setBusy(true);
+    const res = await deleteForm(form.projectPath, form.meta.slug);
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.error ?? "Delete failed");
+      onCloseEditors();
+    }
+  };
+
+  return (
+    <div className={`group ${active ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"}`} onMouseEnter={onHover}>
+      <div className="flex w-full items-start gap-1 px-3 py-2">
+        <button onClick={onSelect} className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left">
+          <div className="flex w-full items-center justify-between gap-2">
+            <span className="truncate text-[14px] text-white">{form.meta.name}</span>
+            {showProject && <span className="shrink-0 text-[12px] text-clide-muted">{form.meta.project}</span>}
+          </div>
+          {form.meta.description && (
+            <span className="w-full truncate text-[12px] text-white/40">{form.meta.description}</span>
+          )}
+          {form.meta.tags.length > 0 && (
+            <span className="w-full truncate text-[11px] text-white/30">{form.meta.tags.join(" · ")}</span>
+          )}
+        </button>
+        <div className="flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100">
+          <button
+            type="button"
+            onClick={onEdit}
+            title="Edit name, description & tags"
+            className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => void api.openFolder(`${form.projectPath}/forms/${form.meta.slug}`)}
+            title="Reveal folder in Finder"
+            className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
+          >
+            <FolderOpen size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={onConfirmDelete}
+            title="Delete form"
+            className="flex h-6 w-6 items-center justify-center rounded text-red-400/70 hover:bg-white/10 hover:text-red-400"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+      </div>
+
+      {error && <div className="px-3 pb-2 text-[11px] text-red-400">{error}</div>}
+
+      {editing && (
+        <FormMetaEditor
+          form={form}
+          busy={busy}
+          onSave={async (patch) => {
+            setBusy(true);
+            setError(null);
+            const res = await updateFormMeta(form.projectPath, form.meta.slug, patch);
+            setBusy(false);
+            if (res.ok) {
+              onCloseEditors();
+            } else {
+              setError(res.error ?? "Save failed");
+            }
+          }}
+          onCancel={onCloseEditors}
+        />
+      )}
+
+      {confirming && (
+        <div className="mx-3 mb-2 flex flex-col gap-1.5 rounded-md border border-white/5 bg-clide-surface px-2.5 py-2">
+          <span className="text-[12px] text-white/70">
+            Delete form “{form.meta.name}”? Files on disk are removed and history cards in the thread lose their form.
+          </span>
+          <div className="flex gap-1.5">
+            <button
+              disabled={busy}
+              onClick={() => void remove()}
+              className="rounded-md bg-red-500/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-red-500 disabled:opacity-40"
+            >
+              Delete
+            </button>
+            <button
+              onClick={onCloseEditors}
+              className="rounded-md px-2.5 py-1 text-[11px] text-white/50 hover:bg-white/5"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface FormMetaEditorProps {
+  form: FormFolder;
+  busy: boolean;
+  onSave: (patch: { name?: string; description?: string; tags?: string[] }) => Promise<void>;
+  onCancel: () => void;
+}
+
+function FormMetaEditor({ form, busy, onSave, onCancel }: FormMetaEditorProps) {
+  const [name, setName] = useState(form.meta.name);
+  const [description, setDescription] = useState(form.meta.description);
+  const [tags, setTags] = useState(form.meta.tags.join(", "));
+  const [error, setError] = useState<string | null>(null);
+
+  const inputBase =
+    "w-full rounded-md border border-clide-border bg-clide-bg px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30";
+
+  const save = async () => {
+    if (name.trim() === "") {
+      setError("Name required");
+      return;
+    }
+    await onSave({
+      name: name.trim(),
+      description,
+      tags: tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t !== ""),
+    });
+  };
+
+  return (
+    <div
+      className="mx-3 mb-2 flex flex-col gap-2 rounded-md border border-white/5 bg-clide-surface px-2.5 py-2"
+      onKeyDown={(e) => {
+        // Keep panel-level palette navigation out of the edit form.
+        e.stopPropagation();
+        if (e.key === "Escape") onCancel();
+      }}
+    >
+      <div className="flex flex-col gap-1">
+        <label className="text-[11px] font-medium text-white/50">Name</label>
+        <input autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputBase} />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-[11px] font-medium text-white/50">Description</label>
+        <input value={description} onChange={(e) => setDescription(e.target.value)} className={inputBase} />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-[11px] font-medium text-white/50">Tags (comma-separated)</label>
+        <input value={tags} onChange={(e) => setTags(e.target.value)} className={inputBase} />
+      </div>
+      <span className="text-[11px] text-white/30">
+        Fields and the script are edited on disk — use “Reveal folder in Finder”.
+      </span>
+      {error && <span className="text-[11px] text-red-400">{error}</span>}
+      <div className="flex gap-1.5">
+        <button
+          disabled={busy}
+          onClick={() => void save()}
+          className="rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-white/20 disabled:opacity-40"
+        >
+          Save
+        </button>
+        <button onClick={onCancel} className="rounded-md px-2.5 py-1 text-[11px] text-white/50 hover:bg-white/5">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}

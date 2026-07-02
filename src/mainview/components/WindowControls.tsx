@@ -1,12 +1,12 @@
-import { Minus, PanelLeft, Search, X } from "lucide-react";
+import { House, Minus, PanelLeft, Settings, X } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
+import ViewTabs from "./ViewTabs";
 
 export default function WindowControls() {
-  const { toggleSidebar, activeProject, openSelector, setViewMode, viewMode } =
-    useApp();
+  const { toggleSidebar, openPanel, activeProject, setActiveProject, focusPanel } = useApp();
   return (
-    <div className="window-controls flex gap-1 justify-between w-full placeitems-center transition-colors rounded-[15px] cursor-move">
+    <div className="window-controls flex justify-between w-full placeitems-center transition-colors rounded-[15px] cursor-move">
       <div className="flex p-1.5 gap-2">
         <button
           className="text-black bg-red-600/30 hover:bg-red-600 rounded-full h-4 w-4 flex items-center justify-center transition-colors"
@@ -21,24 +21,35 @@ export default function WindowControls() {
           <Minus size={10} />
         </button>
       </div>
-      <button
-        className="flex gap-2 text-white/30 transition-colors hover:text-white flex items-center justify-center rounded-full"
-        onClick={openSelector}
-      >
-        <Search size={15} />
-        <span className="text-sm">
-          {activeProject ? activeProject : "CLIDE"}
-        </span>
-      </button>
-      <div className="flex p-1.5 gap-3 justify-end">
-        <button
-          onClick={toggleSidebar}
-          title="Toggle sidebar"
-          className="text-white/30 transition-colors hover:text-white flex items-center justify-center rounded-full"
-        >
-          <PanelLeft size={18} />
-        </button>
-      </div>
+      <ViewTabs />
+      {activeProject !== null && (
+        <div className="flex shrink-0 items-center gap-3 px-1.5">
+          <button
+            onClick={() => {
+              setActiveProject(null);
+              focusPanel(null);
+            }}
+            title="Home"
+            className="text-white/30 transition-colors hover:text-white flex items-center justify-center rounded-full"
+          >
+            <House size={18} />
+          </button>
+          <button
+            onClick={() => openPanel("settings")}
+            title="Settings"
+            className="text-white/30 transition-colors hover:text-white flex items-center justify-center rounded-full"
+          >
+            <Settings size={18} />
+          </button>
+          <button
+            onClick={toggleSidebar}
+            title="Toggle sidebar"
+            className="text-white/30 transition-colors hover:text-white flex items-center justify-center rounded-full"
+          >
+            <PanelLeft size={18} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

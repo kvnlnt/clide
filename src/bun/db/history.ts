@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import type { RepeatInterval, RunRecord, RunStatus } from "../../shared/types";
+import type { RepeatInterval, RunRecord, RunStatus, RunTrigger } from "../../shared/types";
 import { ensureProjectDirs, projectHistoryDb } from "../paths";
 import { migrate } from "./migrations";
 
@@ -15,6 +15,7 @@ interface RunRow {
   pinned: number;
   scheduled_at: string | null;
   repeat_interval: string | null;
+  triggered_by: string | null;
 }
 
 /** projectPath -> open Database. */
@@ -59,6 +60,15 @@ function rowToRecord(row: RunRow): RunRecord {
   } catch {
     inputs = {};
   }
+  let triggeredBy: RunTrigger | null = null;
+  if (row.triggered_by) {
+    try {
+      const parsed = JSON.parse(row.triggered_by) as RunTrigger;
+      if (typeof parsed?.event === "string" && typeof parsed?.sourceRunId === "string") triggeredBy = parsed;
+    } catch {
+      triggeredBy = null;
+    }
+  }
   return {
     id: row.id,
     formSlug: row.form_slug,
@@ -71,6 +81,7 @@ function rowToRecord(row: RunRow): RunRecord {
     pinned: row.pinned === 1,
     scheduledAt: row.scheduled_at,
     repeatInterval: (row.repeat_interval as RepeatInterval | null) ?? null,
+    triggeredBy,
   };
 }
 
@@ -83,12 +94,13 @@ export interface CreateRunInput {
   outputPath?: string | null;
   scheduledAt?: string | null;
   repeatInterval?: RepeatInterval | null;
+  triggeredBy?: RunTrigger | null;
 }
 
 export function createRun(projectPath: string, input: CreateRunInput): RunRecord {
   getDb(projectPath).run(
-    `INSERT INTO runs (id, form_slug, inputs, status, started_at, output_path, scheduled_at, repeat_interval, pinned)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+    `INSERT INTO runs (id, form_slug, inputs, status, started_at, output_path, scheduled_at, repeat_interval, pinned, triggered_by)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
     [
       input.id,
       input.formSlug,
@@ -98,6 +110,7 @@ export function createRun(projectPath: string, input: CreateRunInput): RunRecord
       input.outputPath ?? null,
       input.scheduledAt ?? null,
       input.repeatInterval ?? null,
+      input.triggeredBy ? JSON.stringify(input.triggeredBy) : null,
     ],
   );
   runIndex.set(input.id, projectPath);

@@ -1,6 +1,16 @@
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { FieldType, FormDefinition, FormField, FormFolder, FormMeta, OutputType } from "../../shared/types";
+import type {
+  FieldType,
+  FormDefinition,
+  FormEvents,
+  FormField,
+  FormFolder,
+  FormMeta,
+  MagicField,
+  OutputSpec,
+  OutputType,
+} from "../../shared/types";
 import { listProjects } from "../config";
 import { ensureProjectDirs, projectFormsDir } from "../paths";
 
@@ -37,8 +47,21 @@ function validateMeta(raw: unknown, slug: string, projectName: string): FormMeta
       raw.interpreter === "bash"
         ? raw.interpreter
         : "bash",
+    aiProvider:
+      raw.aiProvider === "claude" || raw.aiProvider === "openai" || raw.aiProvider === "ollama"
+        ? raw.aiProvider
+        : undefined,
+    aiModel: typeof raw.aiModel === "string" && raw.aiModel.trim() ? raw.aiModel : undefined,
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date().toISOString(),
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
+  };
+}
+
+function validateMagic(raw: unknown): MagicField | undefined {
+  if (!isObject(raw) || typeof raw.prompt !== "string" || !raw.prompt.trim()) return undefined;
+  return {
+    prompt: raw.prompt,
+    source: raw.source === "event" ? "event" : "prompt",
   };
 }
 
@@ -54,7 +77,33 @@ function validateField(raw: unknown): FormField | null {
     required: raw.required === true,
     options: Array.isArray(raw.options) ? raw.options.filter((o): o is string => typeof o === "string") : undefined,
     argTemplate: typeof raw.argTemplate === "string" ? raw.argTemplate : undefined,
+    magic: validateMagic(raw.magic),
   };
+}
+
+function validateOutputs(raw: unknown, outputType: OutputType): OutputSpec[] {
+  const outputs: OutputSpec[] = [];
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (!isObject(item)) continue;
+      const kind =
+        item.kind === "effect" || OUTPUT_TYPES.includes(item.kind as OutputType)
+          ? (item.kind as OutputSpec["kind"])
+          : "text";
+      outputs.push({
+        kind,
+        description: typeof item.description === "string" ? item.description : undefined,
+      });
+    }
+  }
+  return outputs.length > 0 ? outputs : [{ kind: outputType }];
+}
+
+function validateEvents(raw: unknown): FormEvents {
+  const obj = isObject(raw) ? raw : {};
+  const names = (v: unknown) =>
+    Array.isArray(v) ? v.filter((n): n is string => typeof n === "string" && n.trim().length > 0) : [];
+  return { emits: names(obj.emits), listensFor: names(obj.listensFor) };
 }
 
 function validateForm(raw: unknown): FormDefinition | null {
@@ -66,6 +115,8 @@ function validateForm(raw: unknown): FormDefinition | null {
     fields,
     aiPromptField: raw.aiPromptField === true,
     outputType,
+    outputs: validateOutputs(raw.outputs, outputType),
+    events: validateEvents(raw.events),
     scriptFile: typeof raw.scriptFile === "string" ? raw.scriptFile : "script.sh",
   };
 }

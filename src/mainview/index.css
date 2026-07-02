@@ -56,9 +56,41 @@ body {
 
 /* Selected sidebar row radial highlight (from Figma). */
 .clide-active-row {
-  background: radial-gradient(
-    circle at 30% 50%,
-    rgba(86, 86, 86, 0.5),
-    rgba(86, 86, 86, 0.2)
-  );
+  background: radial-gradient(circle at 30% 50%, rgba(86, 86, 86, 0.5), rgba(86, 86, 86, 0.2));
+}
+
+/* Welcome screen: staggered entrance (set animation-delay inline). */
+@keyframes clide-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.clide-rise {
+  animation: clide-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Welcome screen: slow ambient glow on the brand mark. */
+@keyframes clide-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 24px 0 rgba(255, 255, 255, 0.04);
+  }
+  50% {
+    box-shadow: 0 0 44px 6px rgba(255, 255, 255, 0.1);
+  }
+}
+.clide-glow {
+  animation: clide-glow 4.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clide-rise,
+  .clide-glow {
+    animation: none;
+  }
 }
