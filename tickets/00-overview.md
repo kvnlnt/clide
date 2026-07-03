@@ -70,3 +70,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 27  | View-Scoped Pinning                   | Pinned float/bucket only inside saved views; title tab stays chronological             | ✅ Done       |
 | 28  | View Management & Form Picker         | Restart persistence, hide/pin/sort views via manager popover, searchable form picker   | ✅ Done       |
 | 29  | Welcome Screen                        | Branded no-project landing: create/open/recent projects, staggered entrance animation  | ✅ Done       |
+| 30  | Unified View Editor                   | Merge tab menu + filter popover into one editor: modal for edits, tab body for new     | ✅ Done       |
+| 31  | Forms Surfaces as Page Content        | Forms panel & new-form creator render as tab page content, not modal-style cards       | ✅ Done       |
+| 32  | Project Tab Cluster & Home Placement  | Project + panel tabs group together with distinct styling; House moves left of title   | ✅ Done       |
+| 33  | Settings as Full-Page Screen          | Settings fills the pane edge-to-edge with a single top-right × as the only exit        | ✅ Done       |

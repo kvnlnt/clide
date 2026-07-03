@@ -50,11 +50,26 @@ interface AppState {
   views: ThreadView[];
   activeViewId: string | null;
   setActiveView: (id: string | null) => void;
-  createView: () => ThreadView | null;
   updateView: (view: ThreadView) => void;
   deleteView: (id: string) => void;
   /** Move the dragged view to the position of the target view (drag-sort). */
   reorderView: (dragId: string, targetId: string) => void;
+
+  /**
+   * An unsaved, in-memory view being set up via the "+" button. Its tab shows
+   * in the strip and its editor renders as the pane body until saved/discarded.
+   */
+  newView: ThreadView | null;
+  /** Begin creating a new view (renders its editor as the pane body). */
+  startNewView: () => void;
+  /** Persist the in-memory new view with its edited fields. */
+  commitNewView: (view: ThreadView) => void;
+  /** Throw away the in-memory new view and return to the title tab. */
+  discardNewView: () => void;
+  /** Id of the existing view whose editor is open in a modal (null = closed). */
+  editingViewId: string | null;
+  /** Open (or, with null, close) the edit-view modal for an existing view. */
+  editView: (id: string | null) => void;
 
   setActiveProject: (p: string | null) => void;
   toggleSidebar: () => void;
@@ -114,6 +129,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [views, setViews] = useState<ThreadView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [newView, setNewView] = useState<ThreadView | null>(null);
+  const [editingViewId, setEditingViewId] = useState<string | null>(null);
 
   const draftSeq = useRef(0);
   /** Last active view per project — restored on project switch, persisted globally. */
@@ -179,17 +196,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setActivePanel(null);
   }, []);
 
-  const createView = useCallback((): ThreadView | null => {
-    if (!activeProject) return null;
+  const startNewView = useCallback(() => {
+    if (!activeProject) return;
     const view: ThreadView = {
       id: crypto.randomUUID(),
       name: `View ${views.length + 1}`,
       filters: {},
     };
-    persistViews([...views, view]);
+    setNewView(view);
     setActiveViewId(view.id);
-    return view;
-  }, [activeProject, views, persistViews]);
+    setActivePanel(null);
+  }, [activeProject, views]);
+
+  const commitNewView = useCallback(
+    (view: ThreadView) => {
+      persistViews([...views, view]);
+      setNewView(null);
+    },
+    [views, persistViews],
+  );
+
+  const discardNewView = useCallback(() => {
+    setNewView(null);
+    setActiveViewId(null);
+    setActivePanel(null);
+  }, []);
+
+  const editView = useCallback((id: string | null) => setEditingViewId(id), []);
+
+  // The edit-view modal's backdrop only covers the content pane, so the header
+  // tab strip stays clickable — close the modal on any navigation.
+  useEffect(() => {
+    setEditingViewId(null);
+  }, [activeViewId, activePanel, activeProject]);
+
+  // Discard an unsaved new view the moment the user navigates elsewhere
+  // (another tab, a panel, or a project switch clearing activeViewId). The
+  // draft was never persisted, so there is nothing to clean up on disk.
+  useEffect(() => {
+    if (newView && (activeViewId !== newView.id || activePanel !== null)) setNewView(null);
+  }, [newView, activeViewId, activePanel]);
 
   const updateView = useCallback(
     (view: ThreadView) => {
@@ -465,10 +511,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     views,
     activeViewId,
     setActiveView,
-    createView,
     updateView,
     deleteView,
     reorderView,
+    newView,
+    startNewView,
+    commitNewView,
+    discardNewView,
+    editingViewId,
+    editView,
     setActiveProject,
     toggleSidebar,
     openNewProject,

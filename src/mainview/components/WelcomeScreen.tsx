@@ -1,4 +1,4 @@
-import { FolderOpen, FolderPlus, Sparkles } from "lucide-react";
+import { ChessKnight, FolderOpen, FolderPlus } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
@@ -42,13 +42,11 @@ export default function WelcomeScreen() {
     <div className="clide-scroll flex flex-1 flex-col items-center justify-center overflow-y-auto p-8">
       {/* Brand */}
       <div className="clide-rise flex flex-col items-center" style={{ animationDelay: "0ms" }}>
-        <div className="clide-glow mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-clide-panel">
-          <Sparkles size={28} className="text-white/80" />
-        </div>
-        <h1 className="text-[34px] font-bold tracking-[0.35em] text-white">CLIDE</h1>
+        <ChessKnight size={58} className="text-white/80" />
+        <h1 className="text-[34px] font-bold tracking-[0.35em] text-white pt-5">CLIDE</h1>
       </div>
-      <p className="clide-rise mt-1 text-[13px] italic text-white/30" style={{ animationDelay: "120ms" }}>
-        ✦ everything is a form
+      <p className="clide-rise mt-1 text-[23px] italic text-white/30" style={{ animationDelay: "120ms" }}>
+        Your Automation Workhorse
       </p>
 
       {/* Primary actions */}

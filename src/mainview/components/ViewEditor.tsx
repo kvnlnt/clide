@@ -1,4 +1,4 @@
-import { Trash2, X } from "lucide-react";
+import { EyeOff, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import type { RunStatus, ThreadView, ThreadViewFilters } from "../types/forms";
@@ -7,19 +7,34 @@ const STATUS_OPTIONS: RunStatus[] = ["idle", "running", "success", "error", "sch
 
 interface Props {
   view: ThreadView;
-  /** A just-created view: Cancel removes it entirely. */
+  /** A just-created (unsaved) view: Cancel/Delete discards it entirely. */
   isNew: boolean;
-  onClose: () => void;
+  /** "modal" overlays the pane for editing an existing view; "page" fills the
+   *  pane body while creating a new view. */
+  variant: "modal" | "page";
 }
 
-/** Popover form for editing a thread view's name and filters. */
-export default function ViewFilterEditor({ view, isNew, onClose }: Props) {
-  const { forms, activeProject, updateView, deleteView } = useApp();
+/**
+ * Combined view editor: name + filters plus the view actions (hide / delete)
+ * that used to live in a separate tab dropdown. Rendered as a centered modal
+ * for an existing view, or as the pane's body content for a brand-new view.
+ */
+export default function ViewEditor({ view, isNew, variant }: Props) {
+  const {
+    forms,
+    activeProject,
+    activeViewId,
+    updateView,
+    deleteView,
+    setActiveView,
+    commitNewView,
+    discardNewView,
+    editView,
+  } = useApp();
 
   const [name, setName] = useState(view.name);
   const [formSlugs, setFormSlugs] = useState<string[]>(view.filters.formSlugs ?? []);
   const [statuses, setStatuses] = useState<RunStatus[]>(view.filters.statuses ?? []);
-  const [pinnedOnly, setPinnedOnly] = useState(view.filters.pinnedOnly ?? false);
   const [query, setQuery] = useState(view.filters.query ?? "");
   const [formQuery, setFormQuery] = useState("");
 
@@ -48,38 +63,55 @@ export default function ViewFilterEditor({ view, isNew, onClose }: Props) {
   const toggle = <T,>(list: T[], item: T): T[] =>
     list.includes(item) ? list.filter((x) => x !== item) : [...list, item];
 
+  /** Dismiss the editor without persisting a change. */
+  const close = () => {
+    if (variant === "modal") editView(null);
+  };
+
   const save = () => {
     const filters: ThreadViewFilters = {};
     if (formSlugs.length > 0) filters.formSlugs = formSlugs;
     if (statuses.length > 0) filters.statuses = statuses;
-    if (pinnedOnly) filters.pinnedOnly = true;
     if (query.trim()) filters.query = query.trim();
-    updateView({ ...view, name: name.trim() || view.name, filters });
-    onClose();
+    const updated: ThreadView = { ...view, name: name.trim() || view.name, filters };
+    if (isNew) commitNewView(updated);
+    else {
+      updateView(updated);
+      close();
+    }
   };
 
   const cancel = () => {
-    if (isNew) deleteView(view.id);
-    onClose();
+    if (isNew) discardNewView();
+    else close();
+  };
+
+  const hide = () => {
+    updateView({ ...view, hidden: true });
+    if (view.id === activeViewId) setActiveView(null);
+    close();
   };
 
   const remove = () => {
-    deleteView(view.id);
-    onClose();
+    if (isNew) discardNewView();
+    else {
+      deleteView(view.id);
+      close();
+    }
   };
 
   const sectionLabel = "mb-1 block text-[11px] uppercase tracking-wide text-white/30";
   const checkboxRow = "flex cursor-pointer items-center gap-2 text-sm text-white/70 hover:text-white";
 
-  return (
+  const body = (
     <div
-      className="w-72 rounded-lg border border-clide-border bg-clide-panel p-3 text-left shadow-xl"
+      className="flex flex-col gap-3 text-left"
       onKeyDown={(e) => {
         if (e.key === "Escape") cancel();
         if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") save();
       }}
     >
-      <div className="mb-3">
+      <div>
         <label className={sectionLabel}>Name</label>
         <input
           autoFocus
@@ -89,7 +121,7 @@ export default function ViewFilterEditor({ view, isNew, onClose }: Props) {
         />
       </div>
 
-      <div className="mb-3">
+      <div>
         <label className={sectionLabel}>Forms</label>
         {projectForms.length === 0 ? (
           <div className="text-sm italic text-white/30">No forms in this project</div>
@@ -145,7 +177,7 @@ export default function ViewFilterEditor({ view, isNew, onClose }: Props) {
         )}
       </div>
 
-      <div className="mb-3">
+      <div>
         <label className={sectionLabel}>Status</label>
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           {STATUS_OPTIONS.map((s) => (
@@ -161,14 +193,7 @@ export default function ViewFilterEditor({ view, isNew, onClose }: Props) {
         </div>
       </div>
 
-      <div className="mb-3">
-        <label className={checkboxRow}>
-          <input type="checkbox" checked={pinnedOnly} onChange={() => setPinnedOnly((v) => !v)} />
-          Pinned only
-        </label>
-      </div>
-
-      <div className="mb-3">
+      <div>
         <label className={sectionLabel}>Text query</label>
         <input
           value={query}
@@ -178,15 +203,24 @@ export default function ViewFilterEditor({ view, isNew, onClose }: Props) {
         />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 pt-1">
         {!isNew && (
-          <button
-            onClick={remove}
-            title="Delete this view"
-            className="flex items-center gap-1.5 rounded px-2 py-1 text-sm text-red-400/70 transition-colors hover:bg-red-500/10 hover:text-red-400"
-          >
-            <Trash2 size={13} /> Delete
-          </button>
+          <>
+            <button
+              onClick={hide}
+              title="Hide this tab (unhide from the project menu)"
+              className="flex items-center gap-1.5 rounded px-2 py-1 text-sm text-white/50 transition-colors hover:bg-white/5 hover:text-white"
+            >
+              <EyeOff size={13} /> Hide
+            </button>
+            <button
+              onClick={remove}
+              title="Delete this view"
+              className="flex items-center gap-1.5 rounded px-2 py-1 text-sm text-red-400/70 transition-colors hover:bg-red-500/10 hover:text-red-400"
+            >
+              <Trash2 size={13} /> Delete
+            </button>
+          </>
         )}
         <div className="flex-1" />
         <button onClick={cancel} className="rounded px-3 py-1 text-sm text-white/50 transition-colors hover:text-white">
@@ -198,6 +232,28 @@ export default function ViewFilterEditor({ view, isNew, onClose }: Props) {
         >
           Save
         </button>
+      </div>
+    </div>
+  );
+
+  if (variant === "modal") {
+    return (
+      <div className="absolute inset-0 z-30 flex items-start justify-center bg-black/50 pt-16" onMouseDown={cancel}>
+        <div
+          className="w-80 rounded-lg border border-clide-border bg-clide-panel p-4 shadow-2xl"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {body}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="clide-scroll flex flex-1 justify-center overflow-y-auto p-6">
+      <div className="h-fit w-full max-w-[420px] rounded-lg border border-clide-border bg-clide-panel p-4">
+        <div className="mb-3 text-[13px] font-bold text-white">New view</div>
+        {body}
       </div>
     </div>
   );

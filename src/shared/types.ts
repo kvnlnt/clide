@@ -172,8 +172,6 @@ export interface ThreadViewFilters {
   formSlugs?: string[];
   /** Only runs in these statuses. */
   statuses?: RunStatus[];
-  /** Only pinned runs. */
-  pinnedOnly?: boolean;
   /** Free-text match on form name / run inputs. */
   query?: string;
 }

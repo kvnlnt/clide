@@ -7,7 +7,7 @@ import { AI_MODELS, DEFAULT_MODEL } from "../types/forms";
 import DependencyWarning from "./DependencyWarning";
 import SpecEditor from "./SpecEditor";
 
-interface NewFormModalProps {
+interface NewFormPageProps {
   onClose: () => void;
 }
 
@@ -19,10 +19,11 @@ const PROVIDERS: { id: AIProvider; label: string }[] = [
   { id: "ollama", label: "Ollama (local)" },
 ];
 
-/** Two-step form creation wizard: describe (input/processing/output) → AI
- * drafts an editable spec → user fine-tunes → generate from the approved spec.
- * On success the new form is dropped into the thread as a ready-to-run card. */
-export default function NewFormModal({ onClose }: NewFormModalProps) {
+/** Two-step form creation flow: describe (input/processing/output) → AI drafts
+ * an editable spec → user fine-tunes → generate from the approved spec. Renders
+ * as the pane's page content. On success the new form is dropped into the
+ * thread as a ready-to-run card. */
+export default function NewFormPage({ onClose }: NewFormPageProps) {
   const { addFormDraft, projects, activeProject } = useApp();
 
   const [step, setStep] = useState<1 | 2>(1);
@@ -137,32 +138,30 @@ export default function NewFormModal({ onClose }: NewFormModalProps) {
     "w-full bg-[rgba(217,217,217,0.05)] text-white text-[13px] rounded px-2.5 py-1.5 outline-none placeholder:text-white/30";
 
   return (
-    <div className="absolute inset-0 z-40 flex items-start justify-center bg-black/50 pt-16" onMouseDown={onClose}>
-      <div
-        className={`flex max-h-[80vh] flex-col overflow-hidden rounded-lg border border-clide-border bg-clide-panel shadow-2xl ${
-          step === 1 ? "w-[460px]" : "w-[600px]"
-        }`}
-        onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-        }}
-      >
-        <div className="flex items-center gap-2 border-b border-clide-border px-4 py-3">
+    <div
+      className="clide-scroll flex flex-1 flex-col items-center overflow-y-auto"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+    >
+      <div className={`flex min-h-full w-full flex-col ${step === 1 ? "max-w-[520px]" : "max-w-[660px]"}`}>
+        <div className="flex items-center gap-2 px-6 pb-4 pt-6">
           <Sparkles size={15} className="text-white/70" />
-          <span className="text-[13px] font-bold text-white">
+          <span className="text-[14px] font-bold text-white">
             {step === 1 ? "Create new form" : `Fine-tune — ${name.trim() || "new form"}`}
           </span>
           <span className="text-[11px] text-white/30">step {step} of 2</span>
           <div className="flex-1" />
           <button
             onClick={onClose}
+            title="Cancel"
             className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
           >
             <X size={14} />
           </button>
         </div>
 
-        <div className="clide-scroll flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-3">
+        <div className="flex flex-1 flex-col gap-4 px-6 pb-4">
           {step === 1 && (
             <>
               <div className="flex flex-col gap-1.5">
@@ -300,7 +299,7 @@ export default function NewFormModal({ onClose }: NewFormModalProps) {
           )}
         </div>
 
-        <div className="flex items-center border-t border-clide-border px-4 py-3">
+        <div className="mt-auto flex items-center border-t border-clide-border px-6 py-4">
           {step === 2 && (
             <button
               disabled={busy}

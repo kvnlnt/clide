@@ -1,10 +1,10 @@
-import { House, Minus, PanelLeft, Settings, X } from "lucide-react";
+import { Minus, PanelLeft, Settings, X } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
 import ViewTabs from "./ViewTabs";
 
 export default function WindowControls() {
-  const { toggleSidebar, openPanel, activeProject, setActiveProject, focusPanel } = useApp();
+  const { toggleSidebar, openPanel, activeProject } = useApp();
   return (
     <div className="window-controls flex justify-between w-full placeitems-center transition-colors rounded-[15px] cursor-move">
       <div className="flex p-1.5 gap-2">
@@ -24,16 +24,6 @@ export default function WindowControls() {
       <ViewTabs />
       {activeProject !== null && (
         <div className="flex shrink-0 items-center gap-3 px-1.5">
-          <button
-            onClick={() => {
-              setActiveProject(null);
-              focusPanel(null);
-            }}
-            title="Home"
-            className="text-white/30 transition-colors hover:text-white flex items-center justify-center rounded-full"
-          >
-            <House size={18} />
-          </button>
           <button
             onClick={() => openPanel("settings")}
             title="Settings"

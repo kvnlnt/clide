@@ -1,4 +1,4 @@
-import { FolderOpen, Pencil, Sparkles, Trash2, X } from "lucide-react";
+import { FolderOpen, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useFormSearch } from "../hooks/useFormSearch";
@@ -60,19 +60,11 @@ export default function FormsPanel() {
   };
 
   return (
-    <div className="flex flex-1 justify-center overflow-hidden p-6">
-      <div className="flex h-full w-[560px] flex-col overflow-hidden rounded-lg border border-clide-border bg-clide-panel">
-        <div className="flex items-center justify-between border-b border-clide-border px-4 py-3">
-          <span className="text-[13px] font-bold text-white">
-            Forms
-            <span className="ml-2 font-normal text-white/40">{activeProject ?? "All projects"}</span>
-          </span>
-          <button
-            onClick={() => closePanel("forms")}
-            className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
-          >
-            <X size={14} />
-          </button>
+    <div className="flex flex-1 flex-col items-center overflow-hidden">
+      <div className="flex h-full w-full max-w-[640px] flex-col overflow-hidden">
+        <div className="flex items-baseline gap-2 px-6 pb-3 pt-6">
+          <span className="text-[15px] font-bold text-white">Forms</span>
+          <span className="text-[13px] text-white/40">{activeProject ?? "All projects"}</span>
         </div>
         <input
           ref={inputRef}
@@ -80,9 +72,9 @@ export default function FormsPanel() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="Search forms…"
-          className="w-full bg-clide-bg px-4 py-3 text-[14px] text-white outline-none placeholder:text-white/30"
+          className="mx-6 rounded-md border border-clide-border bg-clide-surface px-4 py-2.5 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-white/30"
         />
-        <div className="clide-scroll flex-1 overflow-y-auto">
+        <div className="clide-scroll mt-2 flex-1 overflow-y-auto px-2 pb-4">
           {results.length === 0 && query.trim() !== "" && (
             <div className="px-4 py-3 text-[13px] italic text-white/30">No forms match “{query}”</div>
           )}

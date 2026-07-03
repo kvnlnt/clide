@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import FormsPanel from "./components/FormsPanel";
-import NewFormModal from "./components/NewFormModal";
+import NewFormPage from "./components/NewFormPage";
 import NewProjectModal from "./components/NewProjectModal";
 import ProjectSettingsModal from "./components/ProjectSettingsModal";
 import SettingsPanel from "./components/SettingsPanel";
 import Sidebar from "./components/Sidebar";
 import Thread from "./components/Thread";
+import ViewEditor from "./components/ViewEditor";
 import WelcomeScreen from "./components/WelcomeScreen";
 import WindowControls from "./components/WindowControls";
 import { AppProvider, useApp } from "./context/AppContext";
@@ -22,9 +23,13 @@ function Workspace() {
     projectMeta,
     closeNewProject,
     closeNewForm,
+    newView,
+    views,
+    editingViewId,
   } = useApp();
 
   const activeProjectMeta = activeProject ? projectMeta.find((p) => p.name === activeProject) : undefined;
+  const editingView = editingViewId ? views.find((v) => v.id === editingViewId) : undefined;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -44,18 +49,33 @@ function Workspace() {
       </header>
       <div className="flex h-screen text-white">
         <div className="relative flex min-w-0 flex-1 flex-col border-t border-white/10">
-          {activePanel === null && (activeProject ? <Thread /> : <WelcomeScreen />)}
-          {activePanel === "forms" && <FormsPanel />}
-          {activePanel === "settings" && <SettingsPanel onClose={() => closePanel("settings")} />}
-          {activePanel === "project-settings" && activeProjectMeta && (
-            <ProjectSettingsModal
-              path={activeProjectMeta.path}
-              name={activeProjectMeta.name}
-              onClose={() => closePanel("project-settings")}
-            />
+          {newFormOpen ? (
+            <NewFormPage onClose={closeNewForm} />
+          ) : (
+            <>
+              {activePanel === null &&
+                (activeProject ? (
+                  newView ? (
+                    <ViewEditor view={newView} isNew variant="page" />
+                  ) : (
+                    <Thread />
+                  )
+                ) : (
+                  <WelcomeScreen />
+                ))}
+              {activePanel === "forms" && <FormsPanel />}
+              {activePanel === "settings" && <SettingsPanel onClose={() => closePanel("settings")} />}
+              {activePanel === "project-settings" && activeProjectMeta && (
+                <ProjectSettingsModal
+                  path={activeProjectMeta.path}
+                  name={activeProjectMeta.name}
+                  onClose={() => closePanel("project-settings")}
+                />
+              )}
+            </>
           )}
+          {editingView && <ViewEditor view={editingView} isNew={false} variant="modal" />}
           {newProjectOpen && <NewProjectModal onClose={closeNewProject} />}
-          {newFormOpen && <NewFormModal onClose={closeNewForm} />}
         </div>
         {sidebarOpen && activeProject !== null && <Sidebar />}
       </div>

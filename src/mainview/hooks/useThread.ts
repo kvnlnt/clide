@@ -51,7 +51,6 @@ function coalesceRuns(runs: RunRecord[], standalonePinned: boolean): RunGroup[] 
 function matchesView(run: RunRecord, filters: ThreadViewFilters, formsBySlug: Map<string, FormFolder>): boolean {
   if (filters.formSlugs?.length && !filters.formSlugs.includes(run.formSlug)) return false;
   if (filters.statuses?.length && !filters.statuses.includes(run.status)) return false;
-  if (filters.pinnedOnly && !run.pinned) return false;
   const q = filters.query?.trim().toLowerCase();
   if (q) {
     const name = formsBySlug.get(run.formSlug)?.meta.name.toLowerCase() ?? "";
