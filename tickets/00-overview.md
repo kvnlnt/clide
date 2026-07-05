@@ -79,4 +79,4 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 36  | Compact View Toolbar Controls         | Forms/status/keyword filters become summary-collapsed multiselect dropdowns; AND/OR     | ✅ Done       |
 | 37  | Settings Full-Window Overlay          | App settings covers the entire window including the header/tab strip                    | ✅ Done       |
 | 38  | Add Project Modal Full-Window         | New-project modal backdrop dims the whole app, not just the body pane                   | ✅ Done       |
-| 39  | Project Surfaces as Pages             | Forms, project Settings & new Views surfaces become full-width, well-designed pages     | 📋 Open       |
+| 39  | Project Surfaces as Pages             | Forms, project Settings & new Views surfaces become full-width, well-designed pages     | ✅ Done       |
