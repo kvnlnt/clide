@@ -6,7 +6,7 @@ import { useApp } from "../context/AppContext";
  * result; otherwise it invites the user to create or open a form.
  */
 export default function ThreadEmpty({ filtered = false }: { filtered?: boolean }) {
-  const { openNewForm, openPanel } = useApp();
+  const { openNewForm, setProjectSurface } = useApp();
 
   if (filtered) {
     return (
@@ -37,7 +37,7 @@ export default function ThreadEmpty({ filtered = false }: { filtered?: boolean }
             Create a form
           </button>
           <button
-            onClick={() => openPanel("forms")}
+            onClick={() => setProjectSurface("forms")}
             className="flex items-center gap-2 rounded-md border border-white/10 px-4 py-2 text-[13px] font-medium text-white/60 transition-colors hover:border-white/20 hover:text-white"
           >
             <Search size={14} />

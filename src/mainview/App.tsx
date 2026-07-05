@@ -2,11 +2,14 @@ import { useEffect } from "react";
 import FormsPanel from "./components/FormsPanel";
 import NewFormPage from "./components/NewFormPage";
 import NewProjectModal from "./components/NewProjectModal";
-import ProjectSettingsModal from "./components/ProjectSettingsModal";
+import ProjectSettingsPage from "./components/ProjectSettingsPage";
+import ProjectToolbar from "./components/ProjectToolbar";
 import SettingsPanel from "./components/SettingsPanel";
 import Sidebar from "./components/Sidebar";
 import Thread from "./components/Thread";
-import ViewEditor from "./components/ViewEditor";
+import TrafficLights from "./components/TrafficLights";
+import ViewsPage from "./components/ViewsPage";
+import ViewToolbar from "./components/ViewToolbar";
 import WelcomeScreen from "./components/WelcomeScreen";
 import WindowControls from "./components/WindowControls";
 import { AppProvider, useApp } from "./context/AppContext";
@@ -17,33 +20,33 @@ function Workspace() {
     newProjectOpen,
     newFormOpen,
     activeProject,
-    activePanel,
-    openPanel,
-    closePanel,
+    activeViewId,
+    views,
+    projectSurface,
+    setProjectSurface,
     projectMeta,
     closeNewProject,
     closeNewForm,
-    newView,
-    views,
-    editingViewId,
+    appSettingsOpen,
+    closeAppSettings,
   } = useApp();
 
   const activeProjectMeta = activeProject ? projectMeta.find((p) => p.name === activeProject) : undefined;
-  const editingView = editingViewId ? views.find((v) => v.id === editingViewId) : undefined;
+  const activeView = activeViewId ? views.find((v) => v.id === activeViewId) : undefined;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
         e.preventDefault();
-        openPanel("forms");
+        setProjectSurface("forms");
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [openPanel]);
+  }, [setProjectSurface]);
 
   return (
-    <div className="flex h-screen flex-col bg-clide-bg text-white rounded-[15px] p-2.5 border border-white/10">
+    <div className="relative flex h-screen flex-col overflow-hidden rounded-[15px] border border-white/10 bg-clide-bg text-white p-2.5">
       <header className="flex electrobun-webkit-app-region-drag">
         <WindowControls />
       </header>
@@ -51,34 +54,48 @@ function Workspace() {
         <div className="relative flex min-w-0 flex-1 flex-col border-t border-white/10">
           {newFormOpen ? (
             <NewFormPage onClose={closeNewForm} />
+          ) : !activeProject ? (
+            <WelcomeScreen />
+          ) : activeView ? (
+            <>
+              <ViewToolbar view={activeView} />
+              <Thread />
+            </>
           ) : (
             <>
-              {activePanel === null &&
-                (activeProject ? (
-                  newView ? (
-                    <ViewEditor view={newView} isNew variant="page" />
-                  ) : (
-                    <Thread />
-                  )
-                ) : (
-                  <WelcomeScreen />
-                ))}
-              {activePanel === "forms" && <FormsPanel />}
-              {activePanel === "settings" && <SettingsPanel onClose={() => closePanel("settings")} />}
-              {activePanel === "project-settings" && activeProjectMeta && (
-                <ProjectSettingsModal
+              <ProjectToolbar />
+              {projectSurface === "forms" && <FormsPanel />}
+              {projectSurface === "views" && <ViewsPage />}
+              {projectSurface === "project-settings" && activeProjectMeta && (
+                <ProjectSettingsPage
                   path={activeProjectMeta.path}
                   name={activeProjectMeta.name}
-                  onClose={() => closePanel("project-settings")}
+                  onDone={() => setProjectSurface("thread")}
                 />
               )}
+              {projectSurface === "thread" && <Thread />}
             </>
           )}
-          {editingView && <ViewEditor view={editingView} isNew={false} variant="modal" />}
-          {newProjectOpen && <NewProjectModal onClose={closeNewProject} />}
         </div>
         {sidebarOpen && activeProject !== null && <Sidebar />}
       </div>
+
+      {/* Full-window overlay: covers the header/tab strip too, so a minimal
+          drag region + traffic lights are re-rendered here to keep the
+          window movable/closable while Settings is open. */}
+      {appSettingsOpen && (
+        <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg">
+          <div className="flex electrobun-webkit-app-region-drag">
+            <TrafficLights />
+          </div>
+          <SettingsPanel onClose={closeAppSettings} />
+        </div>
+      )}
+
+      {/* NewProjectModal is self-positioned (absolute inset-0); rendering it
+          here rather than inside the body pane makes its backdrop dim the
+          header/tab strip and sidebar too, not just the body. */}
+      {newProjectOpen && <NewProjectModal onClose={closeNewProject} />}
     </div>
   );
 }

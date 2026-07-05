@@ -74,3 +74,9 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 31  | Forms Surfaces as Page Content        | Forms panel & new-form creator render as tab page content, not modal-style cards       | ✅ Done       |
 | 32  | Project Tab Cluster & Home Placement  | Project + panel tabs group together with distinct styling; House moves left of title   | ✅ Done       |
 | 33  | Settings as Full-Page Screen          | Settings fills the pane edge-to-edge with a single top-right × as the only exit        | ✅ Done       |
+| 34  | Project Tab Toolbar                   | Replace project tab dropdown & panel-tab chips with a toolbar fused to the active tab   | ✅ Done       |
+| 35  | View Tab Toolbar                      | View settings modal becomes live-apply toolbar controls under the active view tab       | ✅ Done       |
+| 36  | Compact View Toolbar Controls         | Forms/status/keyword filters become summary-collapsed multiselect dropdowns; AND/OR     | ✅ Done       |
+| 37  | Settings Full-Window Overlay          | App settings covers the entire window including the header/tab strip                    | ✅ Done       |
+| 38  | Add Project Modal Full-Window         | New-project modal backdrop dims the whole app, not just the body pane                   | ✅ Done       |
+| 39  | Project Surfaces as Pages             | Forms, project Settings & new Views surfaces become full-width, well-designed pages     | 📋 Open       |

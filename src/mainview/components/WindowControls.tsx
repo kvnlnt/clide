@@ -1,31 +1,18 @@
-import { Minus, PanelLeft, Settings, X } from "lucide-react";
+import { PanelLeft, Settings } from "lucide-react";
 import { useApp } from "../context/AppContext";
-import { api } from "../rpc";
+import TrafficLights from "./TrafficLights";
 import ViewTabs from "./ViewTabs";
 
 export default function WindowControls() {
-  const { toggleSidebar, openPanel, activeProject } = useApp();
+  const { toggleSidebar, openAppSettings, activeProject } = useApp();
   return (
     <div className="window-controls flex justify-between w-full placeitems-center transition-colors rounded-[15px] cursor-move">
-      <div className="flex p-1.5 gap-2">
-        <button
-          className="text-black bg-red-600/30 hover:bg-red-600 rounded-full h-4 w-4 flex items-center justify-center transition-colors"
-          onClick={api.closeWindow}
-        >
-          <X size={10} />
-        </button>
-        <button
-          className="text-black bg-yellow-600/30 hover:bg-yellow-600 rounded-full h-4 w-4 flex items-center justify-center transition-colors"
-          onClick={api.minimizeWindow}
-        >
-          <Minus size={10} />
-        </button>
-      </div>
+      <TrafficLights />
       <ViewTabs />
       {activeProject !== null && (
         <div className="flex shrink-0 items-center gap-3 px-1.5">
           <button
-            onClick={() => openPanel("settings")}
+            onClick={openAppSettings}
             title="Settings"
             className="text-white/30 transition-colors hover:text-white flex items-center justify-center rounded-full"
           >

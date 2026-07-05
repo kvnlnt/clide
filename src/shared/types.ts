@@ -172,7 +172,14 @@ export interface ThreadViewFilters {
   formSlugs?: string[];
   /** Only runs in these statuses. */
   statuses?: RunStatus[];
-  /** Free-text match on form name / run inputs. */
+  /** Free-text keywords matched against form name / run inputs. */
+  keywords?: string[];
+  /** "and" = every keyword must match; "or" (default) = any keyword matches. */
+  keywordMode?: "and" | "or";
+  /**
+   * @deprecated Replaced by `keywords`. Older `.views.json` files may still
+   * have this; normalized to `keywords: [query]` on load.
+   */
   query?: string;
 }
 

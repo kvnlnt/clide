@@ -15,8 +15,8 @@ export interface DraftCard {
   formSlug: string;
 }
 
-/** Closeable panel tabs that render in the tab strip alongside views. */
-export type PanelKind = "forms" | "settings" | "project-settings";
+/** Which surface the title tab's body shows. Only meaningful when no view tab is active. */
+export type ProjectSurface = "thread" | "forms" | "views" | "project-settings";
 
 interface AppState {
   forms: FormFolder[];
@@ -35,16 +35,15 @@ interface AppState {
   newProjectOpen: boolean;
   newFormOpen: boolean;
 
-  /** Panel tabs currently open in the tab strip (order = display order). */
-  openPanels: PanelKind[];
-  /** The focused panel tab; null means the thread is showing. */
-  activePanel: PanelKind | null;
-  /** Open (or focus, if already open) a panel tab. */
-  openPanel: (kind: PanelKind) => void;
-  /** Close a panel tab; falls back to the thread if it was active. */
-  closePanel: (kind: PanelKind) => void;
-  /** Focus an open panel tab, or null to return to the thread. */
-  focusPanel: (kind: PanelKind | null) => void;
+  /** What the title tab's body shows (thread / Forms / Views / Project Settings). */
+  projectSurface: ProjectSurface;
+  /** Switch the title tab's surface; also activates the title tab. */
+  setProjectSurface: (surface: ProjectSurface) => void;
+
+  /** App-level Settings overlay (API keys, Ollama config) — not project-scoped. */
+  appSettingsOpen: boolean;
+  openAppSettings: () => void;
+  closeAppSettings: () => void;
 
   /** Saved thread views for the active project. "All" is implicit (activeViewId === null). */
   views: ThreadView[];
@@ -55,21 +54,8 @@ interface AppState {
   /** Move the dragged view to the position of the target view (drag-sort). */
   reorderView: (dragId: string, targetId: string) => void;
 
-  /**
-   * An unsaved, in-memory view being set up via the "+" button. Its tab shows
-   * in the strip and its editor renders as the pane body until saved/discarded.
-   */
-  newView: ThreadView | null;
-  /** Begin creating a new view (renders its editor as the pane body). */
-  startNewView: () => void;
-  /** Persist the in-memory new view with its edited fields. */
-  commitNewView: (view: ThreadView) => void;
-  /** Throw away the in-memory new view and return to the title tab. */
-  discardNewView: () => void;
-  /** Id of the existing view whose editor is open in a modal (null = closed). */
-  editingViewId: string | null;
-  /** Open (or, with null, close) the edit-view modal for an existing view. */
-  editView: (id: string | null) => void;
+  /** Create a new view with a default name, persist it, and activate its tab. */
+  createView: () => void;
 
   setActiveProject: (p: string | null) => void;
   toggleSidebar: () => void;
@@ -103,6 +89,13 @@ interface AppState {
   refreshRuns: () => Promise<void>;
 }
 
+/** Migrates a `.views.json` view saved under the old single-`query` filter shape. */
+function normalizeView(view: ThreadView): ThreadView {
+  const { query, ...filters } = view.filters;
+  if (query === undefined || filters.keywords) return view;
+  return { ...view, filters: { ...filters, keywords: [query], keywordMode: filters.keywordMode ?? "or" } };
+}
+
 const AppContext = createContext<AppState | null>(null);
 
 export function useApp(): AppState {
@@ -124,13 +117,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newFormOpen, setNewFormOpen] = useState(false);
-  const [openPanels, setOpenPanels] = useState<PanelKind[]>([]);
-  const [activePanel, setActivePanel] = useState<PanelKind | null>(null);
+  const [projectSurface, setProjectSurfaceState] = useState<ProjectSurface>("thread");
+  const [appSettingsOpen, setAppSettingsOpen] = useState(false);
 
   const [views, setViews] = useState<ThreadView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
-  const [newView, setNewView] = useState<ThreadView | null>(null);
-  const [editingViewId, setEditingViewId] = useState<string | null>(null);
 
   const draftSeq = useRef(0);
   /** Last active view per project — restored on project switch, persisted globally. */
@@ -147,14 +138,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     restoringRef.current = true;
     setActiveViewId(null);
+    setProjectSurfaceState("thread");
     if (!activeProject) {
       setViews([]);
       restoringRef.current = false;
       return;
     }
     let cancelled = false;
-    void api.getViews(activeProject).then((v) => {
+    void api.getViews(activeProject).then((loaded) => {
       if (cancelled) return;
+      const v = loaded.map(normalizeView);
       setViews(v);
       const want = viewByProjectRef.current[activeProject];
       if (want && v.some((view) => view.id === want && !view.hidden)) {
@@ -191,51 +184,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [activeProject],
   );
 
+  // Activating a view tab (or returning to the title tab via null) always
+  // lands on that tab's thread — surfaces are a title-tab-only concept.
   const setActiveView = useCallback((id: string | null) => {
     setActiveViewId(id);
-    setActivePanel(null);
+    setProjectSurfaceState("thread");
   }, []);
 
-  const startNewView = useCallback(() => {
+  const createView = useCallback(() => {
     if (!activeProject) return;
     const view: ThreadView = {
       id: crypto.randomUUID(),
       name: `View ${views.length + 1}`,
       filters: {},
     };
-    setNewView(view);
+    persistViews([...views, view]);
     setActiveViewId(view.id);
-    setActivePanel(null);
-  }, [activeProject, views]);
-
-  const commitNewView = useCallback(
-    (view: ThreadView) => {
-      persistViews([...views, view]);
-      setNewView(null);
-    },
-    [views, persistViews],
-  );
-
-  const discardNewView = useCallback(() => {
-    setNewView(null);
-    setActiveViewId(null);
-    setActivePanel(null);
-  }, []);
-
-  const editView = useCallback((id: string | null) => setEditingViewId(id), []);
-
-  // The edit-view modal's backdrop only covers the content pane, so the header
-  // tab strip stays clickable — close the modal on any navigation.
-  useEffect(() => {
-    setEditingViewId(null);
-  }, [activeViewId, activePanel, activeProject]);
-
-  // Discard an unsaved new view the moment the user navigates elsewhere
-  // (another tab, a panel, or a project switch clearing activeViewId). The
-  // draft was never persisted, so there is nothing to clean up on disk.
-  useEffect(() => {
-    if (newView && (activeViewId !== newView.id || activePanel !== null)) setNewView(null);
-  }, [newView, activeViewId, activePanel]);
+    setProjectSurfaceState("thread");
+  }, [activeProject, views, persistViews]);
 
   const updateView = useCallback(
     (view: ThreadView) => {
@@ -344,41 +310,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [projectList, forms]);
 
   const toggleSidebar = useCallback(() => setSidebarOpen((s) => !s), []);
-  const openPanel = useCallback((kind: PanelKind) => {
-    setOpenPanels((prev) => (prev.includes(kind) ? prev : [...prev, kind]));
-    setActivePanel(kind);
+  // Switching surfaces always means "on the title tab" — clear any active view.
+  const setProjectSurface = useCallback((surface: ProjectSurface) => {
+    setActiveViewId(null);
+    setProjectSurfaceState(surface);
   }, []);
-  const closePanel = useCallback((kind: PanelKind) => {
-    setOpenPanels((prev) => prev.filter((k) => k !== kind));
-    setActivePanel((cur) => (cur === kind ? null : cur));
-  }, []);
-  const focusPanel = useCallback((kind: PanelKind | null) => setActivePanel(kind), []);
+  const openAppSettings = useCallback(() => setAppSettingsOpen(true), []);
+  const closeAppSettings = useCallback(() => setAppSettingsOpen(false), []);
   const openNewProject = useCallback(() => setNewProjectOpen(true), []);
   const closeNewProject = useCallback(() => setNewProjectOpen(false), []);
   const openNewForm = useCallback(() => {
-    closePanel("forms");
+    setProjectSurfaceState("thread");
     setNewFormOpen(true);
-  }, [closePanel]);
+  }, []);
   const closeNewForm = useCallback(() => setNewFormOpen(false), []);
-
-  // A project-settings tab has nothing to target without an active project.
-  useEffect(() => {
-    if (!activeProject) closePanel("project-settings");
-  }, [activeProject, closePanel]);
 
   const removeDraft = useCallback((id: string) => {
     setDrafts((prev) => prev.filter((d) => d.id !== id));
   }, []);
 
-  const addFormDraft = useCallback(
-    (formSlug: string) => {
-      const id = `draft-${draftSeq.current++}`;
-      setDrafts((prev) => [{ id, formSlug }, ...prev]);
-      setRecentSlugs((prev) => [formSlug, ...prev.filter((s) => s !== formSlug)].slice(0, 5));
-      closePanel("forms");
-    },
-    [closePanel],
-  );
+  const addFormDraft = useCallback((formSlug: string) => {
+    const id = `draft-${draftSeq.current++}`;
+    setDrafts((prev) => [{ id, formSlug }, ...prev]);
+    setRecentSlugs((prev) => [formSlug, ...prev.filter((s) => s !== formSlug)].slice(0, 5));
+    setProjectSurfaceState("thread");
+  }, []);
 
   const createProject = useCallback(
     async (name: string, path?: string) => {
@@ -503,23 +459,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     sidebarOpen,
     newProjectOpen,
     newFormOpen,
-    openPanels,
-    activePanel,
-    openPanel,
-    closePanel,
-    focusPanel,
+    projectSurface,
+    setProjectSurface,
+    appSettingsOpen,
+    openAppSettings,
+    closeAppSettings,
     views,
     activeViewId,
     setActiveView,
     updateView,
     deleteView,
     reorderView,
-    newView,
-    startNewView,
-    commitNewView,
-    discardNewView,
-    editingViewId,
-    editView,
+    createView,
     setActiveProject,
     toggleSidebar,
     openNewProject,

@@ -8,11 +8,11 @@ import type { FormFolder } from "../types/forms";
 /**
  * Unified forms CRUD surface for the active project (or all projects when no
  * project is active): fuzzy search, run, AI-powered create, metadata edit, and
- * delete — rendered as a panel tab pane. Opened via ⌘P or the project menu on
- * the title tab.
+ * delete — rendered as a full-width page. Opened via ⌘P or the project
+ * toolbar's Forms button.
  */
 export default function FormsPanel() {
-  const { forms, recentSlugs, addFormDraft, openNewForm, closePanel, activeProject, deleteForm, updateFormMeta } =
+  const { forms, recentSlugs, addFormDraft, openNewForm, setProjectSurface, activeProject, deleteForm, updateFormMeta } =
     useApp();
   const scopedForms = activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms;
   const [query, setQuery] = useState("");
@@ -55,66 +55,72 @@ export default function FormsPanel() {
     } else if (e.key === "Escape") {
       e.preventDefault();
       if (query.trim() !== "") setQuery("");
-      else closePanel("forms");
+      else setProjectSurface("thread");
     }
   };
 
   return (
-    <div className="flex flex-1 flex-col items-center overflow-hidden">
-      <div className="flex h-full w-full max-w-[640px] flex-col overflow-hidden">
-        <div className="flex items-baseline gap-2 px-6 pb-3 pt-6">
-          <span className="text-[15px] font-bold text-white">Forms</span>
-          <span className="text-[13px] text-white/40">{activeProject ?? "All projects"}</span>
-        </div>
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex shrink-0 items-baseline gap-2 px-8 pb-4 pt-7">
+        <h1 className="text-[20px] font-bold text-white">Forms</h1>
+        <span className="text-[13px] text-white/40">{activeProject ?? "All projects"}</span>
+      </div>
+
+      <div className="px-8 pb-4">
         <input
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="Search forms…"
-          className="mx-6 rounded-md border border-clide-border bg-clide-surface px-4 py-2.5 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-white/30"
+          className="w-full max-w-[480px] rounded-md border border-clide-border bg-clide-surface px-4 py-2.5 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-white/30"
         />
-        <div className="clide-scroll mt-2 flex-1 overflow-y-auto px-2 pb-4">
-          {results.length === 0 && query.trim() !== "" && (
-            <div className="px-4 py-3 text-[13px] italic text-white/30">No forms match “{query}”</div>
-          )}
-          {results.map((form, i) => (
-            <FormsPanelRow
-              key={form.meta.slug}
-              form={form}
-              active={active === i}
-              showProject={!activeProject}
-              editing={editingSlug === form.meta.slug}
-              confirming={confirmingSlug === form.meta.slug}
-              onSelect={() => choose(i)}
-              onHover={() => setActive(i)}
-              onEdit={() => {
-                setEditingSlug((cur) => (cur === form.meta.slug ? null : form.meta.slug));
-                setConfirmingSlug(null);
-              }}
-              onConfirmDelete={() => {
-                setConfirmingSlug((cur) => (cur === form.meta.slug ? null : form.meta.slug));
-                setEditingSlug(null);
-              }}
-              onCloseEditors={() => {
-                setEditingSlug(null);
-                setConfirmingSlug(null);
-              }}
-              deleteForm={deleteForm}
-              updateFormMeta={updateFormMeta}
-            />
-          ))}
-          <button
-            onClick={() => choose(createIndex)}
-            onMouseEnter={() => setActive(createIndex)}
-            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[14px] ${
-              active === createIndex ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"
-            }`}
-          >
-            <Sparkles size={15} className="text-white/60" />
-            <span className="italic text-white/70">✦ Create new form...</span>
-          </button>
-        </div>
+      </div>
+
+      <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">
+        {results.length === 0 && query.trim() !== "" && (
+          <div className="px-1 py-3 text-[13px] italic text-white/30">No forms match “{query}”</div>
+        )}
+        {results.length > 0 && (
+          <div className="flex flex-col divide-y divide-white/5 border-t border-white/5">
+            {results.map((form, i) => (
+              <FormsPanelRow
+                key={form.meta.slug}
+                form={form}
+                active={active === i}
+                showProject={!activeProject}
+                editing={editingSlug === form.meta.slug}
+                confirming={confirmingSlug === form.meta.slug}
+                onSelect={() => choose(i)}
+                onHover={() => setActive(i)}
+                onEdit={() => {
+                  setEditingSlug((cur) => (cur === form.meta.slug ? null : form.meta.slug));
+                  setConfirmingSlug(null);
+                }}
+                onConfirmDelete={() => {
+                  setConfirmingSlug((cur) => (cur === form.meta.slug ? null : form.meta.slug));
+                  setEditingSlug(null);
+                }}
+                onCloseEditors={() => {
+                  setEditingSlug(null);
+                  setConfirmingSlug(null);
+                }}
+                deleteForm={deleteForm}
+                updateFormMeta={updateFormMeta}
+              />
+            ))}
+          </div>
+        )}
+        <button
+          onClick={() => choose(createIndex)}
+          onMouseEnter={() => setActive(createIndex)}
+          className={`mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-[14px] ${
+            active === createIndex ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"
+          }`}
+        >
+          <Sparkles size={15} className="text-white/60" />
+          <span className="italic text-white/70">✦ Create new form...</span>
+        </button>
       </div>
     </div>
   );
@@ -168,17 +174,15 @@ function FormsPanelRow({
 
   return (
     <div className={`group ${active ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"}`} onMouseEnter={onHover}>
-      <div className="flex w-full items-start gap-1 px-3 py-2">
-        <button onClick={onSelect} className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left">
-          <div className="flex w-full items-center justify-between gap-2">
-            <span className="truncate text-[14px] text-white">{form.meta.name}</span>
-            {showProject && <span className="shrink-0 text-[12px] text-clide-muted">{form.meta.project}</span>}
-          </div>
-          {form.meta.description && (
-            <span className="w-full truncate text-[12px] text-white/40">{form.meta.description}</span>
-          )}
+      <div className="flex w-full items-center gap-4 px-3 py-2.5">
+        <button onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-4 text-left">
+          <span className="w-[220px] shrink-0 truncate text-[14px] text-white">{form.meta.name}</span>
+          <span className="min-w-0 flex-1 truncate text-[12px] text-white/40">{form.meta.description || "—"}</span>
           {form.meta.tags.length > 0 && (
-            <span className="w-full truncate text-[11px] text-white/30">{form.meta.tags.join(" · ")}</span>
+            <span className="w-[160px] shrink-0 truncate text-[11px] text-white/30">{form.meta.tags.join(" · ")}</span>
+          )}
+          {showProject && (
+            <span className="w-[100px] shrink-0 truncate text-[12px] text-clide-muted">{form.meta.project}</span>
           )}
         </button>
         <div className="flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100">
@@ -289,7 +293,7 @@ function FormMetaEditor({ form, busy, onSave, onCancel }: FormMetaEditorProps) {
 
   return (
     <div
-      className="mx-3 mb-2 flex flex-col gap-2 rounded-md border border-white/5 bg-clide-surface px-2.5 py-2"
+      className="mx-3 mb-2 flex max-w-[560px] flex-col gap-2 rounded-md border border-white/5 bg-clide-surface px-2.5 py-2"
       onKeyDown={(e) => {
         // Keep panel-level palette navigation out of the edit form.
         e.stopPropagation();
