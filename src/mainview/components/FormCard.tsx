@@ -140,7 +140,7 @@ export default function FormCard({
         meta={meta}
         form={form}
         run={run}
-        runCount={isGrouped ? runs.length : undefined}
+        runCount={isGrouped ? runs.length : 1}
         summary={summarize(form, run.inputs, run)}
         expanded={shouldExpand}
         onToggle={toggleable ? () => setExpanded((e) => !e) : undefined}

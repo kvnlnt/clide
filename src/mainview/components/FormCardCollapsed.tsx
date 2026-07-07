@@ -48,18 +48,10 @@ export default function FormCardCollapsed({
         <StatusIcon status={run.status} pinned={run.pinned} size={18} />
       </span>
       <span className="shrink-0 text-[16px] text-white/60">{meta.name}</span>
-      <span className="min-w-0 flex-1 truncate text-[14px] text-clide-muted">
-        {summary}
-      </span>
+      <span className="min-w-0 flex-1 truncate text-[14px] text-clide-muted">{summary}</span>
       <span className="shrink-0 text-[12px] text-white/40">{time}</span>
       <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-        <EllipsisMenu
-          pinned={run.pinned}
-          onPin={onPin}
-          onSchedule={onSchedule}
-          onRerun={onRerun}
-          onDelete={onDelete}
-        />
+        <EllipsisMenu pinned={run.pinned} onPin={onPin} onSchedule={onSchedule} onRerun={onRerun} onDelete={onDelete} />
       </div>
     </div>
   );

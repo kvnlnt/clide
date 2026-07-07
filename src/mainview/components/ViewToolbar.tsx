@@ -144,7 +144,6 @@ export default function ViewToolbar({ view }: Props) {
           title="Rename view"
           className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[13px] font-medium text-white/80 hover:bg-white/5 hover:text-white"
         >
-          {view.name}
           <Pencil size={11} className="text-white/30" />
         </button>
       )}
@@ -152,7 +151,7 @@ export default function ViewToolbar({ view }: Props) {
       <div className="mx-1 h-4 w-px shrink-0 bg-white/10" />
 
       <MultiSelectDropdown
-        label={formSlugs.length === 0 ? "All forms" : pluralizeWord(formSlugs.length, "form", "forms")}
+        label={formSlugs.length === 0 ? "Forms" : pluralizeWord(formSlugs.length, "form", "forms")}
         active={formSlugs.length > 0}
         open={openDropdown === "forms"}
         onToggle={() => toggleDropdown("forms")}
@@ -201,7 +200,7 @@ export default function ViewToolbar({ view }: Props) {
       </MultiSelectDropdown>
 
       <MultiSelectDropdown
-        label={statuses.length === 0 ? "Any status" : pluralizeWord(statuses.length, "status", "statuses")}
+        label={statuses.length === 0 ? "Status" : pluralizeWord(statuses.length, "status", "statuses")}
         active={statuses.length > 0}
         open={openDropdown === "status"}
         onToggle={() => toggleDropdown("status")}
@@ -283,7 +282,6 @@ export default function ViewToolbar({ view }: Props) {
         className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-[12px] text-white/40 hover:bg-white/5 hover:text-white"
       >
         <EyeOff size={12} />
-        Hide
       </button>
       <button
         onClick={remove}
@@ -291,7 +289,6 @@ export default function ViewToolbar({ view }: Props) {
         className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-[12px] text-red-400/60 hover:bg-red-500/10 hover:text-red-400"
       >
         <Trash2 size={12} />
-        Delete
       </button>
     </Toolbar>
   );

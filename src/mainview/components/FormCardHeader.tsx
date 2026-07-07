@@ -2,7 +2,6 @@ import { Braces, Code, Eye, Zap } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import type { FormDefinition, FormMeta, RunRecord } from "../types/forms";
 import EllipsisMenu from "./EllipsisMenu";
-import StatusIcon from "./statusIcon";
 
 const TABS = [
   { id: "results", label: "Results", icon: Eye },
@@ -86,19 +85,23 @@ export default function FormCardHeader({
       className={`flex items-center gap-3 px-4 py-3 ${onToggle ? "cursor-pointer hover:bg-white/5" : ""}`}
       onClick={onToggle}
     >
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-        <StatusIcon status={run.status} pinned={pinned} mode="dot" />
-      </span>
-
       <span className="shrink-0 text-[12px] font-medium text-white">{meta.name}</span>
       {triggerTitle && (
         <span className="flex shrink-0 items-center text-amber-300/80" title={triggerTitle}>
           <Zap size={12} />
         </span>
       )}
-      {runCount && runCount > 1 && (
-        <span className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-white/40 bg-white/10">{runCount}</span>
-      )}
+      <span
+        className={`shrink-0 rounded px-1.5 py-0.5 text-[12px] text-white/40
+        ${run.status === "idle" ? "bg-white/5 text-white/50" : ""}
+        ${run.status === "running" ? "bg-blue-500/20 text-blue-400" : ""}
+        ${run.status === "success" ? "bg-green-500/20 text-green-400" : ""}
+        ${run.status === "error" ? "bg-red-500/20 text-red-400" : ""}
+        ${run.status === "scheduled" ? "bg-yellow-500/20 text-yellow-400" : ""}
+      `}
+      >
+        {runCount}
+      </span>
 
       {!expanded && <span className="min-w-0 flex-1 truncate text-[12px] text-clide-muted">{summary}</span>}
 

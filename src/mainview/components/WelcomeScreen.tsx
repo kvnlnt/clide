@@ -1,4 +1,4 @@
-import { ChessKnight, FolderOpen, FolderPlus } from "lucide-react";
+import { FolderOpen, FolderPlus } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
@@ -42,8 +42,7 @@ export default function WelcomeScreen() {
     <div className="clide-scroll flex flex-1 flex-col items-center justify-center overflow-y-auto p-8">
       {/* Brand */}
       <div className="clide-rise flex flex-col items-center" style={{ animationDelay: "0ms" }}>
-        <ChessKnight size={58} className="text-white/80" />
-        <h1 className="text-[34px] font-bold tracking-[0.35em] text-white pt-5">CLIDE</h1>
+        <h1 className="text-[60px] font-bold text-white pt-5">CLIDE</h1>
       </div>
       <p className="clide-rise mt-1 text-[23px] italic text-white/30" style={{ animationDelay: "120ms" }}>
         Your Automation Workhorse
