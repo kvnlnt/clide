@@ -1,7 +1,8 @@
 import { Braces, Code, Eye, Zap } from "lucide-react";
 import { useApp } from "../context/AppContext";
-import type { FormDefinition, FormMeta, RunRecord } from "../types/forms";
+import type { FormDefinition, FormMeta, RunRecord, RunStatus } from "../types/forms";
 import EllipsisMenu from "./EllipsisMenu";
+import { STATUS_META, STATUS_ORDER } from "./statusIcon";
 
 const TABS = [
   { id: "results", label: "Results", icon: Eye },
@@ -13,8 +14,8 @@ interface FormCardHeaderProps {
   meta: FormMeta;
   form: FormDefinition;
   run: RunRecord;
-  /** When the card represents multiple grouped runs, show a count badge. */
-  runCount?: number;
+  /** Count of runs in the group by status — renders one badge per nonzero status. */
+  statusCounts: Partial<Record<RunStatus, number>>;
   summary: string;
   expanded: boolean;
   onToggle?: () => void;
@@ -44,7 +45,7 @@ export default function FormCardHeader({
   meta,
   form,
   run,
-  runCount,
+  statusCounts,
   summary,
   expanded,
   onToggle,
@@ -60,7 +61,10 @@ export default function FormCardHeader({
   activeTab,
   onTabChange,
 }: FormCardHeaderProps) {
-  const { runs, formsBySlug } = useApp();
+  const { runs, formsBySlug, activeViewId } = useApp();
+  // Pinning only has meaning inside saved views (ticket 27) — hide the
+  // affordance entirely on the chronological title tab.
+  const showPin = activeViewId !== null;
 
   const trigger = run.triggeredBy;
   let triggerTitle: string | null = null;
@@ -82,7 +86,7 @@ export default function FormCardHeader({
 
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-3 ${onToggle ? "cursor-pointer hover:bg-white/5" : ""}`}
+      className={`flex items-center gap-3 px-5 py-3 ${onToggle ? "cursor-pointer hover:bg-white/5" : ""}`}
       onClick={onToggle}
     >
       <span className="shrink-0 text-[12px] font-medium text-white">{meta.name}</span>
@@ -91,17 +95,17 @@ export default function FormCardHeader({
           <Zap size={12} />
         </span>
       )}
-      <span
-        className={`shrink-0 rounded px-1.5 py-0.5 text-[12px] text-white/40
-        ${run.status === "idle" ? "bg-white/5 text-white/50" : ""}
-        ${run.status === "running" ? "bg-blue-500/20 text-blue-400" : ""}
-        ${run.status === "success" ? "bg-green-500/20 text-green-400" : ""}
-        ${run.status === "error" ? "bg-red-500/20 text-red-400" : ""}
-        ${run.status === "scheduled" ? "bg-yellow-500/20 text-yellow-400" : ""}
-      `}
-      >
-        {runCount}
-      </span>
+      <div className="flex shrink-0 items-center gap-1">
+        {STATUS_ORDER.filter((s) => (statusCounts[s] ?? 0) > 0).map((s) => (
+          <span
+            key={s}
+            title={STATUS_META[s].label}
+            className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${STATUS_META[s].badgeClass}`}
+          >
+            {statusCounts[s]}
+          </span>
+        ))}
+      </div>
 
       {!expanded && <span className="min-w-0 flex-1 truncate text-[12px] text-clide-muted">{summary}</span>}
 
@@ -139,7 +143,14 @@ export default function FormCardHeader({
         )}
 
         <div onClick={(e) => e.stopPropagation()}>
-          <EllipsisMenu pinned={pinned} onPin={onPin} onSchedule={onSchedule} onRerun={onRerun} onDelete={onDelete} />
+          <EllipsisMenu
+            pinned={pinned}
+            showPin={showPin}
+            onPin={onPin}
+            onSchedule={onSchedule}
+            onRerun={onRerun}
+            onDelete={onDelete}
+          />
         </div>
       </div>
     </div>

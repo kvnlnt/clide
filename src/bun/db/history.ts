@@ -133,6 +133,17 @@ export function updateRunStatus(
   ]);
 }
 
+/** Change a pending scheduled run's fire time/repeat interval. */
+export function updateRunSchedule(id: string, scheduledAt: string, repeatInterval: RepeatInterval): void {
+  const projectPath = runIndex.get(id);
+  if (!projectPath) return;
+  getDb(projectPath).run(`UPDATE runs SET scheduled_at = ?, repeat_interval = ? WHERE id = ?`, [
+    scheduledAt,
+    repeatInterval,
+    id,
+  ]);
+}
+
 export function setOutputPath(id: string, outputPath: string): void {
   const projectPath = runIndex.get(id);
   if (!projectPath) return;

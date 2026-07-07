@@ -16,7 +16,7 @@ export interface DraftCard {
 }
 
 /** Which surface the title tab's body shows. Only meaningful when no view tab is active. */
-export type ProjectSurface = "thread" | "forms" | "views" | "project-settings";
+export type ProjectSurface = "thread" | "forms" | "views" | "calendar" | "project-settings";
 
 interface AppState {
   forms: FormFolder[];
@@ -45,6 +45,11 @@ interface AppState {
   openAppSettings: () => void;
   closeAppSettings: () => void;
 
+  /** Quick-run form picker (⌘K/Ctrl+K or the toolbar Run button) — drops a draft into the current tab's thread. */
+  runPickerOpen: boolean;
+  openRunPicker: () => void;
+  closeRunPicker: () => void;
+
   /** Saved thread views for the active project. "All" is implicit (activeViewId === null). */
   views: ThreadView[];
   activeViewId: string | null;
@@ -56,6 +61,10 @@ interface AppState {
 
   /** Create a new view with a default name, persist it, and activate its tab. */
   createView: () => void;
+  /** Browser-style tab cycling: title tab + visible views, in strip order. */
+  cycleTab: (delta: 1 | -1) => void;
+  /** Cmd+W / Ctrl+W on a view tab: hide it (title tab is not closeable). */
+  closeActiveTab: () => void;
 
   setActiveProject: (p: string | null) => void;
   toggleSidebar: () => void;
@@ -80,6 +89,10 @@ interface AppState {
     scheduledAt: string,
     repeat: RepeatInterval,
   ) => Promise<void>;
+  /** Edit a pending scheduled run's fire time/repeat. */
+  updateScheduledRun: (runId: string, scheduledAt: string, repeat: RepeatInterval) => Promise<void>;
+  /** Fire a pending scheduled run immediately, bypassing its timer. */
+  runScheduledNow: (runId: string) => Promise<void>;
   cancelRun: (runId: string) => Promise<void>;
   rerun: (run: RunRecord) => Promise<void>;
   setPinned: (runId: string, pinned: boolean) => Promise<void>;
@@ -119,6 +132,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [newFormOpen, setNewFormOpen] = useState(false);
   const [projectSurface, setProjectSurfaceState] = useState<ProjectSurface>("thread");
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
+  const [runPickerOpen, setRunPickerOpen] = useState(false);
 
   const [views, setViews] = useState<ThreadView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
@@ -232,6 +246,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [views, persistViews],
   );
 
+  const cycleTab = useCallback(
+    (delta: 1 | -1) => {
+      if (!activeProject) return;
+      const tabs: (string | null)[] = [null, ...views.filter((v) => !v.hidden).map((v) => v.id)];
+      const from = activeViewId === null ? 0 : tabs.indexOf(activeViewId);
+      const next = ((from === -1 ? 0 : from) + delta + tabs.length) % tabs.length;
+      setActiveView(tabs[next]);
+    },
+    [activeProject, views, activeViewId, setActiveView],
+  );
+
+  const closeActiveTab = useCallback(() => {
+    if (!activeViewId) return;
+    const view = views.find((v) => v.id === activeViewId);
+    if (!view) return;
+    updateView({ ...view, hidden: true });
+    setActiveView(null);
+  }, [activeViewId, views, updateView, setActiveView]);
+
   const refreshForms = useCallback(async () => {
     const f = await api.listForms();
     setForms(f);
@@ -317,6 +350,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
   const openAppSettings = useCallback(() => setAppSettingsOpen(true), []);
   const closeAppSettings = useCallback(() => setAppSettingsOpen(false), []);
+  const openRunPicker = useCallback(() => setRunPickerOpen(true), []);
+  const closeRunPicker = useCallback(() => setRunPickerOpen(false), []);
   const openNewProject = useCallback(() => setNewProjectOpen(true), []);
   const closeNewProject = useCallback(() => setNewProjectOpen(false), []);
   const openNewForm = useCallback(() => {
@@ -424,6 +459,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [refreshRuns],
   );
 
+  const updateScheduledRun = useCallback(
+    async (runId: string, scheduledAt: string, repeat: RepeatInterval) => {
+      await api.updateScheduledRun(runId, scheduledAt, repeat);
+      await refreshRuns();
+    },
+    [refreshRuns],
+  );
+
+  const runScheduledNow = useCallback(
+    async (runId: string) => {
+      await api.runScheduledNow(runId);
+      await refreshRuns();
+    },
+    [refreshRuns],
+  );
+
   const cancelRun = useCallback(async (runId: string) => {
     await api.cancelRun(runId);
   }, []);
@@ -464,6 +515,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     appSettingsOpen,
     openAppSettings,
     closeAppSettings,
+    runPickerOpen,
+    openRunPicker,
+    closeRunPicker,
     views,
     activeViewId,
     setActiveView,
@@ -471,6 +525,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteView,
     reorderView,
     createView,
+    cycleTab,
+    closeActiveTab,
     setActiveProject,
     toggleSidebar,
     openNewProject,
@@ -486,6 +542,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateFormMeta,
     submitRun,
     scheduleRun,
+    updateScheduledRun,
+    runScheduledNow,
     cancelRun,
     rerun,
     setPinned,

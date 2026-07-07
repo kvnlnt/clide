@@ -56,7 +56,9 @@ export default function GridCard({
       onDragOver={onDragOver}
       onDrop={onDrop}
       onClick={onOpen}
-      className={`group relative flex cursor-pointer flex-col justify-between rounded-[5px] border border-clide-border bg-clide-panel p-3 ${SPAN[size]} ${MIN_H[size]}`}
+      className={`group relative flex cursor-pointer flex-col justify-between rounded-[5px] border bg-clide-panel p-3 ${
+        pinned ? "border-white/25" : "border-clide-border"
+      } ${SPAN[size]} ${MIN_H[size]}`}
     >
       <div className="flex items-start justify-between">
         <span className="text-[14px] font-bold text-white">{form.meta.name}</span>
@@ -75,7 +77,7 @@ export default function GridCard({
 
       <div className="mt-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <StatusIcon status={lastRun?.status ?? "idle"} pinned={pinned} size={16} />
+          <StatusIcon status={lastRun?.status ?? "idle"} size={16} />
           <span className="text-[12px] text-white/40">{lastRunTime(lastRun)}</span>
         </div>
         <div className="flex items-center gap-2">

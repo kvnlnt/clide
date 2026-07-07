@@ -8,7 +8,7 @@ interface FormFieldProps {
 }
 
 const inputBase =
-  "w-full bg-[rgba(217,217,217,0.05)] text-white text-[13px] rounded px-2.5 py-1.5 outline-none placeholder:text-white/30 focus:bg-[rgba(217,217,217,0.08)] disabled:opacity-60";
+  "w-full rounded border border-clide-border bg-clide-surface text-white text-[13px] px-2.5 py-1.5 outline-none placeholder:text-white/30 focus:border-white/30 disabled:opacity-60";
 
 export default function FormField({ field, value, onChange, disabled }: FormFieldProps) {
   switch (field.type) {
@@ -60,7 +60,7 @@ export default function FormField({ field, value, onChange, disabled }: FormFiel
               >
                 <span
                   className={`h-3.5 w-3.5 rounded-[3px] border ${
-                    checked ? "bg-white/80 border-white/80" : "bg-[rgba(217,217,217,0.2)] border-transparent"
+                    checked ? "bg-white/80 border-white/80" : "bg-clide-surface border-clide-border"
                   }`}
                 />
                 {opt}

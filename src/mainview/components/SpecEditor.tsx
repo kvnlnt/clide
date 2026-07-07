@@ -6,7 +6,7 @@ const FIELD_TYPES: FieldType[] = ["text", "textarea", "select", "multicheck", "n
 const OUTPUT_KINDS: OutputType[] = ["text", "table", "image", "audio", "video", "json"];
 
 const inputBase =
-  "w-full bg-[rgba(217,217,217,0.05)] text-white text-[13px] rounded px-2.5 py-1.5 outline-none placeholder:text-white/30";
+  "w-full rounded border border-clide-border bg-clide-surface text-white text-[13px] px-2.5 py-1.5 outline-none placeholder:text-white/30 focus:border-white/30";
 const sectionLabel = "text-[11px] font-bold uppercase tracking-wider text-white/30";
 
 interface SpecEditorProps {

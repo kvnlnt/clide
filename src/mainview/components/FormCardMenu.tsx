@@ -2,6 +2,8 @@ import { AlarmClock, Pin, RotateCw, Trash2 } from "lucide-react";
 
 interface FormCardMenuProps {
   pinned: boolean;
+  /** Pinning only has meaning inside saved views — hidden on the title tab. */
+  showPin?: boolean;
   onPin: () => void;
   onSchedule: () => void;
   onRerun: () => void;
@@ -9,20 +11,30 @@ interface FormCardMenuProps {
   onClose: () => void;
 }
 
-export default function FormCardMenu({ pinned, onPin, onSchedule, onRerun, onDelete, onClose }: FormCardMenuProps) {
+export default function FormCardMenu({
+  pinned,
+  showPin = true,
+  onPin,
+  onSchedule,
+  onRerun,
+  onDelete,
+  onClose,
+}: FormCardMenuProps) {
   const item = "flex w-full items-center gap-2 px-3 py-1.5 text-[13px] text-white/80 hover:bg-white/5 text-left";
 
   return (
     <div>
-      <button
-        className={item}
-        onClick={() => {
-          onPin();
-          onClose();
-        }}
-      >
-        <Pin size={14} /> {pinned ? "Unpin" : "Pin"}
-      </button>
+      {showPin && (
+        <button
+          className={item}
+          onClick={() => {
+            onPin();
+            onClose();
+          }}
+        >
+          <Pin size={14} /> {pinned ? "Unpin" : "Pin"}
+        </button>
+      )}
       <button
         className={item}
         onClick={() => {

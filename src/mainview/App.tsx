@@ -1,9 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import CalendarPage from "./components/CalendarPage";
 import FormsPanel from "./components/FormsPanel";
 import NewFormPage from "./components/NewFormPage";
 import NewProjectModal from "./components/NewProjectModal";
 import ProjectSettingsPage from "./components/ProjectSettingsPage";
 import ProjectToolbar from "./components/ProjectToolbar";
+import RunFormPicker from "./components/RunFormPicker";
 import SettingsPanel from "./components/SettingsPanel";
 import Sidebar from "./components/Sidebar";
 import Thread from "./components/Thread";
@@ -29,21 +31,63 @@ function Workspace() {
     closeNewForm,
     appSettingsOpen,
     closeAppSettings,
+    cycleTab,
+    closeActiveTab,
+    runPickerOpen,
+    openRunPicker,
+    closeRunPicker,
   } = useApp();
 
   const activeProjectMeta = activeProject ? projectMeta.find((p) => p.name === activeProject) : undefined;
   const activeView = activeViewId ? views.find((v) => v.id === activeViewId) : undefined;
+
+  // navigator.platform is deprecated but userAgent-sniffing "Mac" is still the
+  // standard cross-browser way to tell Cmd from Ctrl for shortcut purposes.
+  const isMac = useMemo(() => /mac/i.test(navigator.platform || navigator.userAgent), []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
         e.preventDefault();
         setProjectSurface("forms");
+        return;
+      }
+
+      // Browser-style tab navigation is inert while a blocking overlay is open.
+      const overlayOpen = newFormOpen || appSettingsOpen || newProjectOpen;
+      if (overlayOpen || !activeProject) return;
+
+      if (e.ctrlKey && e.key === "Tab") {
+        e.preventDefault();
+        cycleTab(e.shiftKey ? -1 : 1);
+        return;
+      }
+
+      const closeChord = isMac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
+      if (closeChord && e.key.toLowerCase() === "w") {
+        e.preventDefault();
+        closeActiveTab();
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        openRunPicker();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [setProjectSurface]);
+  }, [
+    setProjectSurface,
+    newFormOpen,
+    appSettingsOpen,
+    newProjectOpen,
+    activeProject,
+    cycleTab,
+    closeActiveTab,
+    openRunPicker,
+    isMac,
+  ]);
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden rounded-[15px] border border-white/10 bg-clide-bg text-white p-2.5">
@@ -66,6 +110,7 @@ function Workspace() {
               <ProjectToolbar />
               {projectSurface === "forms" && <FormsPanel />}
               {projectSurface === "views" && <ViewsPage />}
+              {projectSurface === "calendar" && <CalendarPage />}
               {projectSurface === "project-settings" && activeProjectMeta && (
                 <ProjectSettingsPage
                   path={activeProjectMeta.path}
@@ -76,6 +121,7 @@ function Workspace() {
               {projectSurface === "thread" && <Thread />}
             </>
           )}
+          {runPickerOpen && activeProject && <RunFormPicker onClose={closeRunPicker} />}
         </div>
         {sidebarOpen && activeProject !== null && <Sidebar />}
       </div>

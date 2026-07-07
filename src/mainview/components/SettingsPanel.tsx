@@ -1,63 +1,65 @@
-import { X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Loader, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../rpc";
-import type { AIProvider } from "../types/forms";
+import { AI_SERVICE_KIND_LABEL, AI_SERVICE_KIND_NEEDS_BASE_URL } from "../types/forms";
+import type { AIService, AIServiceKind } from "../types/forms";
 
 interface SettingsPanelProps {
   onClose: () => void;
 }
 
-const PROVIDERS: { id: AIProvider; label: string; needsKey: boolean }[] = [
-  { id: "claude", label: "Claude (Anthropic)", needsKey: true },
-  { id: "openai", label: "OpenAI", needsKey: true },
-  { id: "ollama", label: "Ollama (local)", needsKey: false },
-];
+const KINDS: AIServiceKind[] = ["anthropic", "openai", "openai-compatible", "ollama"];
+
+function needsCredential(kind: AIServiceKind): boolean {
+  return kind === "anthropic" || kind === "openai";
+}
 
 export default function SettingsPanel({ onClose }: SettingsPanelProps) {
-  const [ollamaBaseUrl, setOllamaBaseUrl] = useState("http://localhost:11434");
-  const [keys, setKeys] = useState<Partial<Record<AIProvider, string>>>({});
-  const [savedKeys, setSavedKeys] = useState<Partial<Record<AIProvider, boolean>>>({});
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [services, setServices] = useState<AIService[] | null>(null);
+  const [savedKeys, setSavedKeys] = useState<Record<string, boolean>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    const list = await api.listAIServices();
+    setServices(list);
+    const keyed = list.filter((s) => needsCredential(s.kind));
+    const flags = await Promise.all(keyed.map((s) => api.hasServiceCredential(s.id)));
+    setSavedKeys(Object.fromEntries(keyed.map((s, i) => [s.id, flags[i]])));
+  }, []);
 
   useEffect(() => {
-    void api.getAISettings().then((s) => {
-      setOllamaBaseUrl(s.ollamaBaseUrl ?? "http://localhost:11434");
-    });
-    for (const p of PROVIDERS) {
-      if (p.needsKey) {
-        void api.hasCredentials(p.id).then((has) => setSavedKeys((prev) => ({ ...prev, [p.id]: has })));
-      }
-    }
-  }, []);
+    void refresh();
+  }, [refresh]);
 
   // Escape closes the page, same as the top-right ×.
   const handleClose = useCallback(() => onClose(), [onClose]);
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
+      if (e.key === "Escape" && !editingId && !creating) handleClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleClose]);
+  }, [handleClose, editingId, creating]);
 
-  const handleSave = async () => {
-    setSaving(true);
-    await api.saveAISettings({ ollamaBaseUrl: ollamaBaseUrl.trim() || "http://localhost:11434" });
-    for (const p of PROVIDERS) {
-      const key = keys[p.id]?.trim();
-      if (key) {
-        await api.saveCredentials(p.id, key);
-        setSavedKeys((prev) => ({ ...prev, [p.id]: true }));
-      }
-    }
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const persist = async (next: AIService[]) => {
+    setServices(next);
+    await api.saveAIServices(next);
   };
 
-  const inputBase =
-    "w-full rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30";
+  const setDefault = async (id: string) => {
+    if (!services) return;
+    await persist(services.map((s) => ({ ...s, isDefault: s.id === id })));
+  };
+
+  const remove = async (id: string) => {
+    if (!services) return;
+    const remaining = services.filter((s) => s.id !== id);
+    if (remaining.length > 0 && !remaining.some((s) => s.isDefault)) remaining[0]!.isDefault = true;
+    await persist(remaining);
+    setConfirmingId(null);
+  };
 
   return (
     <div className="flex flex-1 flex-col">
@@ -74,60 +76,369 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
       </div>
 
       <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">
-        <div className="mx-auto flex w-full max-w-[560px] flex-col gap-8">
-          {/* AI Provider Keys */}
-          <div className="flex flex-col gap-3">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-white/40">AI Providers</span>
-
-            {PROVIDERS.filter((p) => p.needsKey).map((p) => (
-              <div key={p.id} className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <label className="text-[13px] font-medium text-white/80">{p.label}</label>
-                  {savedKeys[p.id] && (
-                    <span className="rounded-full bg-green-500/20 px-1.5 py-0.5 text-[10px] font-medium text-green-400">
-                      key saved
-                    </span>
-                  )}
-                </div>
-                <input
-                  type="password"
-                  className={inputBase}
-                  placeholder={savedKeys[p.id] ? "••••••••••••  (leave blank to keep)" : "API key"}
-                  value={keys[p.id] ?? ""}
-                  onChange={(e) => setKeys((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                  autoComplete="off"
-                />
-              </div>
-            ))}
+        <div className="mx-auto flex w-full max-w-[640px] flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] font-bold uppercase tracking-wider text-white/40">AI Services</span>
+            {!creating && (
+              <button
+                onClick={() => {
+                  setCreating(true);
+                  setEditingId(null);
+                }}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium text-white/60 hover:bg-white/5 hover:text-white"
+              >
+                <Plus size={13} /> Add service
+              </button>
+            )}
           </div>
 
-          {/* Ollama Configuration */}
-          <div className="flex flex-col gap-3">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-white/40">Ollama</span>
-            <div className="flex flex-col gap-1">
-              <label className="text-[13px] font-medium text-white/80">Base URL</label>
-              <input
-                className={inputBase}
-                placeholder="http://localhost:11434"
-                value={ollamaBaseUrl}
-                onChange={(e) => setOllamaBaseUrl(e.target.value)}
-              />
-              <span className="text-[11px] text-white/30">
-                Default: http://localhost:11434 — change if Ollama runs on a different host or port.
-              </span>
+          {services === null && <div className="text-[13px] italic text-white/30">Loading…</div>}
+
+          {services?.length === 0 && !creating && (
+            <div className="rounded-md border border-dashed border-clide-border px-3 py-4 text-center text-[13px] text-white/40">
+              No AI services configured yet. Add one to enable AI-powered form creation and magic fields.
             </div>
-          </div>
+          )}
 
-          <div className="flex">
+          {creating && (
+            <AIServiceEditor
+              onCancel={() => setCreating(false)}
+              onSave={async (service, apiKey) => {
+                if (apiKey.trim()) await api.saveServiceCredential(service.id, apiKey.trim());
+                const next = [...(services ?? []), service];
+                if (!next.some((s) => s.isDefault)) service.isDefault = true;
+                await persist(next);
+                setCreating(false);
+              }}
+            />
+          )}
+
+          {services && services.length > 0 && (
+            <div className="flex flex-col divide-y divide-white/5 rounded-md border border-clide-border">
+              {services.map((service) =>
+                editingId === service.id ? (
+                  <div key={service.id} className="px-3 py-2.5">
+                    <AIServiceEditor
+                      existing={service}
+                      hasSavedKey={savedKeys[service.id] === true}
+                      onCancel={() => setEditingId(null)}
+                      onSave={async (updated, apiKey) => {
+                        if (apiKey.trim()) await api.saveServiceCredential(updated.id, apiKey.trim());
+                        await persist(services.map((s) => (s.id === updated.id ? updated : s)));
+                        await refresh();
+                        setEditingId(null);
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <ServiceRow
+                    key={service.id}
+                    service={service}
+                    hasSavedKey={savedKeys[service.id] === true}
+                    confirming={confirmingId === service.id}
+                    onEdit={() => {
+                      setEditingId(service.id);
+                      setCreating(false);
+                    }}
+                    onSetDefault={() => void setDefault(service.id)}
+                    onConfirmDelete={() => setConfirmingId((cur) => (cur === service.id ? null : service.id))}
+                    onDelete={() => void remove(service.id)}
+                    onCancelDelete={() => setConfirmingId(null)}
+                  />
+                ),
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ServiceRowProps {
+  service: AIService;
+  hasSavedKey: boolean;
+  confirming: boolean;
+  onEdit: () => void;
+  onSetDefault: () => void;
+  onConfirmDelete: () => void;
+  onDelete: () => void;
+  onCancelDelete: () => void;
+}
+
+function ServiceRow({
+  service,
+  hasSavedKey,
+  confirming,
+  onEdit,
+  onSetDefault,
+  onConfirmDelete,
+  onDelete,
+  onCancelDelete,
+}: ServiceRowProps) {
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
+
+  const runTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    const res = await api.testAIService(service.id);
+    setTesting(false);
+    setTestResult(res);
+  };
+
+  return (
+    <div className="px-3 py-2.5">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onSetDefault}
+          title={service.isDefault ? "Default service" : "Make default"}
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded ${
+            service.isDefault ? "text-amber-300" : "text-white/20 hover:bg-white/10 hover:text-white/60"
+          }`}
+        >
+          <Star size={14} fill={service.isDefault ? "currentColor" : "none"} />
+        </button>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-[14px] text-white">{service.name}</span>
+            <span className="shrink-0 rounded bg-white/5 px-1.5 py-0.5 text-[11px] text-white/40">
+              {AI_SERVICE_KIND_LABEL[service.kind]}
+            </span>
+            {needsCredential(service.kind) &&
+              (hasSavedKey ? (
+                <span className="shrink-0 rounded-full bg-green-500/20 px-1.5 py-0.5 text-[10px] font-medium text-green-400">
+                  key saved
+                </span>
+              ) : (
+                <span className="shrink-0 rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                  no key
+                </span>
+              ))}
+            {service.model && <span className="shrink-0 truncate text-[11px] text-white/30">{service.model}</span>}
+          </div>
+          {testResult && (
+            <div className={`mt-1 text-[11px] ${testResult.ok ? "text-green-400" : "text-red-400"}`}>
+              {testResult.ok ? "Test succeeded" : `Test failed: ${testResult.error}`}
+            </div>
+          )}
+        </div>
+
+        {confirming ? (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="text-[12px] text-white/50">Delete?</span>
             <button
-              onClick={() => void handleSave()}
-              disabled={saving}
-              className="rounded-md bg-white/10 px-4 py-2 text-[13px] font-medium text-white hover:bg-white/20 disabled:opacity-50"
+              onClick={onDelete}
+              className="rounded-md bg-red-500/80 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-red-500"
             >
-              {saving ? "Saving…" : saved ? "Saved ✓" : "Save"}
+              Delete
+            </button>
+            <button onClick={onCancelDelete} className="rounded-md px-2.5 py-1 text-[12px] text-white/50 hover:bg-white/5">
+              Cancel
             </button>
           </div>
+        ) : (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() => void runTest()}
+              disabled={testing}
+              title="Test this service"
+              className="flex h-7 w-7 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-40"
+            >
+              {testing ? <Loader size={13} className="animate-spin" /> : <Check size={13} />}
+            </button>
+            <button
+              onClick={onEdit}
+              title="Edit"
+              className="flex h-7 w-7 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
+            >
+              <Pencil size={13} />
+            </button>
+            <button
+              onClick={onConfirmDelete}
+              title="Delete"
+              className="flex h-7 w-7 items-center justify-center rounded text-red-400/70 hover:bg-white/10 hover:text-red-400"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface AIServiceEditorProps {
+  existing?: AIService;
+  hasSavedKey?: boolean;
+  onSave: (service: AIService, apiKey: string) => Promise<void>;
+  onCancel: () => void;
+}
+
+function AIServiceEditor({ existing, hasSavedKey, onSave, onCancel }: AIServiceEditorProps) {
+  const [name, setName] = useState(existing?.name ?? "");
+  const [kind, setKind] = useState<AIServiceKind>(existing?.kind ?? "anthropic");
+  const [baseUrl, setBaseUrl] = useState(existing?.baseUrl ?? "");
+  const [apiKey, setApiKey] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [model, setModel] = useState(existing?.model ?? "");
+  const [timeoutMs, setTimeoutMs] = useState(existing?.timeoutMs ? String(existing.timeoutMs) : "");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const inputBase =
+    "w-full rounded-md border border-clide-border bg-clide-bg px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30";
+
+  const requiresBaseUrl = AI_SERVICE_KIND_NEEDS_BASE_URL[kind];
+
+  const save = async () => {
+    if (!name.trim()) {
+      setError("Name required");
+      return;
+    }
+    if (requiresBaseUrl && !baseUrl.trim()) {
+      setError("Base URL required for this service kind");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const service: AIService = {
+      id: existing?.id ?? crypto.randomUUID(),
+      name: name.trim(),
+      kind,
+      baseUrl: baseUrl.trim() || undefined,
+      model: model.trim() || undefined,
+      timeoutMs: timeoutMs.trim() ? Number(timeoutMs.trim()) : undefined,
+      isDefault: existing?.isDefault,
+    };
+    await onSave(service, apiKey);
+    setSaving(false);
+  };
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-white/10 bg-white/[0.02] p-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-medium text-white/50">Name</label>
+          <input
+            autoFocus
+            className={inputBase}
+            placeholder="Work Claude"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-medium text-white/50">Kind</label>
+          <select
+            className={`${inputBase} appearance-none`}
+            value={kind}
+            onChange={(e) => setKind(e.target.value as AIServiceKind)}
+          >
+            {KINDS.map((k) => (
+              <option key={k} value={k} className="bg-clide-panel">
+                {AI_SERVICE_KIND_LABEL[k]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {requiresBaseUrl && (
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-medium text-white/50">Base URL</label>
+          <input
+            className={inputBase}
+            placeholder={kind === "ollama" ? "http://localhost:11434" : "https://your-server/v1"}
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+          />
+        </div>
+      )}
+
+      {needsCredential(kind) && (
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-medium text-white/50">API Key</label>
+          <input
+            type="password"
+            className={inputBase}
+            placeholder={hasSavedKey ? "••••••••••••  (leave blank to keep)" : "API key"}
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+      )}
+      {kind === "openai-compatible" && (
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-medium text-white/50">API Key (optional)</label>
+          <input
+            type="password"
+            className={inputBase}
+            placeholder={hasSavedKey ? "••••••••••••  (leave blank to keep)" : "Only if the endpoint requires one"}
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+      )}
+
+      <button
+        onClick={() => setAdvancedOpen((o) => !o)}
+        className="flex items-center gap-1 self-start text-[11px] font-medium text-white/40 hover:text-white/70"
+      >
+        {advancedOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        Advanced
+      </button>
+
+      {advancedOpen && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium text-white/50">Model override</label>
+            <input
+              className={inputBase}
+              placeholder="Uses a sensible default when blank"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+            />
+          </div>
+          {!requiresBaseUrl && (
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-medium text-white/50">Base URL override</label>
+              <input
+                className={inputBase}
+                placeholder="Uses the standard hosted endpoint when blank"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+              />
+            </div>
+          )}
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium text-white/50">Timeout (ms)</label>
+            <input
+              className={inputBase}
+              placeholder="Default"
+              value={timeoutMs}
+              onChange={(e) => setTimeoutMs(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+
+      {error && <span className="text-[11px] text-red-400">{error}</span>}
+
+      <div className="flex gap-1.5">
+        <button
+          disabled={saving}
+          onClick={() => void save()}
+          className="rounded-md bg-white/10 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-white/20 disabled:opacity-40"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button onClick={onCancel} className="rounded-md px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/5">
+          Cancel
+        </button>
       </div>
     </div>
   );

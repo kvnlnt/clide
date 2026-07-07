@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { copyToClipboard } from "../../clipboard";
 import { api } from "../../rpc";
 import type { OutputChunk, OutputType, RunStatus } from "../../types/forms";
 import AudioOutput from "./AudioOutput";
@@ -16,8 +17,6 @@ export interface OutputBlockProps {
   chunks: OutputChunk[];
 }
 
-const DEFAULT_MAX = 400;
-
 function decodeBase64ToText(base64: string): string {
   try {
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
@@ -28,7 +27,6 @@ function decodeBase64ToText(base64: string): string {
 }
 
 export default function OutputBlock({ runId, outputType, status, chunks }: OutputBlockProps) {
-  const [expanded, setExpanded] = useState(false);
   const [fetchedText, setFetchedText] = useState<string | null>(null);
   const [mediaSrc, setMediaSrc] = useState<string | null>(null);
 
@@ -76,7 +74,6 @@ export default function OutputBlock({ runId, outputType, status, chunks }: Outpu
 
   const text = liveStdout || fetchedText || "";
   const streaming = status === "running" || status === "pending";
-  const maxHeight = expanded ? null : DEFAULT_MAX;
 
   let label = outputType.toUpperCase();
   if (outputType === "table" && text) {
@@ -85,16 +82,16 @@ export default function OutputBlock({ runId, outputType, status, chunks }: Outpu
   if (streaming) label = "STREAMING";
 
   const copyText = () => {
-    if (text) void navigator.clipboard?.writeText(text);
+    if (text) void copyToClipboard(text);
   };
 
   let body: React.ReactNode;
   switch (outputType) {
     case "table":
-      body = <TableOutput text={text} maxHeight={maxHeight} />;
+      body = <TableOutput text={text} />;
       break;
     case "json":
-      body = <JsonOutput text={text} maxHeight={maxHeight} />;
+      body = <JsonOutput text={text} />;
       break;
     case "image":
       body = <ImageOutput src={mediaSrc} />;
@@ -106,17 +103,12 @@ export default function OutputBlock({ runId, outputType, status, chunks }: Outpu
       body = <VideoOutput src={mediaSrc} />;
       break;
     default:
-      body = <TextOutput stdout={text} stderr={liveStderr} maxHeight={maxHeight} />;
+      body = <TextOutput stdout={text} stderr={liveStderr} />;
   }
 
   return (
     <div className="overflow-hidden rounded-[5px] border border-clide-border bg-clide-bg">
-      <OutputToolbar
-        label={label}
-        expanded={expanded}
-        onToggleExpand={() => setExpanded((e) => !e)}
-        onCopy={isMedia ? undefined : copyText}
-      />
+      <OutputToolbar label={label} onCopy={isMedia ? undefined : copyText} />
       {body}
     </div>
   );

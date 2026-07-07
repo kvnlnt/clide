@@ -5,6 +5,7 @@ import PortalPopover from "./PortalPopover";
 
 interface EllipsisMenuProps {
   pinned: boolean;
+  showPin?: boolean;
   onPin: () => void;
   onSchedule: () => void;
   onRerun: () => void;
@@ -12,7 +13,15 @@ interface EllipsisMenuProps {
   size?: number;
 }
 
-export default function EllipsisMenu({ pinned, onPin, onSchedule, onRerun, onDelete, size = 16 }: EllipsisMenuProps) {
+export default function EllipsisMenu({
+  pinned,
+  showPin,
+  onPin,
+  onSchedule,
+  onRerun,
+  onDelete,
+  size = 16,
+}: EllipsisMenuProps) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -36,6 +45,7 @@ export default function EllipsisMenu({ pinned, onPin, onSchedule, onRerun, onDel
       >
         <FormCardMenu
           pinned={pinned}
+          showPin={showPin}
           onPin={onPin}
           onSchedule={onSchedule}
           onRerun={onRerun}

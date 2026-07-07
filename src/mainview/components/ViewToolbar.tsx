@@ -1,8 +1,9 @@
-import { EyeOff, Pencil, Trash2, X } from "lucide-react";
+import { EyeOff, Pencil, Play, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import type { RunStatus, ThreadView } from "../types/forms";
 import MultiSelectDropdown from "./MultiSelectDropdown";
+import { STATUS_META } from "./statusIcon";
 import Toolbar from "./Toolbar";
 
 const STATUS_OPTIONS: RunStatus[] = ["idle", "running", "success", "error", "scheduled"];
@@ -20,7 +21,7 @@ interface Props {
  * (MultiSelectDropdown) that expand to their full controls on click.
  */
 export default function ViewToolbar({ view }: Props) {
-  const { forms, activeProject, activeViewId, updateView, deleteView, setActiveView } = useApp();
+  const { forms, activeProject, activeViewId, updateView, deleteView, setActiveView, openRunPicker } = useApp();
 
   const [name, setName] = useState(view.name);
   const [editingName, setEditingName] = useState(false);
@@ -122,6 +123,17 @@ export default function ViewToolbar({ view }: Props) {
 
   return (
     <Toolbar>
+      <button
+        onClick={openRunPicker}
+        title="Run a form (⌘K)"
+        className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] text-white/50 transition-colors hover:bg-white/5 hover:text-white"
+      >
+        <Play size={13} />
+        Run
+      </button>
+
+      <div className="mx-1 h-4 w-px shrink-0 bg-white/10" />
+
       {editingName ? (
         <input
           autoFocus
@@ -207,15 +219,20 @@ export default function ViewToolbar({ view }: Props) {
         onClose={() => setOpenDropdown(null)}
       >
         <div className="flex flex-col gap-0.5">
-          {STATUS_OPTIONS.map((s) => (
-            <label
-              key={s}
-              className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-[13px] text-white/70 hover:bg-white/5 hover:text-white"
-            >
-              <input type="checkbox" checked={statuses.includes(s)} onChange={() => toggleStatus(s)} />
-              {s}
-            </label>
-          ))}
+          {STATUS_OPTIONS.map((s) => {
+            const meta = STATUS_META[s];
+            const Icon = meta.icon;
+            return (
+              <label
+                key={s}
+                className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-[13px] text-white/70 hover:bg-white/5 hover:text-white"
+              >
+                <input type="checkbox" checked={statuses.includes(s)} onChange={() => toggleStatus(s)} />
+                <Icon size={12} className={`shrink-0 ${meta.textClass} ${meta.spin ? "animate-spin" : ""}`} />
+                {meta.label}
+              </label>
+            );
+          })}
         </div>
       </MultiSelectDropdown>
 

@@ -11,6 +11,7 @@ import type {
   OutputSpec,
   OutputType,
 } from "../../shared/types";
+import { getAIService, legacyProviderForKind } from "./aiServices";
 import { complete } from "./providers";
 
 async function which(cmd: string): Promise<string | null> {
@@ -226,6 +227,8 @@ export function normalizeSpec(raw: unknown): FormSpecDraft {
  * from the user's three plain-text descriptions (input/processing/output).
  */
 export async function draftFormSpec(input: DraftFormSpecInput): Promise<FormSpecDraft> {
+  const service = await getAIService(input.serviceId);
+  if (!service) throw new Error("Selected AI service not found");
   const env = await detectEnvironment();
 
   const system = [
@@ -253,7 +256,7 @@ export async function draftFormSpec(input: DraftFormSpecInput): Promise<FormSpec
     env,
   ].join("\n\n");
 
-  const raw = await complete(input.provider, { system, user }, input.model);
+  const raw = await complete(service, { system, user });
   return normalizeSpec(extractJson(raw));
 }
 
@@ -267,6 +270,8 @@ export async function draftFormSpec(input: DraftFormSpecInput): Promise<FormSpec
  * and dependency info. outputs/events/magic are copied through untouched.
  */
 export async function generateFormFromSpec(input: CreateFormInput, spec: FormSpecDraft): Promise<GeneratedForm> {
+  const service = await getAIService(input.serviceId);
+  if (!service) throw new Error("Selected AI service not found");
   const env = await detectEnvironment();
   const now = new Date().toISOString();
 
@@ -314,7 +319,7 @@ export async function generateFormFromSpec(input: CreateFormInput, spec: FormSpe
     env,
   ].join("\n\n");
 
-  const raw = await complete(input.provider, { system, user }, input.model);
+  const raw = await complete(service, { system, user });
   const parsed = extractJson(raw) as Record<string, unknown>;
 
   if (typeof parsed.script !== "string") {
@@ -339,8 +344,8 @@ export async function generateFormFromSpec(input: CreateFormInput, spec: FormSpe
       project: input.project,
       tags: Array.isArray(parsed.tags) ? parsed.tags.filter((t): t is string => typeof t === "string") : [],
       interpreter: spec.interpreter,
-      aiProvider: input.provider,
-      aiModel: input.model,
+      aiProvider: legacyProviderForKind(service.kind),
+      aiModel: service.model,
       createdAt: now,
       updatedAt: now,
     },
@@ -364,6 +369,8 @@ export async function generateFormFromSpec(input: CreateFormInput, spec: FormSpe
  * definition, and script) from the user's name + description.
  */
 export async function generateForm(input: CreateFormInput): Promise<GeneratedForm> {
+  const service = await getAIService(input.serviceId);
+  if (!service) throw new Error("Selected AI service not found");
   const env = await detectEnvironment();
   const now = new Date().toISOString();
 
@@ -391,7 +398,7 @@ export async function generateForm(input: CreateFormInput): Promise<GeneratedFor
     env,
   ].join("\n");
 
-  const raw = await complete(input.provider, { system, user }, input.model);
+  const raw = await complete(service, { system, user });
   const parsed = extractJson(raw) as Partial<GeneratedForm> & {
     meta?: Record<string, unknown>;
     form?: Record<string, unknown>;
@@ -408,8 +415,8 @@ export async function generateForm(input: CreateFormInput): Promise<GeneratedFor
     project: input.project,
     tags: Array.isArray(parsed.meta.tags) ? (parsed.meta.tags as string[]) : [],
     interpreter: (parsed.meta.interpreter as GeneratedForm["meta"]["interpreter"]) ?? "bash",
-    aiProvider: input.provider,
-    aiModel: input.model,
+    aiProvider: legacyProviderForKind(service.kind),
+    aiModel: service.model,
     createdAt: now,
     updatedAt: now,
   };

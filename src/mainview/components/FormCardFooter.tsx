@@ -12,7 +12,7 @@ export default function FormCardFooter({ status, canSubmit, onSubmit, onCancel }
   const running = status === "running" || status === "pending";
 
   return (
-    <div className="flex items-center justify-between px-4 py-3">
+    <div className="flex items-center justify-between px-5 py-3">
       <div className="flex items-center gap-2 text-white/40">
         <Wifi size={16} />
         <span className="text-[11px]">{running ? "Running…" : "Ready"}</span>

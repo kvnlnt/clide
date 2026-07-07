@@ -2,6 +2,8 @@
 // import from a single local module.
 export type {
   AIProvider,
+  AIService,
+  AIServiceKind,
   DraftFormSpecInput,
   DraftFormSpecResult,
   FieldType,
@@ -29,5 +31,9 @@ export type {
   UIState,
 } from "../../shared/types";
 
-// Runtime value re-exports (model catalog).
-export { AI_MODELS, DEFAULT_MODEL } from "../../shared/types";
+// Runtime value re-exports.
+export {
+  AI_SERVICE_KIND_LABEL,
+  AI_SERVICE_KIND_NEEDS_BASE_URL,
+  DEFAULT_MODEL_FOR_KIND,
+} from "../../shared/types";

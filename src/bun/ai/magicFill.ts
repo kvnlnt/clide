@@ -1,22 +1,18 @@
-import type { AIProvider, FormField, FormFolder } from "../../shared/types";
-import { hasCredential } from "./credentials";
+import type { AIService, FormField, FormFolder } from "../../shared/types";
+import { getDefaultAIService, legacyProviderForKind, listAIServices } from "./aiServices";
 import { complete } from "./providers";
 
 /** Max payload text sent to the model as fill context. */
 const PAYLOAD_LIMIT = 8192;
 
-const PROVIDER_ORDER: AIProvider[] = ["claude", "openai", "ollama"];
-
-/** The form's creation provider when it has credentials, else the first provider that does. */
-async function resolveProvider(folder: FormFolder): Promise<{ provider: AIProvider; model?: string } | null> {
-  const preferred = folder.meta.aiProvider;
-  if (preferred && (await hasCredential(preferred))) {
-    return { provider: preferred, model: folder.meta.aiModel };
-  }
-  for (const provider of PROVIDER_ORDER) {
-    if (await hasCredential(provider)) return { provider };
-  }
-  return null;
+/** The form's creation service kind when a matching service exists, else the default service. */
+async function resolveService(folder: FormFolder): Promise<AIService | null> {
+  const services = await listAIServices();
+  if (services.length === 0) return null;
+  const preferredKind = folder.meta.aiProvider
+    ? services.find((s) => legacyProviderForKind(s.kind) === folder.meta.aiProvider)
+    : undefined;
+  return preferredKind ?? (await getDefaultAIService()) ?? null;
 }
 
 function extractJson(text: string): unknown {
@@ -79,8 +75,8 @@ export async function fillMagicFields(
   const ids = Object.keys(fields);
   if (ids.length === 0) return {};
 
-  const resolved = await resolveProvider(folder);
-  if (!resolved) throw new Error("No AI provider with saved credentials");
+  const service = await resolveService(folder);
+  if (!service) throw new Error("No AI service configured — add one in Settings");
 
   const fieldSpecs = folder.form.fields
     .filter((f) => ids.includes(f.id))
@@ -121,7 +117,7 @@ export async function fillMagicFields(
       : []),
   ].join("\n\n");
 
-  const raw = await complete(resolved.provider, { system, user }, resolved.model);
+  const raw = await complete(service, { system, user });
   const parsed = extractJson(raw);
   if (typeof parsed !== "object" || parsed === null) return {};
 

@@ -2,7 +2,7 @@ import { ApplicationMenu, BrowserView, BrowserWindow, Updater, Utils } from "ele
 import { rmSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
 import type { ClideRPC, OutputChunk, Project, RunStatusUpdate } from "../shared/types";
-import { loadAISettings, saveAISettings as persistAISettings } from "./ai/aiSettings";
+import { getAIService, listAIServices, saveAIServices, testAIService } from "./ai/aiServices";
 import { hasCredential, saveCredential } from "./ai/credentials";
 import { draftFormSpec, generateForm, generateFormFromSpec, runDependencyCheck } from "./ai/formGenerator";
 import { fillMagicFields } from "./ai/magicFill";
@@ -25,7 +25,7 @@ import { watchForms } from "./forms/watcher";
 import { writeForm } from "./forms/writer";
 import { formDir, projectFormsDir } from "./paths";
 import { cancelRun, startRun, type RunEmitters } from "./runner/execute";
-import { disposeScheduler, initScheduler, schedule } from "./scheduler";
+import { cancelScheduled, disposeScheduler, initScheduler, rescheduleRun, runScheduledNow, schedule } from "./scheduler";
 import { readUIState, writeUIState } from "./uiState";
 
 const DEV_SERVER_PORT = 5173;
@@ -230,19 +230,28 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
 
       getFormScript: async ({ formSlug }) => await readFormScript(formSlug),
 
-      saveCredentials: async ({ provider, key }) => {
-        await saveCredential(provider, key);
+      saveServiceCredential: async ({ serviceId, key }) => {
+        await saveCredential(serviceId, key);
       },
 
-      hasCredentials: async ({ provider }) => await hasCredential(provider),
+      hasServiceCredential: async ({ serviceId }) => await hasCredential(serviceId),
+
+      listAIServices: async () => await listAIServices(),
+
+      saveAIServices: async ({ services }) => {
+        await saveAIServices(services);
+      },
+
+      testAIService: async ({ serviceId }) => await testAIService(serviceId),
 
       createForm: async (input) => {
         try {
-          if (!(await hasCredential(input.provider))) {
-            return {
-              ok: false,
-              error: `No credentials saved for ${input.provider}.`,
-            };
+          const service = await getAIService(input.serviceId);
+          if (!service) {
+            return { ok: false, error: "Selected AI service not found." };
+          }
+          if ((service.kind === "anthropic" || service.kind === "openai") && !(await hasCredential(service.id))) {
+            return { ok: false, error: `No API key saved for "${service.name}".` };
           }
           // Resolve (or create) the destination project folder.
           const project = (await resolveProjectByName(input.project)) ?? (await addProject(input.project));
@@ -267,11 +276,12 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
 
       draftFormSpec: async (input) => {
         try {
-          if (!(await hasCredential(input.provider))) {
-            return {
-              ok: false,
-              error: `No credentials saved for ${input.provider}.`,
-            };
+          const service = await getAIService(input.serviceId);
+          if (!service) {
+            return { ok: false, error: "Selected AI service not found." };
+          }
+          if ((service.kind === "anthropic" || service.kind === "openai") && !(await hasCredential(service.id))) {
+            return { ok: false, error: `No API key saved for "${service.name}".` };
           }
           const spec = await draftFormSpec(input);
           return { ok: true, spec };
@@ -298,7 +308,10 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
       },
 
       deleteRun: ({ runId }) => {
-        dbDeleteRun(runId);
+        // A pending scheduled run has a live timer — deleting it without
+        // clearing that timer left it firing later and recreating itself.
+        if (getRun(runId)?.status === "scheduled") cancelScheduled(runId);
+        else dbDeleteRun(runId);
       },
 
       scheduleRun: async ({ formSlug, inputs, scheduledAt, repeatInterval }) => {
@@ -306,6 +319,14 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         if (!project) throw new Error(`Form not found: ${formSlug}`);
         const runId = schedule(project.path, formSlug, inputs, scheduledAt, repeatInterval);
         return { runId };
+      },
+
+      updateScheduledRun: async ({ runId, scheduledAt, repeatInterval }) => {
+        return { ok: rescheduleRun(runId, scheduledAt, repeatInterval) };
+      },
+
+      runScheduledNow: async ({ runId }) => {
+        return { ok: runScheduledNow(runId) };
       },
 
       getLayout: async ({ projectSlug }) => {
@@ -336,12 +357,6 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
 
       saveUIState: async (state) => {
         await writeUIState(state);
-      },
-
-      getAISettings: async () => await loadAISettings(),
-
-      saveAISettings: async (settings) => {
-        await persistAISettings(settings);
       },
 
       chooseDirectory: async ({ startingFolder }) => {

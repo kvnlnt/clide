@@ -53,10 +53,9 @@ export function tableRowCount(text: string): number {
 
 interface TableOutputProps {
   text: string;
-  maxHeight: number | null;
 }
 
-export default function TableOutput({ text, maxHeight }: TableOutputProps) {
+export default function TableOutput({ text }: TableOutputProps) {
   const data = useMemo(() => parseTable(text), [text]);
   const [sort, setSort] = useState<{ col: number; dir: 1 | -1 } | null>(null);
 
@@ -81,7 +80,7 @@ export default function TableOutput({ text, maxHeight }: TableOutputProps) {
     setSort((prev) => (prev && prev.col === col ? { col, dir: prev.dir === 1 ? -1 : 1 } : { col, dir: 1 }));
 
   return (
-    <div className="clide-scroll overflow-auto" style={maxHeight ? { maxHeight } : undefined}>
+    <div className="clide-scroll resize-y overflow-auto" style={{ height: 400, minHeight: 120, maxHeight: 1000 }}>
       <table className="w-full border-collapse text-[13px]">
         <thead className="sticky top-0 bg-clide-bg">
           <tr>

@@ -1,7 +1,6 @@
 import { Electroview } from "electrobun/view";
 import type {
-  AIProvider,
-  AISettings,
+  AIService,
   ClideRPC,
   CreateFormInput,
   CreateFormResult,
@@ -202,17 +201,41 @@ export const api = {
     }
   },
 
-  async saveCredentials(provider: AIProvider, key: string): Promise<void> {
-    await request()?.saveCredentials({ provider, key });
+  async saveServiceCredential(serviceId: string, key: string): Promise<void> {
+    await request()?.saveServiceCredential({ serviceId, key });
   },
 
-  async hasCredentials(provider: AIProvider): Promise<boolean> {
+  async hasServiceCredential(serviceId: string): Promise<boolean> {
     const r = request();
     if (!r) return false;
     try {
-      return await r.hasCredentials({ provider });
+      return await r.hasServiceCredential({ serviceId });
     } catch {
       return false;
+    }
+  },
+
+  async listAIServices(): Promise<AIService[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.listAIServices({});
+    } catch {
+      return [];
+    }
+  },
+
+  async saveAIServices(services: AIService[]): Promise<void> {
+    await request()?.saveAIServices({ services });
+  },
+
+  async testAIService(serviceId: string): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.testAIService({ serviceId });
+    } catch (err) {
+      return { ok: false, error: String(err) };
     }
   },
 
@@ -278,6 +301,28 @@ export const api = {
     }
   },
 
+  async updateScheduledRun(runId: string, scheduledAt: string, repeatInterval: RepeatInterval): Promise<boolean> {
+    const r = request();
+    if (!r) return false;
+    try {
+      const { ok } = await r.updateScheduledRun({ runId, scheduledAt, repeatInterval });
+      return ok;
+    } catch {
+      return false;
+    }
+  },
+
+  async runScheduledNow(runId: string): Promise<boolean> {
+    const r = request();
+    if (!r) return false;
+    try {
+      const { ok } = await r.runScheduledNow({ runId });
+      return ok;
+    } catch {
+      return false;
+    }
+  },
+
   async getLayout(projectSlug: string): Promise<ProjectLayout> {
     const r = request();
     if (!r) return { cards: [] };
@@ -318,20 +363,6 @@ export const api = {
 
   async saveUIState(state: UIState): Promise<void> {
     await request()?.saveUIState(state);
-  },
-
-  async getAISettings(): Promise<AISettings> {
-    const r = request();
-    if (!r) return { ollamaBaseUrl: "http://localhost:11434" };
-    try {
-      return await r.getAISettings({});
-    } catch {
-      return { ollamaBaseUrl: "http://localhost:11434" };
-    }
-  },
-
-  async saveAISettings(settings: AISettings): Promise<void> {
-    await request()?.saveAISettings(settings);
   },
 
   async chooseDirectory(startingFolder?: string): Promise<string | null> {

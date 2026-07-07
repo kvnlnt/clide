@@ -1,6 +1,6 @@
 import type { RepeatInterval, RunRecord } from "../shared/types";
 import { projectPaths } from "./config";
-import { createRun, getPendingScheduledRuns, updateRunStatus } from "./db/history";
+import { createRun, deleteRun, getPendingScheduledRuns, getRun, resolveRunProject, updateRunSchedule } from "./db/history";
 
 export type TriggerRun = (
   projectPath: string,
@@ -19,6 +19,14 @@ function nextOccurrence(from: Date, interval: RepeatInterval): Date {
   if (interval === "daily") d.setDate(d.getDate() + 1);
   else if (interval === "weekly") d.setDate(d.getDate() + 7);
   return d;
+}
+
+function clearTimer(runId: string): void {
+  const t = timers.get(runId);
+  if (t) {
+    clearTimeout(t);
+    timers.delete(runId);
+  }
 }
 
 function arm(projectPath: string, run: RunRecord): void {
@@ -92,13 +100,36 @@ export function schedule(
   return id;
 }
 
+/**
+ * Cancel a pending scheduled run: clear its timer and remove the row. A
+ * scheduled run that never executed has no history value worth keeping, and
+ * deleting it (rather than marking it "error") avoids reporting a run that
+ * never ran as having failed.
+ */
 export function cancelScheduled(runId: string): void {
-  const t = timers.get(runId);
-  if (t) {
-    clearTimeout(t);
-    timers.delete(runId);
-  }
-  updateRunStatus(runId, "error", null, new Date().toISOString());
+  clearTimer(runId);
+  deleteRun(runId);
+}
+
+/** Change a pending scheduled run's fire time/repeat and re-arm its timer. Returns false if the run isn't a pending schedule. */
+export function rescheduleRun(runId: string, scheduledAt: string, repeatInterval: RepeatInterval): boolean {
+  const projectPath = resolveRunProject(runId);
+  const run = getRun(runId);
+  if (!projectPath || !run || run.status !== "scheduled") return false;
+  clearTimer(runId);
+  updateRunSchedule(runId, scheduledAt, repeatInterval);
+  arm(projectPath, { ...run, scheduledAt, repeatInterval });
+  return true;
+}
+
+/** Fire a pending scheduled run immediately, bypassing its timer. Returns false if the run isn't a pending schedule. */
+export function runScheduledNow(runId: string): boolean {
+  const projectPath = resolveRunProject(runId);
+  const run = getRun(runId);
+  if (!projectPath || !run || run.status !== "scheduled") return false;
+  clearTimer(runId);
+  fire(projectPath, run, false);
+  return true;
 }
 
 /** Initialise the scheduler: load pending runs from every project and arm timers. */

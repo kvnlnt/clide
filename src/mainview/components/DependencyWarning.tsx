@@ -1,4 +1,5 @@
 import { AlertTriangle, Copy } from "lucide-react";
+import { copyToClipboard } from "../clipboard";
 
 interface DependencyWarningProps {
   dependency: string;
@@ -20,12 +21,12 @@ export default function DependencyWarning({
         Missing dependency: {dependency}
       </div>
       {installInstructions && (
-        <div className="mb-2 flex items-center justify-between gap-2 rounded bg-black/30 px-2 py-1.5 font-mono text-[12px] text-white/80">
+        <div className="mb-2 flex items-center justify-between gap-2 rounded bg-clide-bg px-2 py-1.5 font-mono text-[12px] text-white/80">
           <span className="truncate">{installInstructions}</span>
           <button
             className="shrink-0 text-white/40 hover:text-white"
             title="Copy"
-            onClick={() => void navigator.clipboard?.writeText(installInstructions)}
+            onClick={() => void copyToClipboard(installInstructions)}
           >
             <Copy size={13} />
           </button>

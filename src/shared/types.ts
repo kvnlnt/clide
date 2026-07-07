@@ -14,7 +14,49 @@ export type Interpreter = "bash" | "python3" | "node" | "bun";
 
 export type RepeatInterval = "none" | "daily" | "weekly";
 
+/** @deprecated Superseded by `AIService`/`AIServiceKind` (ticket 45). Kept for
+ *  reading legacy `FormMeta.aiProvider` values written before the migration. */
 export type AIProvider = "claude" | "openai" | "ollama";
+
+/** A configurable AI backend, local or remote. Replaces the old fixed 3-provider list. */
+export type AIServiceKind = "anthropic" | "openai" | "openai-compatible" | "ollama";
+
+export interface AIService {
+  id: string;
+  /** User-facing label, e.g. "Work Claude" or "Local Llama". */
+  name: string;
+  kind: AIServiceKind;
+  /** Required for "openai-compatible" and "ollama"; optional override for the hosted kinds. */
+  baseUrl?: string;
+  /** Model override; falls back to a sensible per-kind default when omitted. */
+  model?: string;
+  /** Request timeout in ms; advanced, optional. */
+  timeoutMs?: number;
+  /** Used when a feature needs a service without asking. At most one should be true. */
+  isDefault?: boolean;
+}
+
+export const AI_SERVICE_KIND_LABEL: Record<AIServiceKind, string> = {
+  anthropic: "Anthropic (Claude)",
+  openai: "OpenAI",
+  "openai-compatible": "OpenAI-compatible",
+  ollama: "Ollama",
+};
+
+/** Which kinds require a base URL (vs. having a fixed hosted endpoint). */
+export const AI_SERVICE_KIND_NEEDS_BASE_URL: Record<AIServiceKind, boolean> = {
+  anthropic: false,
+  openai: false,
+  "openai-compatible": true,
+  ollama: true,
+};
+
+export const DEFAULT_MODEL_FOR_KIND: Record<AIServiceKind, string> = {
+  anthropic: "claude-3-5-sonnet-latest",
+  openai: "gpt-4o-mini",
+  "openai-compatible": "gpt-4o-mini",
+  ollama: "llama3.2",
+};
 
 /** One output or side effect a form produces. A form may have several. */
 export interface OutputSpec {
@@ -208,9 +250,8 @@ export interface CreateFormInput {
   name: string;
   description: string;
   project: string;
-  provider: AIProvider;
-  /** Optional model override; falls back to the provider's default when omitted. */
-  model?: string;
+  /** Which configured AI service to generate with. */
+  serviceId: string;
   /** Fine-tuned spec from the creation wizard. When present, generation is spec-driven. */
   spec?: FormSpecDraft;
 }
@@ -224,8 +265,8 @@ export interface DraftFormSpecInput {
   processing: string;
   /** What does it produce or affect? May be blank (AI infers). */
   output: string;
-  provider: AIProvider;
-  model?: string;
+  /** Which configured AI service to draft with. */
+  serviceId: string;
 }
 
 export interface DraftFormSpecResult {
@@ -233,24 +274,6 @@ export interface DraftFormSpecResult {
   spec?: FormSpecDraft;
   error?: string;
 }
-
-/** Suggested models per provider (users may also type a custom model name). */
-export const AI_MODELS: Record<AIProvider, string[]> = {
-  claude: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest", "claude-3-opus-latest"],
-  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
-  ollama: ["llama3.1", "llama3.2", "mistral", "qwen2.5", "qwen2.5-coder", "codellama", "deepseek-r1"],
-};
-
-export interface AISettings {
-  ollamaBaseUrl: string;
-}
-
-/** Default model used for each provider when none is chosen. */
-export const DEFAULT_MODEL: Record<AIProvider, string> = {
-  claude: "claude-3-5-sonnet-latest",
-  openai: "gpt-4o",
-  ollama: "llama3.1",
-};
 
 export interface GeneratedForm {
   meta: FormMeta;
@@ -320,13 +343,19 @@ export type ClideRPC = {
         params: { formSlug: string };
         response: { script: string; extension: string } | null;
       };
-      saveCredentials: {
-        params: { provider: AIProvider; key: string };
+      saveServiceCredential: {
+        params: { serviceId: string; key: string };
         response: void;
       };
-      hasCredentials: {
-        params: { provider: AIProvider };
+      hasServiceCredential: {
+        params: { serviceId: string };
         response: boolean;
+      };
+      listAIServices: { params: Record<string, never>; response: AIService[] };
+      saveAIServices: { params: { services: AIService[] }; response: void };
+      testAIService: {
+        params: { serviceId: string };
+        response: { ok: boolean; error?: string };
       };
       createForm: { params: CreateFormInput; response: CreateFormResult };
       draftFormSpec: { params: DraftFormSpecInput; response: DraftFormSpecResult };
@@ -346,6 +375,11 @@ export type ClideRPC = {
       };
       deleteRun: { params: { runId: string }; response: void };
       scheduleRun: { params: ScheduleInput; response: { runId: string } };
+      updateScheduledRun: {
+        params: { runId: string; scheduledAt: string; repeatInterval: RepeatInterval };
+        response: { ok: boolean };
+      };
+      runScheduledNow: { params: { runId: string }; response: { ok: boolean } };
       getLayout: {
         params: { projectSlug: string };
         response: ProjectLayout;
@@ -364,8 +398,6 @@ export type ClideRPC = {
       };
       getUIState: { params: Record<string, never>; response: UIState };
       saveUIState: { params: UIState; response: void };
-      getAISettings: { params: Record<string, never>; response: AISettings };
-      saveAISettings: { params: AISettings; response: void };
       chooseDirectory: {
         params: { startingFolder?: string };
         response: string | null;

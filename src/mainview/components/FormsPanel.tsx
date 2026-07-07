@@ -1,4 +1,4 @@
-import { FolderOpen, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { FolderOpen, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useFormSearch } from "../hooks/useFormSearch";
@@ -12,8 +12,16 @@ import type { FormFolder } from "../types/forms";
  * toolbar's Forms button.
  */
 export default function FormsPanel() {
-  const { forms, recentSlugs, addFormDraft, openNewForm, setProjectSurface, activeProject, deleteForm, updateFormMeta } =
-    useApp();
+  const {
+    forms,
+    recentSlugs,
+    addFormDraft,
+    openNewForm,
+    setProjectSurface,
+    activeProject,
+    deleteForm,
+    updateFormMeta,
+  } = useApp();
   const scopedForms = activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms;
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -64,6 +72,16 @@ export default function FormsPanel() {
       <div className="flex shrink-0 items-baseline gap-2 px-8 pb-4 pt-7">
         <h1 className="text-[20px] font-bold text-white">Forms</h1>
         <span className="text-[13px] text-white/40">{activeProject ?? "All projects"}</span>
+        <button
+          onClick={() => choose(createIndex)}
+          onMouseEnter={() => setActive(createIndex)}
+          className={`mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-[14px] ${
+            active === createIndex ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"
+          }`}
+        >
+          <Plus size={15} className="text-white/60" />
+          <span className="italic text-white/70">Create new form...</span>
+        </button>
       </div>
 
       <div className="px-8 pb-4">
@@ -111,16 +129,6 @@ export default function FormsPanel() {
             ))}
           </div>
         )}
-        <button
-          onClick={() => choose(createIndex)}
-          onMouseEnter={() => setActive(createIndex)}
-          className={`mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-[14px] ${
-            active === createIndex ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"
-          }`}
-        >
-          <Sparkles size={15} className="text-white/60" />
-          <span className="italic text-white/70">✦ Create new form...</span>
-        </button>
       </div>
     </div>
   );

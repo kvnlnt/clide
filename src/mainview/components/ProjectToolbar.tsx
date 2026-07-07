@@ -1,4 +1,4 @@
-import { FileText, Layers, Settings } from "lucide-react";
+import { CalendarDays, FileText, Layers, Play, Settings } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import Toolbar from "./Toolbar";
 
@@ -9,7 +9,7 @@ import Toolbar from "./Toolbar";
  * content in place. Hidden-view management lives on the Views page now.
  */
 export default function ProjectToolbar() {
-  const { projectSurface, setProjectSurface } = useApp();
+  const { projectSurface, setProjectSurface, openRunPicker } = useApp();
 
   const btnBase = "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] transition-colors";
   const btnActive = "bg-white/10 text-white";
@@ -17,6 +17,13 @@ export default function ProjectToolbar() {
 
   return (
     <Toolbar className="bg-white/10">
+      <button onClick={openRunPicker} title="Run a form (⌘K)" className={`${btnBase} ${btnInactive}`}>
+        <Play size={13} />
+        Run
+      </button>
+
+      <div className="mx-1 h-4 w-px shrink-0 bg-white/10" />
+
       <button
         onClick={() => setProjectSurface(projectSurface === "forms" ? "thread" : "forms")}
         className={`${btnBase} ${projectSurface === "forms" ? btnActive : btnInactive}`}
@@ -30,6 +37,13 @@ export default function ProjectToolbar() {
       >
         <Layers size={13} />
         Views
+      </button>
+      <button
+        onClick={() => setProjectSurface(projectSurface === "calendar" ? "thread" : "calendar")}
+        className={`${btnBase} ${projectSurface === "calendar" ? btnActive : btnInactive}`}
+      >
+        <CalendarDays size={13} />
+        Calendar
       </button>
       <button
         onClick={() => setProjectSurface(projectSurface === "project-settings" ? "thread" : "project-settings")}

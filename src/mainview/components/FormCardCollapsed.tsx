@@ -45,7 +45,7 @@ export default function FormCardCollapsed({
       onClick={onExpand}
     >
       <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-        <StatusIcon status={run.status} pinned={run.pinned} size={18} />
+        <StatusIcon status={run.status} size={18} />
       </span>
       <span className="shrink-0 text-[16px] text-white/60">{meta.name}</span>
       <span className="min-w-0 flex-1 truncate text-[14px] text-clide-muted">{summary}</span>

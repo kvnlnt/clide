@@ -1,14 +1,12 @@
-import { ChevronDown, ChevronUp, Copy, ExternalLink } from "lucide-react";
+import { Copy, FolderOpen } from "lucide-react";
 
 interface OutputToolbarProps {
   label: string;
-  expanded: boolean;
-  onToggleExpand: () => void;
   onCopy?: () => void;
-  onOpenExternal?: () => void;
+  onReveal?: () => void;
 }
 
-export default function OutputToolbar({ label, expanded, onToggleExpand, onCopy, onOpenExternal }: OutputToolbarProps) {
+export default function OutputToolbar({ label, onCopy, onReveal }: OutputToolbarProps) {
   return (
     <div className="flex items-center justify-between border-b border-clide-border bg-clide-bg px-3 py-1.5">
       <span className="text-[11px] uppercase tracking-wide text-clide-muted">{label}</span>
@@ -18,14 +16,11 @@ export default function OutputToolbar({ label, expanded, onToggleExpand, onCopy,
             <Copy size={14} />
           </button>
         )}
-        {onOpenExternal && (
-          <button className="hover:text-white" onClick={onOpenExternal} title="Open externally">
-            <ExternalLink size={14} />
+        {onReveal && (
+          <button className="hover:text-white" onClick={onReveal} title="Reveal in Finder">
+            <FolderOpen size={14} />
           </button>
         )}
-        <button className="hover:text-white" onClick={onToggleExpand} title={expanded ? "Collapse" : "Expand"}>
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
       </div>
     </div>
   );

@@ -10,9 +10,11 @@ export default {
       colors: {
         clide: {
           bg: "#151212",
-          surface: "#0f0d0d",
-          panel: "#1e1c1c",
-          border: "#3d3c3c",
+          // A subtle lift above `bg`, not a darker well — cards should read
+          // as part of the page, not as black boxes punched into it.
+          surface: "#1c1a1a",
+          panel: "#211f1f",
+          border: "#2a2828",
           muted: "#575757",
         },
       },

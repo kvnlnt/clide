@@ -1,12 +1,15 @@
 import { Eye, EyeOff, Layers, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
+import { STATUS_META } from "./statusIcon";
 import type { ThreadView, ThreadViewFilters } from "../types/forms";
 
 function filterSummary(filters: ThreadViewFilters): string {
   const parts: string[] = [];
   if (filters.formSlugs?.length) parts.push(`${filters.formSlugs.length} form${filters.formSlugs.length === 1 ? "" : "s"}`);
-  if (filters.statuses?.length) parts.push(`${filters.statuses.length} status${filters.statuses.length === 1 ? "" : "es"}`);
+  if (filters.statuses?.length) {
+    parts.push(filters.statuses.map((s) => STATUS_META[s].label).join(", "));
+  }
   if (filters.keywords?.length) {
     const mode = filters.keywordMode === "and" ? "all" : "any";
     parts.push(`${filters.keywords.length} keyword${filters.keywords.length === 1 ? "" : "s"} (${mode})`);

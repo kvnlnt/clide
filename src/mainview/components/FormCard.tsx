@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../rpc";
-import type { FormDefinition, FormMeta, OutputChunk, OutputType, RepeatInterval, RunRecord } from "../types/forms";
+import type { FormDefinition, FormMeta, OutputChunk, OutputType, RepeatInterval, RunRecord, RunStatus } from "../types/forms";
 import FormCardBody from "./FormCardBody";
 import FormCardFooter from "./FormCardFooter";
 import FormCardHeader from "./FormCardHeader";
@@ -125,6 +125,12 @@ export default function FormCard({
   const shouldExpand = run.status === "idle" || running ? true : expanded;
   const toggleable = !(run.status === "idle" || running);
 
+  const statusCounts = useMemo(() => {
+    const counts: Partial<Record<RunStatus, number>> = {};
+    for (const r of runs) counts[r.status] = (counts[r.status] ?? 0) + 1;
+    return counts;
+  }, [runs]);
+
   const submitPayload = () => ({
     ...values,
     ...(form.aiPromptField && aiPrompt ? { __aiPrompt: aiPrompt } : {}),
@@ -132,7 +138,7 @@ export default function FormCard({
 
   return (
     <div
-      className={`overflow-hidden rounded-[5px] border bg-clide-surface ${
+      className={`overflow-hidden rounded-lg border bg-clide-surface ${
         running ? "animate-pulse border-white/20" : "border-clide-border"
       }`}
     >
@@ -140,7 +146,7 @@ export default function FormCard({
         meta={meta}
         form={form}
         run={run}
-        runCount={isGrouped ? runs.length : 1}
+        statusCounts={statusCounts}
         summary={summarize(form, run.inputs, run)}
         expanded={shouldExpand}
         onToggle={toggleable ? () => setExpanded((e) => !e) : undefined}
@@ -167,7 +173,7 @@ export default function FormCard({
 
           {isGrouped ? (
             activeTab === "code" ? (
-              <div className="px-4 py-3">
+              <div className="px-5 py-3">
                 <CodeOutput formSlug={run.formSlug} />
               </div>
             ) : (
@@ -192,7 +198,7 @@ export default function FormCard({
                     chunks={chunks[run.id] ?? []}
                   />
                 ) : (
-                  <div className="px-4 py-3 text-[13px] text-white/40">No results.</div>
+                  <div className="px-5 py-3 text-[13px] text-white/40">No results.</div>
                 )
               ) : activeTab === "code" ? (
                 <div className="px-4 py-3">
@@ -215,7 +221,7 @@ export default function FormCard({
           )}
 
           {showSchedule && editable && (
-            <div className="px-4 pb-2">
+            <div className="px-5 pb-3">
               <ScheduleSubForm
                 onSchedule={(at, repeat) => {
                   onSchedule(submitPayload(), at, repeat);

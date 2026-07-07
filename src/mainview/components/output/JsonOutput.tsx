@@ -56,10 +56,9 @@ function JsonNode({ name, value, depth }: JsonNodeProps) {
 
 interface JsonOutputProps {
   text: string;
-  maxHeight: number | null;
 }
 
-export default function JsonOutput({ text, maxHeight }: JsonOutputProps) {
+export default function JsonOutput({ text }: JsonOutputProps) {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -67,7 +66,10 @@ export default function JsonOutput({ text, maxHeight }: JsonOutputProps) {
     return <div className="px-3 py-2 font-mono text-[13px] text-[rgba(255,100,100,0.85)]">Invalid JSON output.</div>;
   }
   return (
-    <div className="clide-scroll overflow-auto px-3 py-2" style={maxHeight ? { maxHeight } : undefined}>
+    <div
+      className="clide-scroll resize-y overflow-auto px-3 py-2"
+      style={{ height: 400, minHeight: 120, maxHeight: 1000 }}
+    >
       <JsonNode name={null} value={parsed} depth={0} />
     </div>
   );

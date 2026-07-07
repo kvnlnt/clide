@@ -15,10 +15,10 @@ interface FormCardBodyProps {
 
 export default function FormCardBody({ form, values, onChange, disabled, filling, fillFailed }: FormCardBodyProps) {
   if (form.fields.length === 0) {
-    return <div className="px-4 py-3 text-[13px] text-white/40">No inputs — press SEND to run.</div>;
+    return <div className="px-5 py-3.5 text-[13px] text-white/40">No inputs — press SEND to run.</div>;
   }
   return (
-    <div className="flex flex-col gap-4 px-4 py-3">
+    <div className="flex flex-col gap-4 px-5 py-3.5">
       {fillFailed && (
         <div className="flex items-center gap-1.5 text-[11px] text-white/30">
           <Sparkles size={11} /> couldn't auto-fill — fill the fields manually
