@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, on } from "../rpc";
 import type {
+  FilterEntry,
   FormFolder,
   FormMetaPatch,
   OutputChunk,
@@ -66,6 +67,11 @@ interface AppState {
   /** Cmd+W / Ctrl+W on a view tab: hide it (title tab is not closeable). */
   closeActiveTab: () => void;
 
+  /** Rename/hide/delete modal for the active view tab (ticket 50), launched from its kebab menu. */
+  viewSettingsOpen: boolean;
+  openViewSettings: () => void;
+  closeViewSettings: () => void;
+
   setActiveProject: (p: string | null) => void;
   toggleSidebar: () => void;
   openNewProject: () => void;
@@ -102,11 +108,30 @@ interface AppState {
   refreshRuns: () => Promise<void>;
 }
 
-/** Migrates a `.views.json` view saved under the old single-`query` filter shape. */
+/**
+ * Migrates a `.views.json` view saved under any of the pre-ticket-51 filter
+ * shapes (`formSlugs`/`statuses`/`keywords`+`keywordMode`, or the older single
+ * `query` string) into the additive `entries` chip list. Lossless: each old
+ * field becomes one or more entries, so nothing is silently dropped.
+ */
 function normalizeView(view: ThreadView): ThreadView {
-  const { query, ...filters } = view.filters;
-  if (query === undefined || filters.keywords) return view;
-  return { ...view, filters: { ...filters, keywords: [query], keywordMode: filters.keywordMode ?? "or" } };
+  const f = view.filters;
+  if (f.entries) return view;
+
+  const entries: FilterEntry[] = [];
+  if (f.formSlugs?.length) entries.push({ id: crypto.randomUUID(), type: "form", values: f.formSlugs });
+  if (f.statuses?.length) entries.push({ id: crypto.randomUUID(), type: "status", values: f.statuses });
+  if (f.keywords?.length) {
+    if (f.keywordMode === "and") {
+      for (const k of f.keywords) entries.push({ id: crypto.randomUUID(), type: "keyword", values: [k] });
+    } else {
+      entries.push({ id: crypto.randomUUID(), type: "keyword", values: f.keywords });
+    }
+  } else if (f.query) {
+    entries.push({ id: crypto.randomUUID(), type: "keyword", values: [f.query] });
+  }
+
+  return { ...view, filters: entries.length > 0 ? { entries } : {} };
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -133,6 +158,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [projectSurface, setProjectSurfaceState] = useState<ProjectSurface>("thread");
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const [runPickerOpen, setRunPickerOpen] = useState(false);
+  const [viewSettingsOpen, setViewSettingsOpen] = useState(false);
 
   const [views, setViews] = useState<ThreadView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
@@ -203,6 +229,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setActiveView = useCallback((id: string | null) => {
     setActiveViewId(id);
     setProjectSurfaceState("thread");
+    setViewSettingsOpen(false);
   }, []);
 
   const createView = useCallback(() => {
@@ -352,6 +379,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const closeAppSettings = useCallback(() => setAppSettingsOpen(false), []);
   const openRunPicker = useCallback(() => setRunPickerOpen(true), []);
   const closeRunPicker = useCallback(() => setRunPickerOpen(false), []);
+  const openViewSettings = useCallback(() => setViewSettingsOpen(true), []);
+  const closeViewSettings = useCallback(() => setViewSettingsOpen(false), []);
   const openNewProject = useCallback(() => setNewProjectOpen(true), []);
   const closeNewProject = useCallback(() => setNewProjectOpen(false), []);
   const openNewForm = useCallback(() => {
@@ -527,6 +556,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     createView,
     cycleTab,
     closeActiveTab,
+    viewSettingsOpen,
+    openViewSettings,
+    closeViewSettings,
     setActiveProject,
     toggleSidebar,
     openNewProject,

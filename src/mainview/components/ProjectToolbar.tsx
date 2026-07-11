@@ -21,9 +21,13 @@ export default function ProjectToolbar() {
         <Play size={13} />
         Run
       </button>
-
-      <div className="mx-1 h-4 w-px shrink-0 bg-white/10" />
-
+      <button
+        onClick={() => setProjectSurface(projectSurface === "calendar" ? "thread" : "calendar")}
+        className={`${btnBase} ${projectSurface === "calendar" ? btnActive : btnInactive}`}
+      >
+        <CalendarDays size={13} />
+        Calendar
+      </button>
       <button
         onClick={() => setProjectSurface(projectSurface === "forms" ? "thread" : "forms")}
         className={`${btnBase} ${projectSurface === "forms" ? btnActive : btnInactive}`}
@@ -37,13 +41,6 @@ export default function ProjectToolbar() {
       >
         <Layers size={13} />
         Views
-      </button>
-      <button
-        onClick={() => setProjectSurface(projectSurface === "calendar" ? "thread" : "calendar")}
-        className={`${btnBase} ${projectSurface === "calendar" ? btnActive : btnInactive}`}
-      >
-        <CalendarDays size={13} />
-        Calendar
       </button>
       <button
         onClick={() => setProjectSurface(projectSurface === "project-settings" ? "thread" : "project-settings")}

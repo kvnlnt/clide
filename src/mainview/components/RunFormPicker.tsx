@@ -1,4 +1,4 @@
-import { Search, Sparkles } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useFormSearch } from "../hooks/useFormSearch";
@@ -67,6 +67,16 @@ export default function RunFormPicker({ onClose }: RunFormPickerProps) {
         className="w-[480px] overflow-hidden rounded-lg border border-clide-border bg-clide-panel shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
+        <button
+          onClick={() => choose(createIndex)}
+          onMouseEnter={() => setActive(createIndex)}
+          className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-[13px] ${
+            active === createIndex ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"
+          }`}
+        >
+          <Plus size={14} className="shrink-0 text-white/60" />
+          <span className="italic text-white/70">Create new form...</span>
+        </button>
         <div className="flex items-center gap-2 border-b border-clide-border px-3 py-2.5">
           <Search size={14} className="shrink-0 text-white/30" />
           <input
@@ -97,16 +107,6 @@ export default function RunFormPicker({ onClose }: RunFormPickerProps) {
               )}
             </button>
           ))}
-          <button
-            onClick={() => choose(createIndex)}
-            onMouseEnter={() => setActive(createIndex)}
-            className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-[13px] ${
-              active === createIndex ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"
-            }`}
-          >
-            <Sparkles size={14} className="shrink-0 text-white/60" />
-            <span className="italic text-white/70">Create new form...</span>
-          </button>
         </div>
       </div>
     </div>

@@ -7,6 +7,8 @@ export type {
   DraftFormSpecInput,
   DraftFormSpecResult,
   FieldType,
+  FilterEntry,
+  FilterEntryType,
   FormDefinition,
   FormEvents,
   FormField,

@@ -47,20 +47,24 @@ function coalesceRuns(runs: RunRecord[], standalonePinned: boolean): RunGroup[] 
   return groups;
 }
 
-/** AND across filter categories; OR within a category's selections (except keywords, which has its own and/or mode). */
+/** AND across filter entries (chips); OR within a single entry's values. */
 function matchesView(run: RunRecord, filters: ThreadViewFilters, formsBySlug: Map<string, FormFolder>): boolean {
-  if (filters.formSlugs?.length && !filters.formSlugs.includes(run.formSlug)) return false;
-  if (filters.statuses?.length && !filters.statuses.includes(run.status)) return false;
-  const keywords = filters.keywords?.filter((k) => k.trim() !== "");
-  if (keywords?.length) {
-    const name = formsBySlug.get(run.formSlug)?.meta.name.toLowerCase() ?? "";
-    const inputs = JSON.stringify(run.inputs ?? {}).toLowerCase();
-    const matches = (k: string) => {
-      const q = k.trim().toLowerCase();
-      return name.includes(q) || inputs.includes(q);
-    };
-    const isMatch = filters.keywordMode === "and" ? keywords.every(matches) : keywords.some(matches);
-    if (!isMatch) return false;
+  const entries = filters.entries ?? [];
+  for (const entry of entries) {
+    if (entry.values.length === 0) continue;
+    if (entry.type === "form") {
+      if (!entry.values.includes(run.formSlug)) return false;
+    } else if (entry.type === "status") {
+      if (!entry.values.includes(run.status)) return false;
+    } else {
+      const name = formsBySlug.get(run.formSlug)?.meta.name.toLowerCase() ?? "";
+      const inputs = JSON.stringify(run.inputs ?? {}).toLowerCase();
+      const isMatch = entry.values.some((k) => {
+        const q = k.trim().toLowerCase();
+        return q !== "" && (name.includes(q) || inputs.includes(q));
+      });
+      if (!isMatch) return false;
+    }
   }
   return true;
 }

@@ -4,7 +4,7 @@ import { useApp } from "../context/AppContext";
 
 /**
  * Browser-style tab strip hosted in the window-controls header. The left side
- * is the project cluster — a Home button and the project title tab — rendered
+ * is the project projectTab — a Home button and the project title tab — rendered
  * as a filled chip so it reads as a distinct family from the saved views.
  * After a separator come the view tabs: drag-sortable. Activating the title
  * tab or a view tab shows that tab's toolbar + thread as the pane body
@@ -19,16 +19,9 @@ export default function ViewTabs() {
 
   // View tabs: browser-style, merging into the content pane when active.
   const tabShape =
-    "flex min-w-0 items-center gap-2 rounded-tl-[12px] rounded-tr-[12px] px-4 pb-1.5 pt-2 text-sm transition-colors";
-  const activeShape = "relative z-10 -mb-px border-l border-t border-r border-white/10 bg-clide-bg text-white";
+    "flex min-w-0 items-center gap-2 rounded-tl-lg rounded-tr-lg px-4 pb-1.5 pt-2 text-sm transition-colors";
+  const activeShape = "relative z-10 bg-white/10 bg-clide-bg text-white";
   const inactiveShape = "text-white/30 hover:bg-white/[0.03] hover:text-white";
-
-  // Project cluster: filled, self-contained chip — a distinct family.
-  const clusterShape =
-    "flex min-w-0 shrink-0 items-center gap-1.5 self-center rounded-lg px-3 py-2 text-[13px] transition-colors";
-  const clusterActive = "bg-white/10 text-white";
-  const clusterInactive = "bg-clide-panel text-white/45 hover:bg-white/10 hover:text-white";
-
   const titleTabActive = activeViewId === null;
 
   return (
@@ -46,7 +39,7 @@ export default function ViewTabs() {
           <button
             onClick={() => setActiveView(null)}
             title={`All ${activeProject} threads`}
-            className={`${clusterShape} max-w-[200px] ${titleTabActive ? clusterActive : clusterInactive} bg-white/10 rounded-b-none`}
+            className={`${tabShape} max-w-[200px] ${titleTabActive ? activeShape : inactiveShape}`}
           >
             <Folder size={13} className="shrink-0 opacity-70" />
             <span className="min-w-0 truncate text-left">{activeProject}</span>
@@ -83,7 +76,7 @@ export default function ViewTabs() {
             <button
               onClick={() => setActiveView(view.id)}
               title={view.name}
-              className="min-w-0 max-w-[120px] truncate text-left"
+              className="min-w-0 max-w-[120px] truncate text-left group-hover:text-white"
             >
               {view.name}
             </button>

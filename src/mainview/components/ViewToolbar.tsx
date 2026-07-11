@@ -1,128 +1,119 @@
-import { EyeOff, Pencil, Play, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { EllipsisVertical, Play, Plus, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
-import type { RunStatus, ThreadView } from "../types/forms";
-import MultiSelectDropdown from "./MultiSelectDropdown";
+import type { FilterEntry, FilterEntryType, RunStatus, ThreadView } from "../types/forms";
+import PortalPopover from "./PortalPopover";
 import { STATUS_META } from "./statusIcon";
 import Toolbar from "./Toolbar";
 
 const STATUS_OPTIONS: RunStatus[] = ["idle", "running", "success", "error", "scheduled"];
 
-type DropdownKey = "forms" | "status" | "keywords";
+const TYPE_LABEL: Record<FilterEntryType, string> = { form: "Form", status: "Status", keyword: "Keyword" };
+
+/** Either picking which filter type to add, or editing one entry's criteria (new or existing). */
+type PopoverState = { mode: "pick-type" } | { mode: "criteria"; type: FilterEntryType; entryId: string };
 
 interface Props {
   view: ThreadView;
 }
 
 /**
- * Toolbar for an active view tab: fused visually to the tab above it. Every
- * control applies to the saved view immediately via `updateView` — no
- * Save/Cancel. Forms, status, and keywords are compact dropdown triggers
- * (MultiSelectDropdown) that expand to their full controls on click.
+ * Toolbar for an active view tab: fused visually to the tab above it. Filters
+ * are additive chips (ticket 51) — a "+" button adds a chip via a two-step
+ * popover (pick type, then pick criteria); clicking a chip reopens the
+ * criteria step to edit it live. View rename/hide/delete live in a modal
+ * behind the kebab menu (ticket 50), not inline in this toolbar.
  */
 export default function ViewToolbar({ view }: Props) {
-  const { forms, activeProject, activeViewId, updateView, deleteView, setActiveView, openRunPicker } = useApp();
+  const { forms, activeProject, updateView, openRunPicker, openViewSettings } = useApp();
 
-  const [name, setName] = useState(view.name);
-  const [editingName, setEditingName] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState<DropdownKey | null>(null);
+  const anchorRef = useRef<HTMLButtonElement | null>(null);
+  const [popover, setPopover] = useState<PopoverState | null>(null);
   const [formQuery, setFormQuery] = useState("");
   const [keywordInput, setKeywordInput] = useState("");
 
   // Only resync local echo state when the active view itself changes.
   useEffect(() => {
-    setName(view.name);
-    setEditingName(false);
-    setOpenDropdown(null);
+    setPopover(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.id]);
 
   const projectForms = forms.filter((f) => f.meta.project === activeProject);
-  const formSlugs = view.filters.formSlugs ?? [];
-  const statuses = view.filters.statuses ?? [];
-  const keywords = view.filters.keywords ?? [];
-  const keywordMode = view.filters.keywordMode ?? "or";
+  const entries = view.filters.entries ?? [];
 
   const nameFor = (slug: string) => projectForms.find((f) => f.meta.slug === slug)?.meta.name ?? slug;
 
-  const suggestions = useMemo(() => {
+  const currentEntry = popover?.mode === "criteria" ? entries.find((e) => e.id === popover.entryId) : undefined;
+  const currentValues = currentEntry?.values ?? [];
+
+  const formSuggestions = useMemo(() => {
     const q = formQuery.trim().toLowerCase();
     return projectForms
       .filter(
         (f) =>
-          !formSlugs.includes(f.meta.slug) &&
+          !currentValues.includes(f.meta.slug) &&
           (q === "" || f.meta.name.toLowerCase().includes(q) || f.meta.slug.includes(q)),
       )
       .slice(0, 8);
-  }, [projectForms, formSlugs, formQuery]);
+  }, [projectForms, currentValues, formQuery]);
 
-  const toggleDropdown = (key: DropdownKey) => setOpenDropdown((cur) => (cur === key ? null : key));
+  const setEntries = (next: FilterEntry[]) => {
+    const filters = { ...view.filters };
+    if (next.length > 0) filters.entries = next;
+    else delete filters.entries;
+    updateView({ ...view, filters });
+  };
 
-  const commitName = () => {
-    setEditingName(false);
-    const trimmed = name.trim();
-    if (!trimmed || trimmed === view.name) {
-      setName(view.name);
+  const removeEntry = (entryId: string) => setEntries(entries.filter((e) => e.id !== entryId));
+
+  // Adds the entry on first value, updates it in place after, and removes it
+  // if the caller empties it out — one path serves both "add" and "edit".
+  const applyValues = (type: FilterEntryType, entryId: string, values: string[]) => {
+    const exists = entries.some((e) => e.id === entryId);
+    if (values.length === 0) {
+      if (exists) setEntries(entries.filter((e) => e.id !== entryId));
       return;
     }
-    updateView({ ...view, name: trimmed });
+    if (exists) setEntries(entries.map((e) => (e.id === entryId ? { ...e, values } : e)));
+    else setEntries([...entries, { id: entryId, type, values }]);
   };
 
-  const toggleStatus = (s: RunStatus) => {
-    const next = statuses.includes(s) ? statuses.filter((x) => x !== s) : [...statuses, s];
-    const filters = { ...view.filters };
-    if (next.length > 0) filters.statuses = next;
-    else delete filters.statuses;
-    updateView({ ...view, filters });
+  const openAddPopover = (e: React.MouseEvent<HTMLButtonElement>) => {
+    anchorRef.current = e.currentTarget;
+    setPopover({ mode: "pick-type" });
   };
 
-  const addForm = (slug: string) => {
-    updateView({ ...view, filters: { ...view.filters, formSlugs: [...formSlugs, slug] } });
+  const openEditPopover = (e: React.MouseEvent<HTMLButtonElement>, entry: FilterEntry) => {
+    anchorRef.current = e.currentTarget;
     setFormQuery("");
-  };
-
-  const removeForm = (slug: string) => {
-    const next = formSlugs.filter((s) => s !== slug);
-    const filters = { ...view.filters };
-    if (next.length > 0) filters.formSlugs = next;
-    else delete filters.formSlugs;
-    updateView({ ...view, filters });
-  };
-
-  const addKeyword = () => {
-    const trimmed = keywordInput.trim();
     setKeywordInput("");
-    if (!trimmed || keywords.some((k) => k.toLowerCase() === trimmed.toLowerCase())) return;
-    updateView({ ...view, filters: { ...view.filters, keywords: [...keywords, trimmed] } });
+    setPopover({ mode: "criteria", type: entry.type, entryId: entry.id });
   };
 
-  const removeKeyword = (k: string) => {
-    const next = keywords.filter((x) => x !== k);
-    const filters = { ...view.filters };
-    if (next.length > 0) filters.keywords = next;
-    else delete filters.keywords;
-    updateView({ ...view, filters });
+  const pickType = (type: FilterEntryType) => {
+    setFormQuery("");
+    setKeywordInput("");
+    setPopover({ mode: "criteria", type, entryId: crypto.randomUUID() });
   };
 
-  const setKeywordMode = (mode: "and" | "or") => {
-    updateView({ ...view, filters: { ...view.filters, keywordMode: mode } });
+  const chipLabel = (entry: FilterEntry): string => {
+    if (entry.type === "form") {
+      return entry.values.length === 1 ? nameFor(entry.values[0]!) : `${entry.values.length} forms`;
+    }
+    if (entry.type === "status") {
+      return entry.values.length === 1
+        ? STATUS_META[entry.values[0] as RunStatus].label
+        : `${entry.values.length} statuses`;
+    }
+    return entry.values.length === 1 ? `"${entry.values[0]}"` : `${entry.values.length} keywords`;
   };
-
-  const hide = () => {
-    updateView({ ...view, hidden: true });
-    if (view.id === activeViewId) setActiveView(null);
-  };
-
-  const remove = () => deleteView(view.id);
 
   const rowChip = "flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[12px] text-white/80";
   const popoverInput =
     "w-full rounded border border-clide-border bg-clide-bg px-2 py-1 text-[13px] text-white outline-none placeholder:text-white/20 focus:border-white/30";
 
-  const pluralizeWord = (n: number, singular: string, plural: string) => `${n} ${n === 1 ? singular : plural}`;
-
   return (
-    <Toolbar>
+    <Toolbar className="bg-white/10">
       <button
         onClick={openRunPicker}
         title="Run a form (⌘K)"
@@ -134,178 +125,188 @@ export default function ViewToolbar({ view }: Props) {
 
       <div className="mx-1 h-4 w-px shrink-0 bg-white/10" />
 
-      {editingName ? (
-        <input
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onFocus={(e) => e.currentTarget.select()}
-          onBlur={commitName}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commitName();
-            if (e.key === "Escape") {
-              setName(view.name);
-              setEditingName(false);
-            }
-          }}
-          className="w-32 shrink-0 rounded border border-clide-border bg-clide-bg px-1.5 py-0.5 text-[13px] text-white outline-none focus:border-white/30"
-        />
-      ) : (
+      {entries.map((entry) => (
         <button
-          onClick={() => setEditingName(true)}
-          title="Rename view"
-          className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[13px] font-medium text-white/80 hover:bg-white/5 hover:text-white"
+          key={entry.id}
+          onClick={(e) => openEditPopover(e, entry)}
+          className="flex shrink-0 items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[12px] text-white/80 hover:bg-white/15"
         >
-          <Pencil size={11} className="text-white/30" />
+          <span className="text-white/40">{TYPE_LABEL[entry.type]}:</span>
+          <span className="max-w-[160px] truncate">{chipLabel(entry)}</span>
+          <span
+            role="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              removeEntry(entry.id);
+            }}
+            className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full hover:bg-white/10"
+          >
+            <X size={9} />
+          </span>
         </button>
-      )}
+      ))}
 
-      <div className="mx-1 h-4 w-px shrink-0 bg-white/10" />
-
-      <MultiSelectDropdown
-        label={formSlugs.length === 0 ? "Forms" : pluralizeWord(formSlugs.length, "form", "forms")}
-        active={formSlugs.length > 0}
-        open={openDropdown === "forms"}
-        onToggle={() => toggleDropdown("forms")}
-        onClose={() => setOpenDropdown(null)}
+      <button
+        onClick={openAddPopover}
+        title="Add filter"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
       >
-        {formSlugs.length > 0 && (
-          <div className="mb-1.5 flex flex-wrap gap-1">
-            {formSlugs.map((slug) => (
-              <span key={slug} className={rowChip}>
-                <span className="max-w-[140px] truncate">{nameFor(slug)}</span>
-                <button
-                  onClick={() => removeForm(slug)}
-                  title="Remove"
-                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full hover:bg-white/10"
-                >
-                  <X size={9} />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-        <input
-          autoFocus
-          value={formQuery}
-          onChange={(e) => setFormQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && suggestions[0]) addForm(suggestions[0].meta.slug);
-          }}
-          placeholder="Search forms…"
-          className={popoverInput}
-        />
-        <div className="mt-1 max-h-40 space-y-0.5 overflow-y-auto">
-          {suggestions.length === 0 && (
-            <div className="px-1 py-0.5 text-[12px] italic text-white/30">No forms match</div>
-          )}
-          {suggestions.map((f) => (
-            <button
-              key={f.meta.slug}
-              onClick={() => addForm(f.meta.slug)}
-              className="block w-full truncate rounded px-1.5 py-0.5 text-left text-[13px] text-white/60 hover:bg-white/5 hover:text-white"
-            >
-              {f.meta.name}
-            </button>
-          ))}
-        </div>
-      </MultiSelectDropdown>
+        <Plus size={13} />
+      </button>
 
-      <MultiSelectDropdown
-        label={statuses.length === 0 ? "Status" : pluralizeWord(statuses.length, "status", "statuses")}
-        active={statuses.length > 0}
-        open={openDropdown === "status"}
-        onToggle={() => toggleDropdown("status")}
-        onClose={() => setOpenDropdown(null)}
+      <PortalPopover
+        open={popover !== null}
+        anchorRef={anchorRef}
+        onClose={() => setPopover(null)}
+        className="w-64 overflow-hidden rounded-md border border-clide-border bg-clide-panel p-2 shadow-xl"
       >
-        <div className="flex flex-col gap-0.5">
-          {STATUS_OPTIONS.map((s) => {
-            const meta = STATUS_META[s];
-            const Icon = meta.icon;
-            return (
-              <label
-                key={s}
-                className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-[13px] text-white/70 hover:bg-white/5 hover:text-white"
+        {popover?.mode === "pick-type" && (
+          <div className="flex flex-col gap-0.5">
+            <span className="px-1.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/30">
+              Filter by
+            </span>
+            {(["form", "status", "keyword"] as FilterEntryType[]).map((type) => (
+              <button
+                key={type}
+                onClick={() => pickType(type)}
+                className="rounded px-1.5 py-1 text-left text-[13px] text-white/70 hover:bg-white/5 hover:text-white"
               >
-                <input type="checkbox" checked={statuses.includes(s)} onChange={() => toggleStatus(s)} />
-                <Icon size={12} className={`shrink-0 ${meta.textClass} ${meta.spin ? "animate-spin" : ""}`} />
-                {meta.label}
-              </label>
-            );
-          })}
-        </div>
-      </MultiSelectDropdown>
-
-      <MultiSelectDropdown
-        label={keywords.length === 0 ? "Keywords" : pluralizeWord(keywords.length, "keyword", "keywords")}
-        active={keywords.length > 0}
-        open={openDropdown === "keywords"}
-        onToggle={() => toggleDropdown("keywords")}
-        onClose={() => setOpenDropdown(null)}
-      >
-        {keywords.length > 0 && (
-          <div className="mb-1.5 flex flex-wrap gap-1">
-            {keywords.map((k) => (
-              <span key={k} className={rowChip}>
-                <span className="max-w-[140px] truncate">{k}</span>
-                <button
-                  onClick={() => removeKeyword(k)}
-                  title="Remove"
-                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full hover:bg-white/10"
-                >
-                  <X size={9} />
-                </button>
-              </span>
+                {TYPE_LABEL[type]}
+              </button>
             ))}
           </div>
         )}
-        <input
-          autoFocus
-          value={keywordInput}
-          onChange={(e) => setKeywordInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addKeyword();
-            }
-          }}
-          placeholder="Type a keyword, press Enter…"
-          className={popoverInput}
-        />
-        {keywords.length > 1 && (
-          <div className="mt-1.5 flex items-center gap-1 text-[11px] text-white/40">
-            Match
-            <button
-              onClick={() => setKeywordMode("or")}
-              className={`rounded px-1.5 py-0.5 ${keywordMode === "or" ? "bg-white/10 text-white" : "hover:text-white"}`}
-            >
-              any (OR)
-            </button>
-            <button
-              onClick={() => setKeywordMode("and")}
-              className={`rounded px-1.5 py-0.5 ${keywordMode === "and" ? "bg-white/10 text-white" : "hover:text-white"}`}
-            >
-              all (AND)
-            </button>
+
+        {popover?.mode === "criteria" && popover.type === "form" && (
+          <>
+            {currentValues.length > 0 && (
+              <div className="mb-1.5 flex flex-wrap gap-1">
+                {currentValues.map((slug) => (
+                  <span key={slug} className={rowChip}>
+                    <span className="max-w-[140px] truncate">{nameFor(slug)}</span>
+                    <button
+                      onClick={() => applyValues("form", popover.entryId, currentValues.filter((s) => s !== slug))}
+                      title="Remove"
+                      className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full hover:bg-white/10"
+                    >
+                      <X size={9} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <input
+              autoFocus
+              value={formQuery}
+              onChange={(e) => setFormQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && formSuggestions[0]) {
+                  applyValues("form", popover.entryId, [...currentValues, formSuggestions[0].meta.slug]);
+                  setFormQuery("");
+                }
+              }}
+              placeholder="Search forms…"
+              className={popoverInput}
+            />
+            <div className="mt-1 max-h-40 space-y-0.5 overflow-y-auto">
+              {formSuggestions.length === 0 && (
+                <div className="px-1 py-0.5 text-[12px] italic text-white/30">No forms match</div>
+              )}
+              {formSuggestions.map((f) => (
+                <button
+                  key={f.meta.slug}
+                  onClick={() => {
+                    applyValues("form", popover.entryId, [...currentValues, f.meta.slug]);
+                    setFormQuery("");
+                  }}
+                  className="block w-full truncate rounded px-1.5 py-0.5 text-left text-[13px] text-white/60 hover:bg-white/5 hover:text-white"
+                >
+                  {f.meta.name}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {popover?.mode === "criteria" && popover.type === "status" && (
+          <div className="flex flex-col gap-0.5">
+            {STATUS_OPTIONS.map((s) => {
+              const meta = STATUS_META[s];
+              const Icon = meta.icon;
+              const checked = currentValues.includes(s);
+              return (
+                <label
+                  key={s}
+                  className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-[13px] text-white/70 hover:bg-white/5 hover:text-white"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() =>
+                      applyValues(
+                        "status",
+                        popover.entryId,
+                        checked ? currentValues.filter((x) => x !== s) : [...currentValues, s],
+                      )
+                    }
+                  />
+                  <Icon size={12} className={`shrink-0 ${meta.textClass} ${meta.spin ? "animate-spin" : ""}`} />
+                  {meta.label}
+                </label>
+              );
+            })}
           </div>
         )}
-      </MultiSelectDropdown>
+
+        {popover?.mode === "criteria" && popover.type === "keyword" && (
+          <>
+            {currentValues.length > 0 && (
+              <div className="mb-1.5 flex flex-wrap gap-1">
+                {currentValues.map((k) => (
+                  <span key={k} className={rowChip}>
+                    <span className="max-w-[140px] truncate">{k}</span>
+                    <button
+                      onClick={() => applyValues("keyword", popover.entryId, currentValues.filter((x) => x !== k))}
+                      title="Remove"
+                      className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full hover:bg-white/10"
+                    >
+                      <X size={9} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <input
+              autoFocus
+              value={keywordInput}
+              onChange={(e) => setKeywordInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const trimmed = keywordInput.trim();
+                  setKeywordInput("");
+                  if (!trimmed || currentValues.some((k) => k.toLowerCase() === trimmed.toLowerCase())) return;
+                  applyValues("keyword", popover.entryId, [...currentValues, trimmed]);
+                }
+              }}
+              placeholder="Type a keyword, press Enter…"
+              className={popoverInput}
+            />
+          </>
+        )}
+      </PortalPopover>
 
       <div className="flex-1" />
 
       <button
-        onClick={hide}
-        title="Hide this tab (unhide from the project toolbar)"
+        onClick={() => {
+          setPopover(null);
+          openViewSettings();
+        }}
+        title="View settings"
         className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-[12px] text-white/40 hover:bg-white/5 hover:text-white"
       >
-        <EyeOff size={12} />
-      </button>
-      <button
-        onClick={remove}
-        title="Delete this view"
-        className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-[12px] text-red-400/60 hover:bg-red-500/10 hover:text-red-400"
-      >
-        <Trash2 size={12} />
+        <EllipsisVertical size={14} />
       </button>
     </Toolbar>
   );

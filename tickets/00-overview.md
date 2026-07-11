@@ -95,3 +95,5 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 47  | Scheduling CRUD & Calendar            | Fix broken scheduling, full schedule management, calendar surface on project toolbar    | ✅ Done       |
 | 48  | Pinning View-Only                     | Hide the pin action & pinned styling on the title tab — pinning lives in views          | ✅ Done       |
 | 49  | New Form Page Full Width              | Create-form flow drops its narrow centered column and adopts the full-width page style  | ✅ Done       |
+| 50  | View Actions Kebab Menu & Modal       | View rename/hide/delete move into a modal launched from a kebab icon in the toolbar     | ✅ Done       |
+| 51  | Additive Filter Chips                 | Permanent filter dropdowns become a "+" button adding editable chips, AND-combined      | ✅ Done       |

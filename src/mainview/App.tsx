@@ -11,6 +11,7 @@ import Sidebar from "./components/Sidebar";
 import Thread from "./components/Thread";
 import TrafficLights from "./components/TrafficLights";
 import ViewsPage from "./components/ViewsPage";
+import ViewSettingsModal from "./components/ViewSettingsModal";
 import ViewToolbar from "./components/ViewToolbar";
 import WelcomeScreen from "./components/WelcomeScreen";
 import WindowControls from "./components/WindowControls";
@@ -36,6 +37,8 @@ function Workspace() {
     runPickerOpen,
     openRunPicker,
     closeRunPicker,
+    viewSettingsOpen,
+    closeViewSettings,
   } = useApp();
 
   const activeProjectMeta = activeProject ? projectMeta.find((p) => p.name === activeProject) : undefined;
@@ -54,7 +57,7 @@ function Workspace() {
       }
 
       // Browser-style tab navigation is inert while a blocking overlay is open.
-      const overlayOpen = newFormOpen || appSettingsOpen || newProjectOpen;
+      const overlayOpen = newFormOpen || appSettingsOpen || newProjectOpen || viewSettingsOpen;
       if (overlayOpen || !activeProject) return;
 
       if (e.ctrlKey && e.key === "Tab") {
@@ -82,6 +85,7 @@ function Workspace() {
     newFormOpen,
     appSettingsOpen,
     newProjectOpen,
+    viewSettingsOpen,
     activeProject,
     cycleTab,
     closeActiveTab,
@@ -95,7 +99,7 @@ function Workspace() {
         <WindowControls />
       </header>
       <div className="flex h-screen text-white">
-        <div className="relative flex min-w-0 flex-1 flex-col border-t border-white/10">
+        <div className="relative flex min-w-0 flex-1 flex-col">
           {newFormOpen ? (
             <NewFormPage onClose={closeNewForm} />
           ) : !activeProject ? (
@@ -142,6 +146,11 @@ function Workspace() {
           here rather than inside the body pane makes its backdrop dim the
           header/tab strip and sidebar too, not just the body. */}
       {newProjectOpen && <NewProjectModal onClose={closeNewProject} />}
+
+      {/* Same reasoning as NewProjectModal above — full-window backdrop dim. */}
+      {viewSettingsOpen && activeView && (
+        <ViewSettingsModal view={activeView} onClose={closeViewSettings} />
+      )}
     </div>
   );
 }

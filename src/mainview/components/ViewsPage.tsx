@@ -2,19 +2,18 @@ import { Eye, EyeOff, Layers, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { STATUS_META } from "./statusIcon";
-import type { ThreadView, ThreadViewFilters } from "../types/forms";
+import type { RunStatus, ThreadView, ThreadViewFilters } from "../types/forms";
 
 function filterSummary(filters: ThreadViewFilters): string {
-  const parts: string[] = [];
-  if (filters.formSlugs?.length) parts.push(`${filters.formSlugs.length} form${filters.formSlugs.length === 1 ? "" : "s"}`);
-  if (filters.statuses?.length) {
-    parts.push(filters.statuses.map((s) => STATUS_META[s].label).join(", "));
-  }
-  if (filters.keywords?.length) {
-    const mode = filters.keywordMode === "and" ? "all" : "any";
-    parts.push(`${filters.keywords.length} keyword${filters.keywords.length === 1 ? "" : "s"} (${mode})`);
-  }
-  return parts.length > 0 ? parts.join(" · ") : "No filters — shows every run";
+  const entries = filters.entries ?? [];
+  if (entries.length === 0) return "No filters — shows every run";
+  return entries
+    .map((entry) => {
+      if (entry.type === "form") return `${entry.values.length} form${entry.values.length === 1 ? "" : "s"}`;
+      if (entry.type === "status") return entry.values.map((s) => STATUS_META[s as RunStatus].label).join("/");
+      return `${entry.values.length} keyword${entry.values.length === 1 ? "" : "s"}`;
+    })
+    .join(" · ");
 }
 
 /**

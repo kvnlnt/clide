@@ -209,18 +209,35 @@ export interface ProjectLayout {
 
 // Thread views (saved filters, shown as browser-style tabs) ------------------
 
+export type FilterEntryType = "form" | "status" | "keyword";
+
+/**
+ * One additive filter chip. Values within an entry combine as OR (e.g. a
+ * status entry with Error + Success matches either); entries combine as AND
+ * across the whole filter set (ticket 51).
+ */
+export interface FilterEntry {
+  /** Stable identity — used as the edit/remove target for the chip. */
+  id: string;
+  type: FilterEntryType;
+  /** Form slugs, `RunStatus` values, or free-text keywords, depending on `type`. */
+  values: string[];
+}
+
 export interface ThreadViewFilters {
-  /** Only runs of these forms. */
+  /** Additive filter chips (ticket 51). Absent/empty = no filtering. */
+  entries?: FilterEntry[];
+  /** @deprecated Replaced by `entries` (ticket 51). Older `.views.json` files may still have this. */
   formSlugs?: string[];
-  /** Only runs in these statuses. */
+  /** @deprecated Replaced by `entries` (ticket 51). */
   statuses?: RunStatus[];
-  /** Free-text keywords matched against form name / run inputs. */
+  /** @deprecated Replaced by `entries` (ticket 51). */
   keywords?: string[];
-  /** "and" = every keyword must match; "or" (default) = any keyword matches. */
+  /** @deprecated Replaced by `entries` (ticket 51). */
   keywordMode?: "and" | "or";
   /**
-   * @deprecated Replaced by `keywords`. Older `.views.json` files may still
-   * have this; normalized to `keywords: [query]` on load.
+   * @deprecated Oldest legacy shape, superseded by `keywords` then `entries`.
+   * Older `.views.json` files may still have this.
    */
   query?: string;
 }
