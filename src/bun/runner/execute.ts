@@ -1,6 +1,7 @@
 import { join } from "node:path";
-import type { Interpreter, OutputChunk, RunRecord, RunStatusUpdate, RunTrigger } from "../../shared/types";
-import { createRun, getRun, setOutputPath, updateRunStatus } from "../db/history";
+import { buildCommand } from "../../shared/command";
+import type { FormDefinition, Interpreter, OutputChunk, RunRecord, RunStatusUpdate, RunTrigger } from "../../shared/types";
+import { createRun, getRun, setOutputPath, setResolvedCommand, updateRunStatus } from "../db/history";
 import { publishRunEvents } from "../events/bus";
 import { loadFormFolder } from "../forms/loader";
 import { formDir } from "../paths";
@@ -67,21 +68,64 @@ export async function startRun(
   });
 
   // Fire-and-forget the actual execution.
-  void execute(
-    projectPath,
-    projectName,
-    runId,
-    folder.form.scriptFile,
-    folder.meta.interpreter ?? "bash",
-    formSlug,
-    inputs,
-    emitters,
-  );
+  if (folder.form.command) {
+    void executeCommand(projectPath, projectName, runId, formSlug, inputs, emitters);
+  } else {
+    void executeScript(
+      projectPath,
+      projectName,
+      runId,
+      folder.form.scriptFile ?? "script.sh",
+      folder.meta.interpreter ?? "bash",
+      formSlug,
+      inputs,
+      emitters,
+    );
+  }
 
   return { runId };
 }
 
-async function execute(
+/** Runs a command-backed form (ticket 52): spawns its tool directly, no interpreter, no script file. */
+async function executeCommand(
+  projectPath: string,
+  projectName: string,
+  runId: string,
+  formSlug: string,
+  inputs: Record<string, unknown>,
+  emitters: RunEmitters,
+): Promise<void> {
+  const folder = await loadFormFolder(projectPath, formSlug, projectName);
+  if (!folder?.form.command) return;
+
+  const built = buildCommand(folder.form, inputs);
+  const resolvedPath = Bun.which(built.tool);
+  if (!resolvedPath) {
+    finishWithError(runId, emitters, `Tool not installed: "${built.tool}" is not on PATH.`);
+    return;
+  }
+  setResolvedCommand(runId, built.tool, built.argv);
+
+  const capture = new OutputCapture(projectPath, runId);
+
+  let proc: ReturnType<typeof Bun.spawn>;
+  try {
+    proc = Bun.spawn([resolvedPath, ...built.argv], {
+      stdout: "pipe",
+      stderr: "pipe",
+      stdin: built.stdin !== undefined ? new TextEncoder().encode(built.stdin) : undefined,
+      env: Object.keys(built.env).length > 0 ? { ...process.env, ...built.env } : undefined,
+    });
+  } catch (err) {
+    finishWithError(runId, emitters, `Failed to spawn: ${String(err)}`);
+    return;
+  }
+
+  registry.register(runId, proc);
+  await pumpAndFinish(proc, runId, formSlug, capture, folder.form, emitters);
+}
+
+async function executeScript(
   projectPath: string,
   projectName: string,
   runId: string,
@@ -112,7 +156,17 @@ async function execute(
   }
 
   registry.register(runId, proc);
+  await pumpAndFinish(proc, runId, formSlug, capture, folder.form, emitters);
+}
 
+async function pumpAndFinish(
+  proc: ReturnType<typeof Bun.spawn>,
+  runId: string,
+  formSlug: string,
+  capture: OutputCapture,
+  form: FormDefinition,
+  emitters: RunEmitters,
+): Promise<void> {
   const decoder = new TextDecoder();
 
   async function pump(stream: ReadableStream<Uint8Array> | undefined, type: "stdout" | "stderr"): Promise<void> {
@@ -148,13 +202,42 @@ async function execute(
   updateRunStatus(runId, status, exitCode, finishedAt);
   emitters.emitStatus({ runId, status, exitCode, finishedAt });
 
-  // Fire the form's declared events on the internal bus (ticket 23).
+  // Fire the form's declared events on the internal bus (ticket 23), carrying
+  // any file artifacts this run produced (ticket 56).
   if (status === "success") {
-    const emits = folder.form.events?.emits ?? [];
+    const emits = form.events?.emits ?? [];
     if (emits.length > 0) {
-      publishRunEvents({ runId, formSlug }, emits, capture.text, folder.form.outputType);
+      const artifacts = await collectArtifacts(capture.text, form.outputType);
+      publishRunEvents({ runId, formSlug }, emits, capture.text, form.outputType, artifacts);
     }
   }
+}
+
+/**
+ * File paths a run produced, for the event bus's "artifacts" (ticket 56):
+ * for image/audio/video outputs, the last printed line (the established
+ * convention — see `readOutputFile`); plus any other line that's itself an
+ * existing absolute path. Deliberately simple — not a general-purpose parser.
+ */
+async function collectArtifacts(text: string, outputType: FormDefinition["outputType"]): Promise<string[]> {
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("/"));
+  const candidates = new Set(lines);
+  if (outputType === "image" || outputType === "audio" || outputType === "video") {
+    const last = lines[lines.length - 1];
+    if (last) candidates.add(last);
+  }
+  const artifacts: string[] = [];
+  for (const candidate of Array.from(candidates).slice(0, 20)) {
+    try {
+      if (await Bun.file(candidate).exists()) artifacts.push(candidate);
+    } catch {
+      /* not a real path — skip */
+    }
+  }
+  return artifacts;
 }
 
 function finishWithError(runId: string, emitters: RunEmitters, message: string): void {

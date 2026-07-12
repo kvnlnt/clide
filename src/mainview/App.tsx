@@ -9,6 +9,7 @@ import RunFormPicker from "./components/RunFormPicker";
 import SettingsPanel from "./components/SettingsPanel";
 import Sidebar from "./components/Sidebar";
 import Thread from "./components/Thread";
+import ToolsPage from "./components/ToolsPage";
 import TrafficLights from "./components/TrafficLights";
 import ViewsPage from "./components/ViewsPage";
 import ViewSettingsModal from "./components/ViewSettingsModal";
@@ -114,6 +115,7 @@ function Workspace() {
               <ProjectToolbar />
               {projectSurface === "forms" && <FormsPanel />}
               {projectSurface === "views" && <ViewsPage />}
+              {projectSurface === "tools" && <ToolsPage />}
               {projectSurface === "calendar" && <CalendarPage />}
               {projectSurface === "project-settings" && activeProjectMeta && (
                 <ProjectSettingsPage

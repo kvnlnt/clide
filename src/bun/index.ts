@@ -1,11 +1,14 @@
 import { ApplicationMenu, BrowserView, BrowserWindow, Updater, Utils } from "electrobun/bun";
+import { createHash } from "node:crypto";
 import { rmSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
-import type { ClideRPC, OutputChunk, Project, RunStatusUpdate } from "../shared/types";
+import type { ClideRPC, OutputChunk, Project, RunStatusUpdate, ToolRegistryEntry, ToolSource } from "../shared/types";
 import { getAIService, listAIServices, saveAIServices, testAIService } from "./ai/aiServices";
 import { hasCredential, saveCredential } from "./ai/credentials";
 import { draftFormSpec, generateForm, generateFormFromSpec, runDependencyCheck } from "./ai/formGenerator";
 import { fillMagicFields } from "./ai/magicFill";
+import { draftCommandFields } from "./ai/commandFields";
+import { distillToolSpec, suggestTools } from "./ai/toolSpec";
 import {
   addProject,
   listProjects,
@@ -16,16 +19,26 @@ import {
   resolveProjectByName,
 } from "./config";
 import { deleteRun as dbDeleteRun, getAllRuns, getRun, getRunHistory, indexRuns, setPinned } from "./db/history";
-import { rebuildListenerIndex, registerHop, setAutoSubmitHandler } from "./events/bus";
+import { rebuildListenerIndex, registerHop, resolvePayloadMapping, setAutoSubmitHandler } from "./events/bus";
 import { readLayout, writeLayout } from "./forms/layout";
 import { listForms, loadFormFolder, resolveFormProject } from "./forms/loader";
 import { seedExampleProjects } from "./forms/seed";
 import { readViews, writeViews } from "./forms/views";
 import { watchForms } from "./forms/watcher";
-import { writeForm } from "./forms/writer";
+import { writeCommandForm, writeForm } from "./forms/writer";
 import { formDir, projectFormsDir } from "./paths";
 import { cancelRun, startRun, type RunEmitters } from "./runner/execute";
 import { cancelScheduled, disposeScheduler, initScheduler, rescheduleRun, runScheduledNow, schedule } from "./scheduler";
+import { captureHelp, resolveTool as resolveToolPath } from "./tools/inspect";
+import {
+  findByHash,
+  findByRealPath,
+  getTool,
+  listTools as listRegisteredTools,
+  removeTool,
+  saveTool,
+  storeDroppedBinary,
+} from "./tools/registry";
 import { readUIState, writeUIState } from "./uiState";
 
 const DEV_SERVER_PORT = 5173;
@@ -146,7 +159,7 @@ async function readFormScript(formSlug: string): Promise<{ script: string; exten
   const project = await projectForSlug(formSlug);
   if (!project) return null;
   const folder = await loadFormFolder(project.path, formSlug, project.name);
-  if (!folder) return null;
+  if (!folder?.form.scriptFile) return null;
   try {
     const scriptPath = join(formDir(project.path, formSlug), folder.form.scriptFile);
     const script = await Bun.file(scriptPath).text();
@@ -155,6 +168,37 @@ async function readFormScript(formSlug: string): Promise<{ script: string; exten
   } catch {
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Tool registry helpers (ticket 53).
+// ---------------------------------------------------------------------------
+
+function basename(p: string): string {
+  return p.split("/").filter(Boolean).pop() ?? p;
+}
+
+/** Resolves + dedupes against an existing entry, or builds a fresh bare-bones one. Does not capture help. */
+async function resolveOrCreateEntry(
+  nameOrPath: string,
+  name: string | undefined,
+  source: ToolSource,
+): Promise<{ ok: true; entry: ToolRegistryEntry } | { ok: false; error: string }> {
+  const resolved = resolveToolPath(nameOrPath);
+  if (!resolved.ok || !resolved.execPath) {
+    return { ok: false, error: resolved.error ?? `Could not resolve "${nameOrPath}"` };
+  }
+  const existing = await findByRealPath(resolved.execPath);
+  if (existing) return { ok: true, entry: existing };
+  return {
+    ok: true,
+    entry: {
+      id: crypto.randomUUID(),
+      name: name?.trim() || basename(resolved.execPath),
+      execPath: resolved.execPath,
+      source,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -298,6 +342,145 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           if (!folder) return { ok: false, error: `Form not found: ${formSlug}` };
           const values = await fillMagicFields(folder, fields, payload);
           return { ok: true, values };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      listTools: async () => await listRegisteredTools(),
+
+      resolveTool: async ({ nameOrPath }) => {
+        const result = resolveToolPath(nameOrPath);
+        return result.ok ? { ok: true, execPath: result.execPath } : { ok: false, error: result.error };
+      },
+
+      registerTool: async ({ nameOrPath, name, source }) => {
+        const resolved = await resolveOrCreateEntry(nameOrPath, name, source);
+        if (!resolved.ok) return resolved;
+        await saveTool(resolved.entry);
+        return { ok: true, entry: resolved.entry };
+      },
+
+      inspectTool: async ({ nameOrPath, name, source, serviceId, model }) => {
+        const resolved = await resolveOrCreateEntry(nameOrPath, name, source);
+        if (!resolved.ok) return resolved;
+        const service = await getAIService(serviceId);
+        if (!service) return { ok: false, error: "Selected AI service not found." };
+
+        const captured = await captureHelp(resolved.entry.execPath);
+        let entry = resolved.entry;
+        if (captured) entry = { ...entry, helpText: captured.text };
+
+        try {
+          const spec = captured ? await distillToolSpec(entry.name, captured.text, service, model) : undefined;
+          entry = {
+            ...entry,
+            spec,
+            inspectedAt: spec ? new Date().toISOString() : entry.inspectedAt,
+            inspectedWith: spec ? { serviceId, model } : entry.inspectedWith,
+          };
+        } catch (err) {
+          // Distillation failure keeps the raw help text usable — not fatal.
+          await saveTool(entry);
+          return { ok: true, entry, error: `AI distillation failed: ${String(err)}` };
+        }
+
+        await saveTool(entry);
+        return { ok: true, entry };
+      },
+
+      redistillTool: async ({ id, helpText, serviceId, model }) => {
+        const existing = await getTool(id);
+        if (!existing) return { ok: false, error: "Tool not found." };
+        const text = helpText?.trim() || existing.helpText;
+        if (!text) return { ok: false, error: "No help text to distill — paste some first." };
+        const service = await getAIService(serviceId);
+        if (!service) return { ok: false, error: "Selected AI service not found." };
+        try {
+          const spec = await distillToolSpec(existing.name, text, service, model);
+          const entry: ToolRegistryEntry = {
+            ...existing,
+            helpText: text,
+            spec,
+            inspectedAt: new Date().toISOString(),
+            inspectedWith: { serviceId, model },
+          };
+          await saveTool(entry);
+          return { ok: true, entry };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      updateTool: async ({ id, name }) => {
+        const existing = await getTool(id);
+        if (!existing) return { ok: false, error: "Tool not found." };
+        if (name !== undefined && !name.trim()) return { ok: false, error: "Name required" };
+        const entry: ToolRegistryEntry = { ...existing, name: name?.trim() || existing.name };
+        await saveTool(entry);
+        return { ok: true, entry };
+      },
+
+      removeTool: ({ id }) => {
+        removeTool(id);
+      },
+
+      registerDroppedTool: async ({ fileName, base64 }) => {
+        try {
+          const bytes = new Uint8Array(Buffer.from(base64, "base64"));
+          const hash = createHash("sha256").update(bytes).digest("hex");
+          const existing = await findByHash(hash);
+          if (existing) return { ok: true, entry: existing };
+
+          const stored = await storeDroppedBinary(fileName, bytes);
+          const entry: ToolRegistryEntry = {
+            id: crypto.randomUUID(),
+            name: fileName.replace(/\.[^.]+$/, "") || fileName,
+            execPath: stored.execPath,
+            source: "custom",
+            sourceHash: stored.hash,
+          };
+          await saveTool(entry);
+          return { ok: true, entry };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      suggestTools: async ({ query, serviceId, model }) => {
+        const service = await getAIService(serviceId);
+        if (!service) return { ok: false, error: "Selected AI service not found." };
+        try {
+          const names = await suggestTools(query, service, model);
+          const verified = names.filter((name) => resolveToolPath(name).ok);
+          return { ok: true, suggestions: verified };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      draftCommandFields: async ({ toolName, actionName, spec, serviceId, model }) => {
+        const service = await getAIService(serviceId);
+        if (!service) return { ok: false, error: "Selected AI service not found." };
+        try {
+          const fields = await draftCommandFields(toolName, actionName, spec, service, model);
+          return { ok: true, fields };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      createCommandForm: async ({ project, name, description, tags, command, fields, outputType, outputs, events }) => {
+        try {
+          const resolvedProject = (await resolveProjectByName(project)) ?? (await addProject(project));
+          const slug = await writeCommandForm(
+            resolvedProject.path,
+            { name, description, project: resolvedProject.name, tags },
+            { fields, outputType, outputs, events, command },
+          );
+          await pushProjectsChanged();
+          await pushFormsChanged();
+          return { ok: true, slug };
         } catch (err) {
           return { ok: false, error: String(err) };
         }
@@ -465,18 +648,31 @@ rebuildListenerIndex(await listForms());
 setAutoSubmitHandler((event, target) => {
   void (async () => {
     try {
-      // Magic fill (ticket 24): fill the listening form's magic fields from the
-      // event payload before submitting. Failure never blocks the pipeline.
-      let inputs: Record<string, unknown> = {};
-      let fillError: string | null = null;
       const folder = await loadFormFolder(target.projectPath, target.slug, target.projectName);
-      const magicFields: Record<string, string> = {};
-      for (const field of folder?.form.fields ?? []) {
-        if (field.magic?.prompt) magicFields[field.id] = field.magic.prompt;
+      const fields = folder?.form.fields ?? [];
+
+      // Deterministic payload → field mapping (ticket 56) fills first, with no
+      // AI call — a mapping that resolves to nothing is left empty/visible
+      // rather than falling back to AI for that field. Fields without a
+      // mapping (or "prompt"-sourced magic) go through AI magic fill (ticket 24)
+      // as before. Failure of either path never blocks submission.
+      const inputs: Record<string, unknown> = {};
+      const aiMagicFields: Record<string, string> = {};
+      for (const field of fields) {
+        const magic = field.magic;
+        if (!magic?.prompt) continue;
+        if (magic.source === "event" && magic.payloadMapping) {
+          const value = resolvePayloadMapping(magic.payloadMapping, event);
+          if (value !== undefined && value !== null && value !== "") inputs[field.id] = value;
+          continue;
+        }
+        aiMagicFields[field.id] = magic.prompt;
       }
-      if (folder && Object.keys(magicFields).length > 0) {
+
+      let fillError: string | null = null;
+      if (folder && Object.keys(aiMagicFields).length > 0) {
         try {
-          inputs = await fillMagicFields(folder, magicFields, event.payload);
+          Object.assign(inputs, await fillMagicFields(folder, aiMagicFields, event.payload));
         } catch (err) {
           fillError = String(err);
         }
@@ -488,6 +684,7 @@ setAutoSubmitHandler((event, target) => {
       await startRun(target.projectPath, target.projectName, target.slug, inputs, emitters, runId, {
         event: event.name,
         sourceRunId: event.sourceRunId,
+        artifacts: event.payload.artifacts,
       });
       if (fillError) {
         emitters.emitChunk({

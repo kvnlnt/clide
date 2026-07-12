@@ -2,19 +2,27 @@ import { Electroview } from "electrobun/view";
 import type {
   AIService,
   ClideRPC,
+  CommandSpec,
   CreateFormInput,
   CreateFormResult,
   DraftFormSpecInput,
   DraftFormSpecResult,
+  FormEvents,
   FormFolder,
+  FormField,
   FormMetaPatch,
   OutputChunk,
+  OutputSpec,
+  OutputType,
   Project,
   ProjectLayout,
   RepeatInterval,
   RunRecord,
   RunStatusUpdate,
   ThreadView,
+  ToolRegistryEntry,
+  ToolSource,
+  ToolSpec,
   UIState,
 } from "../shared/types";
 
@@ -414,5 +422,144 @@ export const api = {
 
   log(msg: string, type?: "info" | "warn" | "error" | "debug"): void {
     send()?.logToBun({ msg, type });
+  },
+
+  async listTools(): Promise<ToolRegistryEntry[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.listTools({});
+    } catch {
+      return [];
+    }
+  },
+
+  async resolveTool(nameOrPath: string): Promise<{ ok: boolean; execPath?: string; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.resolveTool({ nameOrPath });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async registerTool(
+    nameOrPath: string,
+    name: string | undefined,
+    source: ToolSource,
+  ): Promise<{ ok: boolean; entry?: ToolRegistryEntry; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.registerTool({ nameOrPath, name, source });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async inspectTool(
+    nameOrPath: string,
+    name: string | undefined,
+    source: ToolSource,
+    serviceId: string,
+    model: string,
+  ): Promise<{ ok: boolean; entry?: ToolRegistryEntry; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.inspectTool({ nameOrPath, name, source, serviceId, model });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async redistillTool(
+    id: string,
+    helpText: string | undefined,
+    serviceId: string,
+    model: string,
+  ): Promise<{ ok: boolean; entry?: ToolRegistryEntry; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.redistillTool({ id, helpText, serviceId, model });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async updateTool(id: string, name?: string): Promise<{ ok: boolean; entry?: ToolRegistryEntry; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.updateTool({ id, name });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async removeTool(id: string): Promise<void> {
+    await request()?.removeTool({ id });
+  },
+
+  async suggestTools(
+    query: string,
+    serviceId: string,
+    model: string,
+  ): Promise<{ ok: boolean; suggestions?: string[]; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.suggestTools({ query, serviceId, model });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async draftCommandFields(
+    toolName: string,
+    actionName: string,
+    spec: ToolSpec,
+    serviceId: string,
+    model: string,
+  ): Promise<{ ok: boolean; fields?: FormField[]; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.draftCommandFields({ toolName, actionName, spec, serviceId, model });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async registerDroppedTool(fileName: string, base64: string): Promise<{ ok: boolean; entry?: ToolRegistryEntry; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.registerDroppedTool({ fileName, base64 });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async createCommandForm(input: {
+    project: string;
+    name: string;
+    description: string;
+    tags: string[];
+    command: CommandSpec;
+    fields: FormField[];
+    outputType: OutputType;
+    outputs: OutputSpec[];
+    events: FormEvents;
+  }): Promise<{ ok: boolean; slug?: string; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.createCommandForm(input);
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
   },
 };

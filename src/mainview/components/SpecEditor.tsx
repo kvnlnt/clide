@@ -238,7 +238,7 @@ function InputRow({
 // Outputs
 // ---------------------------------------------------------------------------
 
-function OutputsSection({ outputs, onChange }: { outputs: OutputSpec[]; onChange: (outputs: OutputSpec[]) => void }) {
+export function OutputsSection({ outputs, onChange }: { outputs: OutputSpec[]; onChange: (outputs: OutputSpec[]) => void }) {
   const kinds = new Set(outputs.filter((o) => o.kind !== "effect").map((o) => o.kind));
   const effects = outputs.filter((o) => o.kind === "effect");
 
@@ -315,7 +315,7 @@ function OutputsSection({ outputs, onChange }: { outputs: OutputSpec[]; onChange
 // Event name tag editor
 // ---------------------------------------------------------------------------
 
-function TagEditor({
+export function TagEditor({
   label,
   hint,
   tags,

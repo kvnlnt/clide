@@ -65,6 +65,14 @@ export interface OutputSpec {
   description?: string;
 }
 
+/**
+ * Deterministic source for a field's value from a triggering event's payload
+ * (ticket 56) — tried before falling back to AI magic fill. "text" is the
+ * emitting run's raw stdout; "json" walks a dot-path into the parsed JSON
+ * payload; "artifact" picks the nth file path the emitting run produced.
+ */
+export type PayloadMapping = { kind: "text" } | { kind: "json"; path: string } | { kind: "artifact"; index: number };
+
 /** Auto-fill configuration for a field. Runtime lands in ticket 24. */
 export interface MagicField {
   /** Associative prompt used to fill the field, e.g. "today's date in ISO". */
@@ -76,6 +84,8 @@ export interface MagicField {
    *             prompt (ticket 23 supplies the payload).
    */
   source: "prompt" | "event";
+  /** When `source` is "event": try this deterministic mapping first, falling back to AI fill if it resolves to nothing (ticket 56). */
+  payloadMapping?: PayloadMapping;
 }
 
 /** Event wiring declared by a form. Runtime lands in ticket 23. */
@@ -86,6 +96,24 @@ export interface FormEvents {
   listensFor: string[];
 }
 
+/** How a command-backed field's value becomes part of the argv (ticket 52). */
+export type ArgMappingKind = "flag" | "option" | "positional" | "env" | "stdin";
+
+/** Maps one form field's value onto the invocation of a command-backed form's tool. */
+export interface ArgMapping {
+  kind: ArgMappingKind;
+  /** Flag token for "flag"/"option", e.g. "--verbose" or "-o". Defaults to `--<field id>`. */
+  flag?: string;
+  /** For "option": `--flag value` (default) vs. `--flag=value`. */
+  style?: "space" | "equals";
+  /** For "positional": explicit ordering among positional fields (ascending; ties broken by field order). */
+  order?: number;
+  /** For "option"/"positional" with an array value: repeat the flag per value instead of joining with commas. */
+  repeat?: boolean;
+  /** For "env": environment variable name. Defaults to the field id, upper-cased. */
+  envName?: string;
+}
+
 export interface FormField {
   id: string;
   label: string;
@@ -93,8 +121,19 @@ export interface FormField {
   placeholder?: string;
   required?: boolean;
   options?: string[];
+  /** @deprecated Legacy script-form arg templating (e.g. `--post {{value}}`). Superseded by `argMapping` (ticket 52). */
   argTemplate?: string;
+  /** How this field's value maps onto the tool invocation. Command-backed forms only (ticket 52). */
+  argMapping?: ArgMapping;
   magic?: MagicField;
+}
+
+/** A command-backed form's fixed invocation target (ticket 52): one tool, one action. */
+export interface CommandSpec {
+  /** Tool registry entry id, or a bare executable name/path resolved on PATH (ticket 53). */
+  tool: string;
+  /** Fixed argv prefix before any field-derived args, e.g. `["convert"]` for a subcommand. */
+  baseArgs: string[];
 }
 
 export interface FormDefinition {
@@ -105,7 +144,66 @@ export interface FormDefinition {
   /** All outputs/effects. Normalized on load from outputType when absent. */
   outputs?: OutputSpec[];
   events?: FormEvents;
-  scriptFile: string;
+  /** Present on command-backed forms (ticket 52); mutually exclusive with `scriptFile` in practice. */
+  command?: CommandSpec;
+  /** @deprecated Legacy script-backed forms only. Absent on command-backed forms. */
+  scriptFile?: string;
+}
+
+// Tool registry & AI inspection (ticket 53) ----------------------------------
+
+export type ToolSource = "discovered" | "custom";
+
+export interface ToolSpecSubcommand {
+  name: string;
+  description: string;
+}
+
+export interface ToolSpecOption {
+  /** All flag spellings for this option, e.g. `["-o", "--output"]`. */
+  flags: string[];
+  description: string;
+  takesValue: boolean;
+  repeatable?: boolean;
+}
+
+export interface ToolSpecPositional {
+  name: string;
+  description: string;
+}
+
+/** AI-distilled structure of a CLI tool's self-documentation, used to draft form fields (ticket 54). */
+export interface ToolSpec {
+  description: string;
+  subcommands: ToolSpecSubcommand[];
+  options: ToolSpecOption[];
+  positionals: ToolSpecPositional[];
+  examples: string[];
+}
+
+/** A CLI tool CLIDE knows about — discovered on PATH or registered by dropping an executable (ticket 55). */
+export interface ToolRegistryEntry {
+  id: string;
+  /** Display name, editable — defaults to the executable's basename. */
+  name: string;
+  /** Resolved absolute path at last successful resolve. */
+  execPath: string;
+  source: ToolSource;
+  /** Raw captured `--help`/`man` text (or user-pasted docs), kept even if distillation fails. */
+  helpText?: string;
+  /** AI-distilled structure, when distillation has succeeded. */
+  spec?: ToolSpec;
+  inspectedAt?: string;
+  /** Which AI service + model produced `spec`. */
+  inspectedWith?: { serviceId: string; model: string };
+  /** Set when the executable was last found missing at resolve time; never touches the entry's persistence. */
+  missing?: boolean;
+  /**
+   * SHA-256 of the original bytes, set only for `source: "custom"` entries
+   * whose executable was copied in via drag-and-drop (ticket 55) — dedupes
+   * re-drops of the same binary without depending on its original path.
+   */
+  sourceHash?: string;
 }
 
 /** AI-drafted, user-editable plan for a form. Never persisted to disk. */
@@ -161,6 +259,8 @@ export interface RunTrigger {
   event: string;
   /** Run id of the emitting run (its output is the event payload). */
   sourceRunId: string;
+  /** File paths the emitting run produced, passed along in the event payload (ticket 56). */
+  artifacts?: string[];
 }
 
 export interface RunRecord {
@@ -177,6 +277,8 @@ export interface RunRecord {
   repeatInterval: RepeatInterval | null;
   /** Set when the run was auto-submitted by the event bus. */
   triggeredBy?: RunTrigger | null;
+  /** Resolved tool + argv actually executed, for command-backed forms (ticket 52). */
+  command?: { tool: string; argv: string[] } | null;
 }
 
 export interface OutputChunk {
@@ -382,10 +484,72 @@ export type ClideRPC = {
           /** Field id → magic prompt, for the fields needing fill. */
           fields: Record<string, string>;
           /** Optional event payload context (event-triggered fills). */
-          payload?: { text: string; json?: unknown };
+          payload?: { text: string; json?: unknown; artifacts?: string[] };
         };
         response: { ok: boolean; values?: Record<string, unknown>; error?: string };
       };
+      // Tool registry & inspection (ticket 53) --------------------------------
+      listTools: { params: Record<string, never>; response: ToolRegistryEntry[] };
+      resolveTool: {
+        params: { nameOrPath: string };
+        response: { ok: boolean; execPath?: string; error?: string };
+      };
+      inspectTool: {
+        params: {
+          nameOrPath: string;
+          /** Display name override; defaults to the executable's basename. */
+          name?: string;
+          source: ToolSource;
+          serviceId: string;
+          model: string;
+        };
+        response: { ok: boolean; entry?: ToolRegistryEntry; error?: string };
+      };
+      /** Registers a tool without capturing/distilling help — the confirm step's "just add it" path. */
+      registerTool: {
+        params: { nameOrPath: string; name?: string; source: ToolSource };
+        response: { ok: boolean; entry?: ToolRegistryEntry; error?: string };
+      };
+      /** Re-distills an entry's stored (or freshly pasted) help text with a chosen service+model. */
+      redistillTool: {
+        params: { id: string; helpText?: string; serviceId: string; model: string };
+        response: { ok: boolean; entry?: ToolRegistryEntry; error?: string };
+      };
+      updateTool: {
+        params: { id: string; name?: string };
+        response: { ok: boolean; entry?: ToolRegistryEntry; error?: string };
+      };
+      removeTool: { params: { id: string }; response: void };
+      /** Drag-and-drop registration (ticket 55): copies the dropped bytes into CLIDE's own storage and chmods +x. */
+      registerDroppedTool: {
+        params: { fileName: string; base64: string };
+        response: { ok: boolean; entry?: ToolRegistryEntry; error?: string };
+      };
+
+      // Form creation wizard (ticket 54) --------------------------------------
+      suggestTools: {
+        params: { query: string; serviceId: string; model: string };
+        response: { ok: boolean; suggestions?: string[]; error?: string };
+      };
+      draftCommandFields: {
+        params: { toolName: string; actionName: string; spec: ToolSpec; serviceId: string; model: string };
+        response: { ok: boolean; fields?: FormField[]; error?: string };
+      };
+      createCommandForm: {
+        params: {
+          project: string;
+          name: string;
+          description: string;
+          tags: string[];
+          command: CommandSpec;
+          fields: FormField[];
+          outputType: OutputType;
+          outputs: OutputSpec[];
+          events: FormEvents;
+        };
+        response: { ok: boolean; slug?: string; error?: string };
+      };
+
       setPinned: {
         params: { runId: string; pinned: boolean };
         response: void;

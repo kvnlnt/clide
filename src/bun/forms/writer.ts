@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { GeneratedForm } from "../../shared/types";
+import type { FormDefinition, FormMeta, GeneratedForm } from "../../shared/types";
 import { ensureDir, formDir, projectFormsDir } from "../paths";
 
 function slugify(name: string): string {
@@ -11,18 +11,23 @@ function slugify(name: string): string {
     .slice(0, 64);
 }
 
-/**
- * Write a generated form to disk inside a project folder as a self-contained
- * folder. Returns the slug actually used (de-duplicated if a folder exists).
- */
-export async function writeForm(projectPath: string, generated: GeneratedForm): Promise<string> {
-  const base = generated.meta.slug ? slugify(generated.meta.slug) : slugify(generated.meta.name);
+/** Picks a free slug for a new form folder, de-duplicating against what's on disk. */
+async function reserveSlug(projectPath: string, preferredSlug: string, name: string): Promise<string> {
+  const base = preferredSlug ? slugify(preferredSlug) : slugify(name);
   let slug = base || `form-${Date.now()}`;
   let suffix = 1;
   while (await Bun.file(join(formDir(projectPath, slug), "meta.json")).exists()) {
     slug = `${base}-${suffix++}`;
   }
+  return slug;
+}
 
+/**
+ * Write a generated form to disk inside a project folder as a self-contained
+ * folder. Returns the slug actually used (de-duplicated if a folder exists).
+ */
+export async function writeForm(projectPath: string, generated: GeneratedForm): Promise<string> {
+  const slug = await reserveSlug(projectPath, generated.meta.slug, generated.meta.name);
   const dir = formDir(projectPath, slug);
   ensureDir(dir);
 
@@ -48,6 +53,34 @@ export async function writeForm(projectPath: string, generated: GeneratedForm): 
   } catch {
     /* non-fatal */
   }
+
+  return slug;
+}
+
+/**
+ * Write a command-backed form (ticket 52/54): no script, no interpreter —
+ * `form.command` points straight at an installed tool. Used by the form
+ * creation wizard.
+ */
+export async function writeCommandForm(
+  projectPath: string,
+  meta: Omit<FormMeta, "slug" | "createdAt" | "updatedAt"> & { slug?: string },
+  form: FormDefinition,
+): Promise<string> {
+  const slug = await reserveSlug(projectPath, meta.slug ?? "", meta.name);
+  const dir = formDir(projectPath, slug);
+  ensureDir(dir);
+
+  const now = new Date().toISOString();
+  const fullMeta: FormMeta = {
+    ...meta,
+    slug,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await Bun.write(join(dir, "meta.json"), JSON.stringify(fullMeta, null, 2));
+  await Bun.write(join(dir, "form.json"), JSON.stringify(form, null, 2));
 
   return slug;
 }

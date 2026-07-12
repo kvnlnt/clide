@@ -205,7 +205,7 @@ export default function FormCard({
                   <CodeOutput formSlug={run.formSlug} />
                 </div>
               ) : (
-                <FormCardBody form={form} values={run.inputs} onChange={() => {}} disabled />
+                <FormCardBody form={form} values={run.inputs} onChange={() => {}} disabled run={run} />
               )}
             </>
           ) : (
@@ -217,6 +217,7 @@ export default function FormCard({
               disabled={!editable}
               filling={filling}
               fillFailed={fillFailed}
+              run={run}
             />
           )}
 

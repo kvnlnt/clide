@@ -44,6 +44,24 @@ export function defaultProjectsDir(): string {
 }
 
 /**
+ * Machine-global tool registry (ticket 53): one JSON file per registered CLI
+ * tool. Global, not per-project — the same installed tool serves forms in
+ * every project.
+ */
+export function toolsDir(): string {
+  return join(appDataDir(), "tools");
+}
+
+export function toolEntryPath(id: string): string {
+  return join(toolsDir(), `${id}.json`);
+}
+
+/** Where dropped-executable bytes are copied (ticket 55) — webviews don't expose real paths for dropped files. */
+export function toolBinDir(): string {
+  return join(toolsDir(), "bin");
+}
+
+/**
  * Create a directory, tolerating EEXIST which some Bun versions throw even with
  * `recursive: true`.
  */

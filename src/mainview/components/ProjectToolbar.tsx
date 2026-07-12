@@ -1,4 +1,4 @@
-import { CalendarDays, FileText, Layers, Play, Settings } from "lucide-react";
+import { CalendarDays, FileText, Layers, Play, Settings, Wrench } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import Toolbar from "./Toolbar";
 
@@ -41,6 +41,13 @@ export default function ProjectToolbar() {
       >
         <Layers size={13} />
         Views
+      </button>
+      <button
+        onClick={() => setProjectSurface(projectSurface === "tools" ? "thread" : "tools")}
+        className={`${btnBase} ${projectSurface === "tools" ? btnActive : btnInactive}`}
+      >
+        <Wrench size={13} />
+        Tools
       </button>
       <button
         onClick={() => setProjectSurface(projectSurface === "project-settings" ? "thread" : "project-settings")}

@@ -97,3 +97,16 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 49  | New Form Page Full Width              | Create-form flow drops its narrow centered column and adopts the full-width page style  | ✅ Done       |
 | 50  | View Actions Kebab Menu & Modal       | View rename/hide/delete move into a modal launched from a kebab icon in the toolbar     | ✅ Done       |
 | 51  | Additive Filter Chips                 | Permanent filter dropdowns become a "+" button adding editable chips, AND-combined      | ✅ Done       |
+| 52  | Command-Backed Forms                  | Epic: forms wrap one installed CLI tool directly — command model, direct spawn, preview | ✅ Done       |
+| 53  | Tool Registry & AI Inspection         | Resolve tools, capture --help/man safely, AI-distill to ToolSpec, Tools page            | ✅ Done       |
+| 54  | Form Creation Wizard                  | Chat tool-finder (service+model pick), AI-drafted fields, fully manual fine-tuning      | ✅ Done¹      |
+| 55  | Drag-Drop Tool Registration           | Drop an executable to register it; consent-gated inspection or pasted help docs         | ✅ Done       |
+| 56  | Event-Bus Flows                       | Payloads carry artifacts; deterministic payload→field mapping; chains visible in thread | ✅ Done²      |
+
+¹ Ticket 54: create flow (all 4 steps) is complete; reopening the wizard to
+  edit an existing command-backed form (section 5) is not wired — "Edit" on
+  FormsPanel still only edits name/description/tags.
+² Ticket 56: artifact collection, deterministic payload→field mapping, and
+  card display (trigger/artifacts/emits-listeners) all work backend-to-UI;
+  the wizard has no step yet to author a field's `payloadMapping` — it must
+  be set by hand in `form.json` until a follow-up adds that picker.

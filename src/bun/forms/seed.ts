@@ -153,11 +153,12 @@ export async function seedExampleProjects(): Promise<void> {
       const dir = formDir(project.path, seed.meta.slug);
       ensureDir(dir);
       const meta: FormMeta = { ...seed.meta, project: project.name, createdAt: now, updatedAt: now };
+      const scriptFile = seed.form.scriptFile ?? "script.sh";
       await Bun.write(join(dir, "meta.json"), JSON.stringify(meta, null, 2));
       await Bun.write(join(dir, "form.json"), JSON.stringify(seed.form, null, 2));
-      await Bun.write(join(dir, seed.form.scriptFile), seed.script);
+      await Bun.write(join(dir, scriptFile), seed.script);
       try {
-        await Bun.spawn(["chmod", "+x", join(dir, seed.form.scriptFile)]).exited;
+        await Bun.spawn(["chmod", "+x", join(dir, scriptFile)]).exited;
       } catch {
         /* non-fatal */
       }

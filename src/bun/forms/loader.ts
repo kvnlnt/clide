@@ -1,6 +1,9 @@
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type {
+  ArgMapping,
+  ArgMappingKind,
+  CommandSpec,
   FieldType,
   FormDefinition,
   FormEvents,
@@ -65,6 +68,21 @@ function validateMagic(raw: unknown): MagicField | undefined {
   };
 }
 
+const ARG_MAPPING_KINDS: ArgMappingKind[] = ["flag", "option", "positional", "env", "stdin"];
+
+function validateArgMapping(raw: unknown): ArgMapping | undefined {
+  if (!isObject(raw)) return undefined;
+  if (!ARG_MAPPING_KINDS.includes(raw.kind as ArgMappingKind)) return undefined;
+  return {
+    kind: raw.kind as ArgMappingKind,
+    flag: typeof raw.flag === "string" ? raw.flag : undefined,
+    style: raw.style === "equals" ? "equals" : raw.style === "space" ? "space" : undefined,
+    order: typeof raw.order === "number" ? raw.order : undefined,
+    repeat: raw.repeat === true,
+    envName: typeof raw.envName === "string" ? raw.envName : undefined,
+  };
+}
+
 function validateField(raw: unknown): FormField | null {
   if (!isObject(raw)) return null;
   if (typeof raw.id !== "string" || typeof raw.label !== "string") return null;
@@ -77,7 +95,17 @@ function validateField(raw: unknown): FormField | null {
     required: raw.required === true,
     options: Array.isArray(raw.options) ? raw.options.filter((o): o is string => typeof o === "string") : undefined,
     argTemplate: typeof raw.argTemplate === "string" ? raw.argTemplate : undefined,
+    argMapping: validateArgMapping(raw.argMapping),
     magic: validateMagic(raw.magic),
+  };
+}
+
+function validateCommand(raw: unknown): CommandSpec | undefined {
+  if (!isObject(raw)) return undefined;
+  if (typeof raw.tool !== "string" || !raw.tool.trim()) return undefined;
+  return {
+    tool: raw.tool,
+    baseArgs: Array.isArray(raw.baseArgs) ? raw.baseArgs.filter((a): a is string => typeof a === "string") : [],
   };
 }
 
@@ -111,13 +139,16 @@ function validateForm(raw: unknown): FormDefinition | null {
   if (!Array.isArray(raw.fields)) return null;
   const fields = raw.fields.map(validateField).filter((f): f is FormField => f !== null);
   const outputType = OUTPUT_TYPES.includes(raw.outputType as OutputType) ? (raw.outputType as OutputType) : "text";
+  const command = validateCommand(raw.command);
   return {
     fields,
     aiPromptField: raw.aiPromptField === true,
     outputType,
     outputs: validateOutputs(raw.outputs, outputType),
     events: validateEvents(raw.events),
-    scriptFile: typeof raw.scriptFile === "string" ? raw.scriptFile : "script.sh",
+    command,
+    // Legacy script forms always had a scriptFile; a command form has none.
+    scriptFile: typeof raw.scriptFile === "string" ? raw.scriptFile : command ? undefined : "script.sh",
   };
 }
 

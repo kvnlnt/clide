@@ -16,6 +16,7 @@ interface RunRow {
   scheduled_at: string | null;
   repeat_interval: string | null;
   triggered_by: string | null;
+  resolved_command: string | null;
 }
 
 /** projectPath -> open Database. */
@@ -69,6 +70,15 @@ function rowToRecord(row: RunRow): RunRecord {
       triggeredBy = null;
     }
   }
+  let command: RunRecord["command"] = null;
+  if (row.resolved_command) {
+    try {
+      const parsed = JSON.parse(row.resolved_command) as { tool: string; argv: string[] };
+      if (typeof parsed?.tool === "string" && Array.isArray(parsed?.argv)) command = parsed;
+    } catch {
+      command = null;
+    }
+  }
   return {
     id: row.id,
     formSlug: row.form_slug,
@@ -82,6 +92,7 @@ function rowToRecord(row: RunRow): RunRecord {
     scheduledAt: row.scheduled_at,
     repeatInterval: (row.repeat_interval as RepeatInterval | null) ?? null,
     triggeredBy,
+    command,
   };
 }
 
@@ -148,6 +159,16 @@ export function setOutputPath(id: string, outputPath: string): void {
   const projectPath = runIndex.get(id);
   if (!projectPath) return;
   getDb(projectPath).run(`UPDATE runs SET output_path = ? WHERE id = ?`, [outputPath, id]);
+}
+
+/** Records the exact tool + argv a command-backed run executed (ticket 52). */
+export function setResolvedCommand(id: string, tool: string, argv: string[]): void {
+  const projectPath = runIndex.get(id);
+  if (!projectPath) return;
+  getDb(projectPath).run(`UPDATE runs SET resolved_command = ? WHERE id = ?`, [
+    JSON.stringify({ tool, argv }),
+    id,
+  ]);
 }
 
 export function setPinned(id: string, pinned: boolean): void {

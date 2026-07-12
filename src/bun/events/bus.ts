@@ -1,4 +1,4 @@
-import type { FormFolder, OutputType } from "../../shared/types";
+import type { FormFolder, OutputType, PayloadMapping } from "../../shared/types";
 
 /**
  * In-app event bus (Bun main process). Runs that finish successfully emit
@@ -12,8 +12,12 @@ export interface BusEvent {
   name: string; // e.g. "media:created"
   sourceRunId: string;
   sourceFormSlug: string;
-  /** stdout of the emitting run, plus parsed JSON when its primary output kind is json. */
-  payload: { text: string; json?: unknown };
+  /**
+   * stdout of the emitting run, parsed JSON when its primary output kind is
+   * json, plus file paths it produced (ticket 56) — this is what "piping"
+   * moves between forms instead of a shell pipe.
+   */
+  payload: { text: string; json?: unknown; artifacts: string[] };
   timestamp: number;
 }
 
@@ -41,7 +45,11 @@ export function setAutoSubmitHandler(handler: AutoSubmitHandler): void {
   autoSubmit = handler;
 }
 
-/** (Re)build the event → listeners index from the currently loaded forms. */
+/**
+ * (Re)build the event → listeners index from the currently loaded forms.
+ * Cross-project by design: `forms` spans every registered project, so a form
+ * in one project can listen for an event emitted by a form in another.
+ */
 export function rebuildListenerIndex(forms: FormFolder[]): void {
   listenerIndex.clear();
   for (const folder of forms) {
@@ -71,6 +79,7 @@ export function publishRunEvents(
   emits: string[],
   payloadText: string,
   primaryKind: OutputType,
+  artifacts: string[],
 ): void {
   if (!autoSubmit || emits.length === 0) return;
 
@@ -96,7 +105,7 @@ export function publishRunEvents(
       name,
       sourceRunId: source.runId,
       sourceFormSlug: source.formSlug,
-      payload: { text: payloadText, json },
+      payload: { text: payloadText, json, artifacts },
       timestamp: Date.now(),
     };
     for (const target of targets) {
@@ -107,4 +116,23 @@ export function publishRunEvents(
       autoSubmit(event, target);
     }
   }
+}
+
+/**
+ * Resolves one field's deterministic payload mapping against a triggering
+ * event (ticket 56). Returns undefined when the mapping has nothing to give
+ * (missing JSON path, no artifact at that index) — callers fall back to AI
+ * magic fill rather than writing a wrong value.
+ */
+export function resolvePayloadMapping(mapping: PayloadMapping, event: BusEvent): unknown {
+  if (mapping.kind === "text") return event.payload.text;
+  if (mapping.kind === "artifact") return event.payload.artifacts[mapping.index];
+  // "json": walk a dot-path into the parsed payload.
+  const segments = mapping.path.split(".").filter(Boolean);
+  let cur: unknown = event.payload.json;
+  for (const seg of segments) {
+    if (typeof cur !== "object" || cur === null) return undefined;
+    cur = (cur as Record<string, unknown>)[seg];
+  }
+  return cur;
 }
