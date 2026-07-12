@@ -1,6 +1,8 @@
 import { X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useApp } from "../context/AppContext";
+import Modal from "./Modal";
+import { useUIFeedback } from "./UIFeedback";
 import type { ThreadView } from "../types/forms";
 
 interface Props {
@@ -15,16 +17,8 @@ interface Props {
  */
 export default function ViewSettingsModal({ view, onClose }: Props) {
   const { updateView, deleteView, setActiveView, activeViewId } = useApp();
+  const { confirm, toast } = useUIFeedback();
   const [name, setName] = useState(view.name);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
 
   const commitName = () => {
     const trimmed = name.trim();
@@ -41,8 +35,15 @@ export default function ViewSettingsModal({ view, onClose }: Props) {
     onClose();
   };
 
-  const remove = () => {
+  const remove = async () => {
+    const res = await confirm({
+      title: `Delete view "${view.name}"?`,
+      message: "Its saved filters are gone for good; the runs it showed are untouched.",
+      confirmLabel: "Delete",
+    });
+    if (!res.ok) return;
     deleteView(view.id);
+    toast("View deleted");
     onClose();
   };
 
@@ -50,14 +51,7 @@ export default function ViewSettingsModal({ view, onClose }: Props) {
     "w-full rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30";
 
   return (
-    <div
-      className="absolute inset-0 z-40 flex items-start justify-center bg-black/50 pt-16"
-      onMouseDown={onClose}
-    >
-      <div
-        className="w-[420px] overflow-hidden rounded-lg border border-clide-border bg-clide-panel shadow-2xl"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+    <Modal onClose={onClose} widthClassName="w-[420px]" panelClassName="overflow-hidden">
         <div className="flex items-center justify-between border-b border-clide-border px-5 py-4">
           <span className="text-[14px] font-bold text-white">View settings</span>
           <button
@@ -93,35 +87,14 @@ export default function ViewSettingsModal({ view, onClose }: Props) {
               <span className="text-[11px] text-white/30">Unhide from the project toolbar</span>
             </button>
 
-            {confirmingDelete ? (
-              <div className="flex items-center justify-between rounded-md bg-red-500/10 px-2.5 py-2">
-                <span className="text-[13px] text-red-400">Delete this view?</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setConfirmingDelete(false)}
-                    className="rounded-md px-2.5 py-1 text-[12px] text-white/50 hover:bg-white/5"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={remove}
-                    className="rounded-md bg-red-500/80 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-red-500"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => setConfirmingDelete(true)}
-                className="flex items-center rounded-md px-2.5 py-2 text-left text-[13px] text-red-400/70 hover:bg-red-500/10 hover:text-red-400"
-              >
-                Delete view
-              </button>
-            )}
+            <button
+              onClick={() => void remove()}
+              className="flex items-center rounded-md px-2.5 py-2 text-left text-[13px] text-red-400/70 hover:bg-red-500/10 hover:text-red-400"
+            >
+              Delete view
+            </button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

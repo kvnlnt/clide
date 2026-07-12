@@ -2,6 +2,7 @@ import { Plus, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useFormSearch } from "../hooks/useFormSearch";
+import Modal from "./Modal";
 
 interface RunFormPickerProps {
   onClose: () => void;
@@ -55,18 +56,12 @@ export default function RunFormPicker({ onClose }: RunFormPickerProps) {
     } else if (e.key === "Enter") {
       e.preventDefault();
       choose(active);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
     }
+    // Escape is handled by Modal — window-level, focus-independent.
   };
 
   return (
-    <div className="absolute inset-0 z-40 flex items-start justify-center bg-black/50 pt-24" onMouseDown={onClose}>
-      <div
-        className="w-[480px] overflow-hidden rounded-lg border border-clide-border bg-clide-panel shadow-2xl"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+    <Modal onClose={onClose} widthClassName="w-[480px]" backdropClassName="pt-24" panelClassName="overflow-hidden">
         <button
           onClick={() => choose(createIndex)}
           onMouseEnter={() => setActive(createIndex)}
@@ -108,7 +103,6 @@ export default function RunFormPicker({ onClose }: RunFormPickerProps) {
             </button>
           ))}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

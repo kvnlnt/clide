@@ -117,6 +117,7 @@ export default function FormCardBody({ form, values, onChange, disabled, filling
                 </span>
               )}
             </label>
+            {field.description && <span className="text-[12px] text-white/40">{field.description}</span>}
             <FormField
               field={field}
               value={values[field.id]}

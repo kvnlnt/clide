@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useFormSearch } from "../hooks/useFormSearch";
 import { api } from "../rpc";
+import { useUIFeedback } from "./UIFeedback";
 import type { FormFolder } from "../types/forms";
 
 /**
@@ -26,7 +27,6 @@ export default function FormsPanel() {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
-  const [confirmingSlug, setConfirmingSlug] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const results = useFormSearch(scopedForms, query, recentSlugs);
@@ -108,20 +108,13 @@ export default function FormsPanel() {
                 active={active === i}
                 showProject={!activeProject}
                 editing={editingSlug === form.meta.slug}
-                confirming={confirmingSlug === form.meta.slug}
                 onSelect={() => choose(i)}
                 onHover={() => setActive(i)}
                 onEdit={() => {
                   setEditingSlug((cur) => (cur === form.meta.slug ? null : form.meta.slug));
-                  setConfirmingSlug(null);
-                }}
-                onConfirmDelete={() => {
-                  setConfirmingSlug((cur) => (cur === form.meta.slug ? null : form.meta.slug));
-                  setEditingSlug(null);
                 }}
                 onCloseEditors={() => {
                   setEditingSlug(null);
-                  setConfirmingSlug(null);
                 }}
                 deleteForm={deleteForm}
                 updateFormMeta={updateFormMeta}
@@ -139,11 +132,9 @@ interface FormsPanelRowProps {
   active: boolean;
   showProject: boolean;
   editing: boolean;
-  confirming: boolean;
   onSelect: () => void;
   onHover: () => void;
   onEdit: () => void;
-  onConfirmDelete: () => void;
   onCloseEditors: () => void;
   deleteForm: (projectPath: string, slug: string) => Promise<{ ok: boolean; error?: string }>;
   updateFormMeta: (
@@ -158,26 +149,29 @@ function FormsPanelRow({
   active,
   showProject,
   editing,
-  confirming,
   onSelect,
   onHover,
   onEdit,
-  onConfirmDelete,
   onCloseEditors,
   deleteForm,
   updateFormMeta,
 }: FormsPanelRowProps) {
+  const { confirm, toast } = useUIFeedback();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const remove = async () => {
+    const res = await confirm({
+      title: `Delete form "${form.meta.name}"?`,
+      message: "Files on disk are removed and history cards in the thread lose their form.",
+      confirmLabel: "Delete",
+    });
+    if (!res.ok) return;
     setBusy(true);
-    const res = await deleteForm(form.projectPath, form.meta.slug);
+    const result = await deleteForm(form.projectPath, form.meta.slug);
     setBusy(false);
-    if (!res.ok) {
-      setError(res.error ?? "Delete failed");
-      onCloseEditors();
-    }
+    if (result.ok) toast("Form deleted");
+    else toast(result.error ?? "Delete failed", "error");
   };
 
   return (
@@ -212,9 +206,10 @@ function FormsPanelRow({
           </button>
           <button
             type="button"
-            onClick={onConfirmDelete}
+            disabled={busy}
+            onClick={() => void remove()}
             title="Delete form"
-            className="flex h-6 w-6 items-center justify-center rounded text-red-400/70 hover:bg-white/10 hover:text-red-400"
+            className="flex h-6 w-6 items-center justify-center rounded text-red-400/70 hover:bg-white/10 hover:text-red-400 disabled:opacity-40"
           >
             <Trash2 size={13} />
           </button>
@@ -242,28 +237,6 @@ function FormsPanelRow({
         />
       )}
 
-      {confirming && (
-        <div className="mx-3 mb-2 flex flex-col gap-1.5 rounded-md border border-white/5 bg-clide-surface px-2.5 py-2">
-          <span className="text-[12px] text-white/70">
-            Delete form “{form.meta.name}”? Files on disk are removed and history cards in the thread lose their form.
-          </span>
-          <div className="flex gap-1.5">
-            <button
-              disabled={busy}
-              onClick={() => void remove()}
-              className="rounded-md bg-red-500/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-red-500 disabled:opacity-40"
-            >
-              Delete
-            </button>
-            <button
-              onClick={onCloseEditors}
-              className="rounded-md px-2.5 py-1 text-[11px] text-white/50 hover:bg-white/5"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

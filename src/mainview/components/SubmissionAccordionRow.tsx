@@ -5,7 +5,7 @@ import type {
   OutputType,
   RunRecord,
 } from "../types/forms";
-import FormCardBody from "./FormCardBody";
+import SubmittedSummary from "./SubmittedSummary";
 import OutputBlock from "./output/OutputBlock";
 import StatusIcon from "./statusIcon";
 
@@ -109,12 +109,7 @@ export default function SubmissionAccordionRow({
                 </div>
               )
             ) : (
-              <FormCardBody
-                form={form}
-                values={run.inputs}
-                onChange={() => {}}
-                disabled
-              />
+              <SubmittedSummary form={form} run={run} />
             )
           ) : (
             <div className="py-2 text-[13px] text-white/40">No output yet.</div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import CalendarPage from "./components/CalendarPage";
 import FormsPanel from "./components/FormsPanel";
 import NewFormPage from "./components/NewFormPage";
@@ -9,14 +9,15 @@ import RunFormPicker from "./components/RunFormPicker";
 import SettingsPanel from "./components/SettingsPanel";
 import Sidebar from "./components/Sidebar";
 import Thread from "./components/Thread";
-import ToolsPage from "./components/ToolsPage";
 import TrafficLights from "./components/TrafficLights";
 import ViewsPage from "./components/ViewsPage";
 import ViewSettingsModal from "./components/ViewSettingsModal";
 import ViewToolbar from "./components/ViewToolbar";
 import WelcomeScreen from "./components/WelcomeScreen";
 import WindowControls from "./components/WindowControls";
-import { AppProvider, useApp } from "./context/AppContext";
+import { UIFeedbackLayer, UIFeedbackProvider } from "./components/UIFeedback";
+import { AppProvider, useApp, type ProjectSurface } from "./context/AppContext";
+import { on } from "./rpc";
 
 function Workspace() {
   const {
@@ -49,17 +50,52 @@ function Workspace() {
   // standard cross-browser way to tell Cmd from Ctrl for shortcut purposes.
   const isMac = useMemo(() => /mac/i.test(navigator.platform || navigator.userAgent), []);
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        setProjectSurface("forms");
-        return;
-      }
+  /** Dedupe guard: some platforms deliver both a native menu accelerator and the webview keydown. */
+  const lastActionRef = useRef<{ action: string; at: number }>({ action: "", at: 0 });
 
-      // Browser-style tab navigation is inert while a blocking overlay is open.
+  // Single dispatcher for surface jumps + run picker, shared by the renderer's
+  // keydown handler and the native View menu (which lists these shortcuts).
+  const dispatchViewAction = useCallback(
+    (action: string) => {
       const overlayOpen = newFormOpen || appSettingsOpen || newProjectOpen || viewSettingsOpen;
       if (overlayOpen || !activeProject) return;
+      const now = Date.now();
+      if (lastActionRef.current.action === action && now - lastActionRef.current.at < 400) return;
+      lastActionRef.current = { action, at: now };
+
+      if (action === "view:run-picker") {
+        openRunPicker();
+        return;
+      }
+      // Surface jumps toggle like their toolbar buttons: press again → thread.
+      const surface = action.slice("view:".length) as ProjectSurface;
+      setProjectSurface(projectSurface === surface ? "thread" : surface);
+    },
+    [newFormOpen, appSettingsOpen, newProjectOpen, viewSettingsOpen, activeProject, openRunPicker, setProjectSurface, projectSurface],
+  );
+
+  // Native app-menu clicks (View → Forms/Calendar/…) route through the same dispatcher.
+  useEffect(() => on("menuAction", dispatchViewAction), [dispatchViewAction]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      // All shortcuts are inert while a blocking overlay is open or no project is active.
+      const overlayOpen = newFormOpen || appSettingsOpen || newProjectOpen || viewSettingsOpen;
+      if (overlayOpen || !activeProject) return;
+
+      // ⌘P Forms, ⌘⇧C Calendar, ⌘⇧V Views, ⌘, Settings (plain C/V stay copy/paste).
+      if (e.ctrlKey || e.metaKey) {
+        const key = e.key.toLowerCase();
+        const act = (action: string) => {
+          e.preventDefault();
+          dispatchViewAction(action);
+        };
+        if (key === "p" && !e.shiftKey) return act("view:forms");
+        if (key === "c" && e.shiftKey) return act("view:calendar");
+        if (key === "v" && e.shiftKey) return act("view:views");
+        if (key === ",") return act("view:project-settings");
+        if (key === "k") return act("view:run-picker");
+      }
 
       if (e.ctrlKey && e.key === "Tab") {
         e.preventDefault();
@@ -71,18 +107,12 @@ function Workspace() {
       if (closeChord && e.key.toLowerCase() === "w") {
         e.preventDefault();
         closeActiveTab();
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        openRunPicker();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
-    setProjectSurface,
+    dispatchViewAction,
     newFormOpen,
     appSettingsOpen,
     newProjectOpen,
@@ -90,7 +120,6 @@ function Workspace() {
     activeProject,
     cycleTab,
     closeActiveTab,
-    openRunPicker,
     isMac,
   ]);
 
@@ -101,9 +130,7 @@ function Workspace() {
       </header>
       <div className="flex h-screen text-white">
         <div className="relative flex min-w-0 flex-1 flex-col">
-          {newFormOpen ? (
-            <NewFormPage onClose={closeNewForm} />
-          ) : !activeProject ? (
+          {!activeProject ? (
             <WelcomeScreen />
           ) : activeView ? (
             <>
@@ -115,7 +142,6 @@ function Workspace() {
               <ProjectToolbar />
               {projectSurface === "forms" && <FormsPanel />}
               {projectSurface === "views" && <ViewsPage />}
-              {projectSurface === "tools" && <ToolsPage />}
               {projectSurface === "calendar" && <CalendarPage />}
               {projectSurface === "project-settings" && activeProjectMeta && (
                 <ProjectSettingsPage
@@ -144,6 +170,19 @@ function Workspace() {
         </div>
       )}
 
+      {/* Form creation is a focused, modal activity (ticket 67): the wizard
+          covers the entire window — tab strip and sidebar included — using
+          the same overlay mechanic as Settings above. The workspace stays
+          mounted underneath, untouched on close/create. */}
+      {newFormOpen && (
+        <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg">
+          <div className="flex electrobun-webkit-app-region-drag">
+            <TrafficLights />
+          </div>
+          <NewFormPage onClose={closeNewForm} />
+        </div>
+      )}
+
       {/* NewProjectModal is self-positioned (absolute inset-0); rendering it
           here rather than inside the body pane makes its backdrop dim the
           header/tab strip and sidebar too, not just the body. */}
@@ -153,6 +192,9 @@ function Workspace() {
       {viewSettingsOpen && activeView && (
         <ViewSettingsModal view={activeView} onClose={closeViewSettings} />
       )}
+
+      {/* Confirm dialogs + toasts, above every overlay (z-100/110). */}
+      <UIFeedbackLayer />
     </div>
   );
 }
@@ -160,7 +202,9 @@ function Workspace() {
 function App() {
   return (
     <AppProvider>
-      <Workspace />
+      <UIFeedbackProvider>
+        <Workspace />
+      </UIFeedbackProvider>
     </AppProvider>
   );
 }

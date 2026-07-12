@@ -1,6 +1,6 @@
 import { Eye, EyeOff, Layers, Trash2 } from "lucide-react";
-import { useState } from "react";
 import { useApp } from "../context/AppContext";
+import { useUIFeedback } from "./UIFeedback";
 import { STATUS_META } from "./statusIcon";
 import type { RunStatus, ThreadView, ThreadViewFilters } from "../types/forms";
 
@@ -23,7 +23,7 @@ function filterSummary(filters: ThreadViewFilters): string {
  */
 export default function ViewsPage() {
   const { activeProject, views, setActiveView, updateView, deleteView } = useApp();
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const { confirm, toast } = useUIFeedback();
 
   const open = (view: ThreadView) => {
     if (view.hidden) updateView({ ...view, hidden: false });
@@ -32,9 +32,15 @@ export default function ViewsPage() {
 
   const toggleHidden = (view: ThreadView) => updateView({ ...view, hidden: !view.hidden });
 
-  const remove = (id: string) => {
-    deleteView(id);
-    setConfirmingId(null);
+  const remove = async (view: ThreadView) => {
+    const res = await confirm({
+      title: `Delete view "${view.name}"?`,
+      message: "Its saved filters are gone for good; the runs it showed are untouched.",
+      confirmLabel: "Delete",
+    });
+    if (!res.ok) return;
+    deleteView(view.id);
+    toast("View deleted");
   };
 
   return (
@@ -73,46 +79,26 @@ export default function ViewsPage() {
                 </button>
 
                 <div className="flex shrink-0 items-center gap-1">
-                  {confirmingId === view.id ? (
-                    <>
-                      <span className="mr-1 text-[12px] text-white/50">Delete this view?</span>
-                      <button
-                        onClick={() => remove(view.id)}
-                        className="rounded-md bg-red-500/80 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-red-500"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        onClick={() => setConfirmingId(null)}
-                        className="rounded-md px-2.5 py-1 text-[12px] text-white/50 hover:bg-white/5"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => open(view)}
-                        className="rounded-md px-2.5 py-1 text-[12px] font-medium text-white/70 hover:bg-white/5 hover:text-white"
-                      >
-                        Open
-                      </button>
-                      <button
-                        onClick={() => toggleHidden(view)}
-                        title={view.hidden ? "Show tab" : "Hide tab"}
-                        className="flex h-7 w-7 items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
-                      >
-                        {view.hidden ? <Eye size={13} /> : <EyeOff size={13} />}
-                      </button>
-                      <button
-                        onClick={() => setConfirmingId(view.id)}
-                        title="Delete view"
-                        className="flex h-7 w-7 items-center justify-center rounded-md text-red-400/70 hover:bg-white/10 hover:text-red-400"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </>
-                  )}
+                  <button
+                    onClick={() => open(view)}
+                    className="rounded-md px-2.5 py-1 text-[12px] font-medium text-white/70 hover:bg-white/5 hover:text-white"
+                  >
+                    Open
+                  </button>
+                  <button
+                    onClick={() => toggleHidden(view)}
+                    title={view.hidden ? "Show tab" : "Hide tab"}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
+                  >
+                    {view.hidden ? <Eye size={13} /> : <EyeOff size={13} />}
+                  </button>
+                  <button
+                    onClick={() => void remove(view)}
+                    title="Delete view"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-red-400/70 hover:bg-white/10 hover:text-red-400"
+                  >
+                    <Trash2 size={13} />
+                  </button>
                 </div>
               </div>
             ))}

@@ -38,6 +38,7 @@ function validateField(raw: unknown, index: number): FormField | null {
     id,
     label,
     type,
+    description: typeof raw.description === "string" && raw.description.trim() ? raw.description.trim() : undefined,
     required: raw.required === true,
     options: Array.isArray(raw.options) ? raw.options.filter((o): o is string => typeof o === "string") : undefined,
     argMapping: validateArgMapping(raw.argMapping),
@@ -46,11 +47,12 @@ function validateField(raw: unknown, index: number): FormField | null {
 
 const SYSTEM_PROMPT = [
   "You design a GUI form for CLIDE, which wraps ONE action of an installed CLI tool as a form.",
-  'Follow the Unix philosophy: the form does one thing well. Only include fields for options/positionals relevant to the described action — do not include every flag the tool has.',
+  "The user has stated a goal for the form. Follow the Unix philosophy: the form does one thing well. Only include fields for the options/positionals the stated goal actually needs — do not include every flag the tool has.",
   "Respond ONLY with a single JSON object: { \"fields\": FormField[] } where each FormField is:",
   `{
   "id": string (kebab-case, unique),
   "label": string (human-friendly),
+  "description": string (one short sentence of help text for the user),
   "type": "text" | "textarea" | "select" | "multicheck" | "number" | "file" | "date",
   "required": boolean,
   "options": string[] (only for select/multicheck),
@@ -66,20 +68,25 @@ const SYSTEM_PROMPT = [
 ].join("\n");
 
 /**
- * Drafts a field set for one scoped action of a tool from its distilled
- * ToolSpec (ticket 53/54) — the wizard's AI-assist step. Fully overridable
- * afterward; this only produces a starting point.
+ * Drafts a field set for one scoped action of a tool from the user's stated
+ * goal plus the tool's distilled ToolSpec (tickets 54/61) — the wizard's
+ * AI-assist step. Fully overridable afterward; this only produces a starting
+ * point.
  */
 export async function draftCommandFields(
+  goal: string,
   toolName: string,
   actionName: string,
   spec: ToolSpec,
   service: AIService,
   model: string,
 ): Promise<FormField[]> {
-  const user = [`Tool: ${toolName}`, `Action: ${actionName}`, `Tool spec:\n${JSON.stringify(spec, null, 2)}`].join(
-    "\n\n",
-  );
+  const user = [
+    `The form's goal, as stated by the user: ${goal}`,
+    `Tool: ${toolName}`,
+    `Action: ${actionName}`,
+    `Tool spec:\n${JSON.stringify(spec, null, 2)}`,
+  ].join("\n\n");
   const raw = await complete({ ...service, model }, { system: SYSTEM_PROMPT, user });
   const parsed = extractJson(raw);
   const list = isObject(parsed) && Array.isArray(parsed.fields) ? parsed.fields : [];

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import AutoSizeOutput from "./AutoSizeOutput";
 
 interface JsonNodeProps {
   name: string | null;
@@ -66,11 +67,8 @@ export default function JsonOutput({ text }: JsonOutputProps) {
     return <div className="px-3 py-2 font-mono text-[13px] text-[rgba(255,100,100,0.85)]">Invalid JSON output.</div>;
   }
   return (
-    <div
-      className="clide-scroll resize-y overflow-auto px-3 py-2"
-      style={{ height: 400, minHeight: 120, maxHeight: 1000 }}
-    >
+    <AutoSizeOutput className="px-3 py-2">
       <JsonNode name={null} value={parsed} depth={0} />
-    </div>
+    </AutoSizeOutput>
   );
 }

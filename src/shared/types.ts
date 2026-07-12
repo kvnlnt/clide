@@ -118,6 +118,8 @@ export interface FormField {
   id: string;
   label: string;
   type: FieldType;
+  /** User-facing help text shown under the label on the form card (ticket 61). */
+  description?: string;
   placeholder?: string;
   required?: boolean;
   options?: string[];
@@ -196,6 +198,12 @@ export interface ToolRegistryEntry {
   inspectedAt?: string;
   /** Which AI service + model produced `spec`. */
   inspectedWith?: { serviceId: string; model: string };
+  /**
+   * Version fingerprint captured at inspection time (ticket 60): the first
+   * line of `--version` output when the tool has one, else the binary's
+   * size+mtime. A mismatch on later use flags the cached spec as stale.
+   */
+  fingerprint?: string;
   /** Set when the executable was last found missing at resolve time; never touches the entry's persistence. */
   missing?: boolean;
   /**
@@ -519,20 +527,49 @@ export type ClideRPC = {
         params: { id: string; name?: string };
         response: { ok: boolean; entry?: ToolRegistryEntry; error?: string };
       };
-      removeTool: { params: { id: string }; response: void };
+      /** `deleteBinary` also removes the copied executable for custom installs (ticket 58); ignored otherwise. */
+      removeTool: { params: { id: string; deleteBinary?: boolean }; response: void };
       /** Drag-and-drop registration (ticket 55): copies the dropped bytes into CLIDE's own storage and chmods +x. */
       registerDroppedTool: {
         params: { fileName: string; base64: string };
         response: { ok: boolean; entry?: ToolRegistryEntry; error?: string };
       };
+      /** Native file dialog for picking a single file (ticket 58's custom-tool install). */
+      chooseFile: {
+        params: { startingFolder?: string };
+        response: string | null;
+      };
+      /** Picker-path custom-tool install (ticket 58): main process reads the bytes directly, no base64 round-trip. */
+      installToolFromPath: {
+        params: { path: string };
+        response: { ok: boolean; entry?: ToolRegistryEntry; error?: string };
+      };
 
-      // Form creation wizard (ticket 54) --------------------------------------
+      // Form creation wizard (tickets 54, 59-61) ------------------------------
       suggestTools: {
         params: { query: string; serviceId: string; model: string };
         response: { ok: boolean; suggestions?: string[]; error?: string };
       };
+      /** Models offered for a service's model select (ticket 59): live-queried for local kinds, curated for hosted. */
+      listServiceModels: {
+        params: { serviceId: string };
+        response: { ok: boolean; models?: string[]; error?: string };
+      };
+      /** Compares a registry entry's stored version fingerprint to the binary's current one (ticket 60). */
+      checkToolFreshness: {
+        params: { id: string };
+        response: { ok: boolean; stale?: boolean; entry?: ToolRegistryEntry; error?: string };
+      };
       draftCommandFields: {
-        params: { toolName: string; actionName: string; spec: ToolSpec; serviceId: string; model: string };
+        params: {
+          /** The user's step-1 statement of what the form should do — scopes which options matter (ticket 61). */
+          goal: string;
+          toolName: string;
+          actionName: string;
+          spec: ToolSpec;
+          serviceId: string;
+          model: string;
+        };
         response: { ok: boolean; fields?: FormField[]; error?: string };
       };
       createCommandForm: {
@@ -607,6 +644,8 @@ export type ClideRPC = {
       onFormsChanged: { forms: FormFolder[] };
       onOutputChunk: OutputChunk;
       onRunStatus: RunStatusUpdate;
+      /** Native application-menu item clicked (e.g. View → Forms); action is a `view:*` id. */
+      onMenuAction: { action: string };
     };
   }>;
 };

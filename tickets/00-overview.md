@@ -102,6 +102,25 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 54  | Form Creation Wizard                  | Chat tool-finder (service+model pick), AI-drafted fields, fully manual fine-tuning      | ✅ Done¹      |
 | 55  | Drag-Drop Tool Registration           | Drop an executable to register it; consent-gated inspection or pasted help docs         | ✅ Done       |
 | 56  | Event-Bus Flows                       | Payloads carry artifacts; deterministic payload→field mapping; chains visible in thread | ✅ Done²      |
+| 57  | Tools Management into Settings        | Tools manager leaves the project toolbar; renders as a Settings section under AI Services | ✅ Done       |
+| 58  | Install Custom CLI Tool               | Upload an executable via file picker; copy kept in app config storage; only needs --help | ✅ Done       |
+| 59  | Wizard Step 1: Goal-First Describe    | Goal description box first, service+model (select) second; tool sections move to step 2  | ✅ Done       |
+| 60  | Wizard Step 2: Tool Choice & Cache    | Candidate tools from cached registry + AI; version-aware re-inspection; drop zone here   | ✅ Done       |
+| 61  | Wizard Step 3: Fields CRUD            | Auto-drafted from goal; label/description/type/optional + per-field CLI cell; preview top | ✅ Done       |
+| 62  | Wizard Step 4: Remove Effects         | Effects rows leave the outputs editor; output kinds + events only; legacy forms still load | ✅ Done       |
+| 63  | Wizard Step Header Navigation         | Clickable 4-step indicator in the wizard header; any reachable step is one click away     | ✅ Done       |
+| 64  | Step 3 Field Editor Cards             | Unlabeled widget rows become labeled cards: named controls, accordion, empty-label guard  | ✅ Done       |
+| 65  | Plain-Language Field Mapping          | Map fields by picking the tool's real options from its spec, phrased in user terms        | ✅ Done       |
+| 66  | Step 3 Live Form Preview              | Interactive "how it will look" pane using the real form components; sample values feed CLI | ✅ Done       |
+| 67  | Wizard Full-Window Takeover           | Form creation covers the entire window like Settings — no tab strip/sidebar distractions  | ✅ Done       |
+| 68  | Settings Scroll Fix                   | Expanded settings content runs off-screen unscrollably — min-h-0 flex chain repair        | ✅ Done       |
+| 69  | Calendar Day Scheduling               | Click a day → pick a form, fill its fields, scheduled for that date; composer below grid  | ✅ Done       |
+| 70  | Surface Jump Shortcuts                | ⌘⇧C Calendar, ⌘⇧V Views, ⌘, Settings — toggling like their toolbar buttons; ⌘P guard fix  | ✅ Done       |
+| 71  | Submitted Summary, No Code Tab        | Code tab removed; Submitted shows a friendly value list + the command line that ran       | ✅ Done       |
+| 72  | Auto-Size Result Outputs              | Text/JSON/table results hug content up to 400px, scroll beyond; resize handle still works | ✅ Done       |
+| 73  | Native View Menu                      | App menu-bar View menu lists the surface shortcuts (⌘P, ⌘⇧C, ⌘⇧V, ⌘,, ⌘K) and triggers them | ✅ Done       |
+| 74  | Calendar Modals, Confirms & Toasts    | Composer/editor become modals; all confirmations are popup dialogs; results shown as toasts | ✅ Done       |
+| 75  | Escape Always Closes Modals           | Shared Modal component + window-level Escape hook; all modals converted, pattern enforced   | ✅ Done       |
 
 ¹ Ticket 54: create flow (all 4 steps) is complete; reopening the wizard to
   edit an existing command-backed form (section 5) is not wired — "Edit" on

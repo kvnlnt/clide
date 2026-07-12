@@ -1,4 +1,4 @@
-import { Braces, Code, Eye, Zap } from "lucide-react";
+import { Braces, Eye, Zap } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import type { FormDefinition, FormMeta, RunRecord, RunStatus } from "../types/forms";
 import EllipsisMenu from "./EllipsisMenu";
@@ -7,7 +7,6 @@ import { STATUS_META, STATUS_ORDER } from "./statusIcon";
 const TABS = [
   { id: "results", label: "Results", icon: Eye },
   { id: "submitted", label: "Submitted", icon: Braces },
-  { id: "code", label: "Code", icon: Code },
 ] as const;
 
 interface FormCardHeaderProps {
@@ -29,8 +28,8 @@ interface FormCardHeaderProps {
   onDelete: () => void;
   onUndo: () => void;
   showTabs?: boolean;
-  activeTab?: "results" | "submitted" | "code";
-  onTabChange?: (tab: "results" | "submitted" | "code") => void;
+  activeTab?: "results" | "submitted";
+  onTabChange?: (tab: "results" | "submitted") => void;
 }
 
 function formatTime(iso: string | null): string {

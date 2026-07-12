@@ -92,3 +92,31 @@ function quoteToken(token: string): string {
 export function formatCommandPreview(tool: string, argv: string[]): string {
   return [tool, ...argv].map(quoteToken).join(" ");
 }
+
+/**
+ * Human-readable rendering of what ONE field contributes to the invocation,
+ * with `<Label>` standing in for the value — e.g. `--width <Width>`,
+ * `<Input file>`, `WIDTH=<Width>`, `piped to stdin` (ticket 61). Uses the
+ * same mapping semantics as `buildCommand` so the wizard's per-field cell
+ * can't drift from what actually runs.
+ */
+export function describeFieldMapping(field: FormField): string {
+  const mapping = field.argMapping;
+  if (!mapping) return "not passed to the command";
+  const placeholder = `<${field.label.trim() || field.id}>`;
+  const flag = mapping.flag ?? `--${field.id}`;
+  switch (mapping.kind) {
+    case "flag":
+      return flag;
+    case "option": {
+      const one = mapping.style === "equals" ? `${flag}=${placeholder}` : `${flag} ${placeholder}`;
+      return mapping.repeat ? `${one} (repeated per value)` : one;
+    }
+    case "positional":
+      return mapping.repeat ? `${placeholder} …` : placeholder;
+    case "env":
+      return `${mapping.envName ?? field.id.toUpperCase()}=${placeholder}`;
+    case "stdin":
+      return "piped to stdin";
+  }
+}

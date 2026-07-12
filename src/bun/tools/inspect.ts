@@ -1,4 +1,4 @@
-import { realpathSync } from "node:fs";
+import { realpathSync, statSync } from "node:fs";
 
 const HELP_TIMEOUT_MS = 4000;
 const MAX_HELP_CHARS = 64 * 1024;
@@ -102,4 +102,28 @@ export async function captureHelp(execPath: string): Promise<HelpCapture | null>
   }
 
   return null;
+}
+
+/**
+ * Version fingerprint for cache invalidation (ticket 60): the first line of
+ * `--version` when the tool has one (same safety rails as help capture),
+ * else the binary's size+mtime. Pass `allowExec: false` when the user has
+ * never consented to executing this binary — the stat-based fingerprint is
+ * used alone then. Never throws; a fingerprint of last resort is always
+ * produced so freshness checks can't block.
+ */
+export async function captureFingerprint(execPath: string, allowExec = true): Promise<string> {
+  if (allowExec) {
+    const result = await runCapture([execPath, "--version"]);
+    const firstLine = result?.text.split("\n")[0]?.trim();
+    if (firstLine && firstLine.length > 0 && firstLine.length <= 200) {
+      return `v:${firstLine}`;
+    }
+  }
+  try {
+    const st = statSync(execPath);
+    return `f:${st.size}-${st.mtimeMs}`;
+  } catch {
+    return "f:unknown";
+  }
 }

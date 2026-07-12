@@ -1,6 +1,9 @@
-import { ChevronLeft, ChevronRight, Play, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, Plus, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
+import CalendarComposer from "./CalendarComposer";
+import Modal from "./Modal";
+import { useUIFeedback } from "./UIFeedback";
 import type { RepeatInterval, RunRecord } from "../types/forms";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -60,8 +63,21 @@ function projectOccurrences(run: RunRecord, rangeStart: Date, rangeEnd: Date): D
 
 export default function CalendarPage() {
   const { activeProject, runs, formsBySlug, updateScheduledRun, runScheduledNow, deleteRun } = useApp();
+  const { confirm, toast } = useUIFeedback();
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** Day being composed for (ticket 69). Composer and ScheduleDetail are mutually exclusive. */
+  const [composeDate, setComposeDate] = useState<Date | null>(null);
+
+  const openComposer = (day: Date) => {
+    setSelectedId(null);
+    setComposeDate(day);
+  };
+
+  const openDetail = (runId: string) => {
+    setComposeDate(null);
+    setSelectedId(runId);
+  };
 
   const scheduled = useMemo(
     () => runs.filter((r) => r.status === "scheduled" && formsBySlug.get(r.formSlug)?.meta.project === activeProject),
@@ -138,18 +154,31 @@ export default function CalendarPage() {
             return (
               <div
                 key={day.toISOString()}
-                className={`flex min-h-[92px] flex-col gap-1 bg-clide-bg p-1.5 ${inMonth ? "" : "opacity-40"}`}
+                onClick={() => openComposer(day)}
+                className={`group flex min-h-[92px] cursor-pointer flex-col gap-1 bg-clide-bg p-1.5 hover:bg-white/[0.02] ${inMonth ? "" : "opacity-40"}`}
               >
-                <span
-                  className={`text-[11px] ${isSameDay(day, new Date()) ? "font-bold text-white" : "text-white/40"}`}
-                >
-                  {day.getDate()}
+                <span className="flex items-center justify-between">
+                  <span
+                    className={`text-[11px] ${isSameDay(day, new Date()) ? "font-bold text-white" : "text-white/40"}`}
+                  >
+                    {day.getDate()}
+                  </span>
+                  {/* Hover affordance (ticket 69): schedule a form for this day. */}
+                  <span
+                    title="Schedule a form for this day"
+                    className="flex h-4 w-4 items-center justify-center rounded text-white/40 opacity-0 transition-opacity group-hover:opacity-100"
+                  >
+                    <Plus size={11} />
+                  </span>
                 </span>
                 {visible.map((chip) => (
                   <button
                     key={chip.key}
                     disabled={chip.projected}
-                    onClick={() => setSelectedId(chip.run.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDetail(chip.run.id);
+                    }}
                     title={`${formsBySlug.get(chip.run.formSlug)?.meta.name ?? chip.run.formSlug} — ${chip.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
                     className={`truncate rounded px-1.5 py-0.5 text-left text-[11px] ${
                       chip.projected
@@ -167,6 +196,8 @@ export default function CalendarPage() {
           })}
         </div>
 
+        {composeDate && <CalendarComposer date={composeDate} onClose={() => setComposeDate(null)} />}
+
         {selected && (
           <ScheduleDetail
             run={selected}
@@ -174,21 +205,33 @@ export default function CalendarPage() {
             onClose={() => setSelectedId(null)}
             onSave={async (scheduledAt, repeat) => {
               await updateScheduledRun(selected.id, scheduledAt, repeat);
+              toast("Schedule updated");
+              setSelectedId(null);
             }}
             onRunNow={async () => {
               await runScheduledNow(selected.id);
+              toast("Run started");
               setSelectedId(null);
             }}
             onCancel={async () => {
+              const name = formsBySlug.get(selected.formSlug)?.meta.name ?? selected.formSlug;
+              const res = await confirm({
+                title: "Cancel this scheduled run?",
+                message: `"${name}" will no longer run${selected.repeatInterval && selected.repeatInterval !== "none" ? ", including future repeats" : ""}.`,
+                confirmLabel: "Cancel run",
+                cancelLabel: "Keep it",
+              });
+              if (!res.ok) return;
               await deleteRun(selected.id);
+              toast("Schedule cancelled");
               setSelectedId(null);
             }}
           />
         )}
 
-        {scheduled.length === 0 && (
+        {scheduled.length === 0 && !composeDate && (
           <div className="mt-6 text-center text-[13px] text-white/30">
-            Nothing scheduled. Schedule a run from a form's ⋯ menu.
+            Nothing scheduled. Click a day to schedule a form, or use a form's ⋯ menu.
           </div>
         )}
       </div>
@@ -227,7 +270,12 @@ function ScheduleDetail({ run, formName, onClose, onSave, onRunNow, onCancel }: 
   };
 
   return (
-    <div className="mt-4 flex flex-col gap-3 rounded-md border border-clide-border bg-clide-panel p-4">
+    // Modal over the body pane (tickets 74/75) — matches the composer's presentation.
+    <Modal
+      onClose={onClose}
+      widthClassName="w-[520px]"
+      panelClassName="clide-scroll flex max-h-[85%] flex-col gap-3 overflow-y-auto p-5"
+    >
       <div className="flex items-center justify-between">
         <span className="text-[14px] font-bold text-white">{formName}</span>
         <button onClick={onClose} className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white">
@@ -273,6 +321,6 @@ function ScheduleDetail({ run, formName, onClose, onSave, onRunNow, onCancel }: 
           <Trash2 size={13} /> Cancel
         </button>
       </div>
-    </div>
+    </Modal>
   );
 }

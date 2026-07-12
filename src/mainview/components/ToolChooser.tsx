@@ -1,0 +1,418 @@
+import { AlertTriangle, Check, RefreshCw, Search, Sparkles, Terminal, Wrench } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../rpc";
+import ToolDropZone, { fileToBase64 } from "./ToolDropZone";
+import type { ServiceModelValue } from "./ServiceModelPicker";
+import type { ToolRegistryEntry } from "../types/forms";
+
+const inputBase =
+  "rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30";
+
+/** A tool the user can pick: a registry entry, or an installed-but-unregistered AI suggestion. */
+interface Candidate {
+  key: string;
+  entry?: ToolRegistryEntry;
+  /** For unregistered suggestions: the bare name and its resolved path. */
+  name: string;
+  execPath: string;
+  suggested: boolean;
+}
+
+interface Props {
+  /** The user's step-1 goal — seeds the AI suggestions and registry matching. */
+  goal: string;
+  /** Session service+model (picked in step 1) — used for suggestion + inspection calls. */
+  serviceModel: ServiceModelValue;
+  selected: ToolRegistryEntry | null;
+  onSelect: (tool: ToolRegistryEntry | null) => void;
+}
+
+/** Loose goal→tool matching over the cached registry: any goal word appearing in the name or description. */
+function matchesGoal(entry: ToolRegistryEntry, goal: string): boolean {
+  const words = goal.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4);
+  if (words.length === 0) return false;
+  const hay = `${entry.name} ${entry.spec?.description ?? ""}`.toLowerCase();
+  return words.some((w) => hay.includes(w));
+}
+
+/**
+ * Wizard step 2 (ticket 60): specify or OK the tool. Candidates come from
+ * the cached registry (no AI calls for known tools) plus goal-seeded AI
+ * suggestions verified installed; inline consent-gated registration for
+ * unknown ones; version-aware staleness on cached specs; search, manual
+ * resolve, and drag-and-drop as the always-available manual paths.
+ */
+export default function ToolChooser({ goal, serviceModel, selected, onSelect }: Props) {
+  const [registry, setRegistry] = useState<ToolRegistryEntry[]>([]);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [suggestBusy, setSuggestBusy] = useState(false);
+
+  const [search, setSearch] = useState("");
+  const [manualInput, setManualInput] = useState("");
+  const [manualBusy, setManualBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /** Unregistered pick awaiting the register/inspect decision. */
+  const [pendingPick, setPendingPick] = useState<{ name: string; execPath: string } | null>(null);
+  const [inspectBusy, setInspectBusy] = useState(false);
+
+  /** Set when the selected cached entry's binary changed since inspection (ticket 60). */
+  const [stale, setStale] = useState(false);
+  const [reinspectBusy, setReinspectBusy] = useState(false);
+
+  const suggestedForGoal = useRef<string | null>(null);
+
+  // Assemble candidates: registry matches immediately, AI suggestions layered in once.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const tools = await api.listTools();
+      if (cancelled) return;
+      setRegistry(tools);
+
+      const fromRegistry: Candidate[] = tools
+        .filter((t) => matchesGoal(t, goal))
+        .map((t) => ({ key: t.id, entry: t, name: t.name, execPath: t.execPath, suggested: false }));
+      setCandidates(fromRegistry);
+
+      if (!serviceModel.serviceId || suggestedForGoal.current === goal) return;
+      suggestedForGoal.current = goal;
+      setSuggestBusy(true);
+      const res = await api.suggestTools(goal, serviceModel.serviceId, serviceModel.model);
+      if (cancelled) return;
+      setSuggestBusy(false);
+      if (!res.ok || !res.suggestions) return;
+
+      const additions: Candidate[] = [];
+      for (const name of res.suggestions) {
+        const resolved = await api.resolveTool(name);
+        if (!resolved.ok || !resolved.execPath) continue;
+        const registered = tools.find((t) => t.execPath === resolved.execPath);
+        additions.push(
+          registered
+            ? { key: registered.id, entry: registered, name: registered.name, execPath: registered.execPath, suggested: true }
+            : { key: `path:${resolved.execPath}`, name, execPath: resolved.execPath, suggested: true },
+        );
+      }
+      if (cancelled) return;
+      setCandidates((prev) => {
+        const merged = [...prev];
+        for (const add of additions) {
+          const existing = merged.findIndex((c) => c.execPath === add.execPath);
+          if (existing >= 0) merged[existing] = { ...merged[existing]!, suggested: true };
+          else merged.push(add);
+        }
+        return merged;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goal, serviceModel.serviceId]);
+
+  /** Reflects a fresh/updated registry entry into every local list so cards don't show stale info. */
+  const mergeEntry = (entry: ToolRegistryEntry) => {
+    setRegistry((prev) => [...prev.filter((t) => t.id !== entry.id), entry]);
+    setCandidates((prev) =>
+      prev.map((c) =>
+        c.execPath === entry.execPath ? { ...c, key: entry.id, entry, name: entry.name } : c,
+      ),
+    );
+  };
+
+  /** Picks a registered entry: freshness-check cached specs so stale info is flagged, not silently reused. */
+  const pickEntry = async (entry: ToolRegistryEntry) => {
+    setPendingPick(null);
+    setStale(false);
+    onSelect(entry);
+    if (!entry.spec) return;
+    const res = await api.checkToolFreshness(entry.id);
+    if (res.ok && res.entry) {
+      if (res.stale) setStale(true);
+      mergeEntry(res.entry);
+      onSelect(res.entry);
+    }
+  };
+
+  /** Picks an unregistered candidate: user decides between bare registration and consent-gated inspection. */
+  const pickUnregistered = (name: string, execPath: string) => {
+    onSelect(null);
+    setStale(false);
+    setError(null);
+    setPendingPick({ name, execPath });
+  };
+
+  const registerBare = async () => {
+    if (!pendingPick) return;
+    setManualBusy(true);
+    const res = await api.registerTool(pendingPick.execPath, pendingPick.name, "discovered");
+    setManualBusy(false);
+    if (!res.ok || !res.entry) {
+      setError(res.error ?? "Could not register that tool.");
+      return;
+    }
+    setPendingPick(null);
+    mergeEntry(res.entry);
+    onSelect(res.entry);
+  };
+
+  const inspectAndPick = async () => {
+    if (!pendingPick || !serviceModel.serviceId) return;
+    setInspectBusy(true);
+    setError(null);
+    const res = await api.inspectTool(
+      pendingPick.execPath,
+      pendingPick.name,
+      "discovered",
+      serviceModel.serviceId,
+      serviceModel.model,
+    );
+    setInspectBusy(false);
+    if (!res.ok || !res.entry) {
+      setError(res.error ?? "Inspection failed.");
+      return;
+    }
+    setPendingPick(null);
+    mergeEntry(res.entry);
+    onSelect(res.entry);
+  };
+
+  const reinspectStale = async () => {
+    if (!selected || !serviceModel.serviceId) return;
+    setReinspectBusy(true);
+    const res = await api.inspectTool(
+      selected.execPath,
+      selected.name,
+      selected.source,
+      serviceModel.serviceId,
+      serviceModel.model,
+    );
+    setReinspectBusy(false);
+    if (res.ok && res.entry) {
+      setStale(false);
+      mergeEntry(res.entry);
+      onSelect(res.entry);
+    }
+  };
+
+  const resolveManual = async (nameOrPath: string) => {
+    const trimmed = nameOrPath.trim();
+    if (!trimmed) return;
+    setManualBusy(true);
+    setError(null);
+    const res = await api.resolveTool(trimmed);
+    setManualBusy(false);
+    if (!res.ok || !res.execPath) {
+      setError(res.error ?? "Could not resolve that tool.");
+      return;
+    }
+    const registered = registry.find((t) => t.execPath === res.execPath);
+    if (registered) void pickEntry(registered);
+    else pickUnregistered(trimmed, res.execPath);
+  };
+
+  // Drag-and-drop a custom executable (tickets 55/60): auto-registers, then joins as the selection.
+  const handleDrop = async (files: File[]) => {
+    const file = files[0];
+    if (!file) return;
+    setManualBusy(true);
+    setError(null);
+    const base64 = await fileToBase64(file);
+    const res = await api.registerDroppedTool(file.name, base64);
+    setManualBusy(false);
+    if (!res.ok || !res.entry) {
+      setError(res.error ?? `Could not register ${file.name}`);
+      return;
+    }
+    mergeEntry(res.entry);
+    // Custom tool with no spec yet — offer inspection before use, consent-gated.
+    pickUnregistered(res.entry.name, res.entry.execPath);
+    onSelect(res.entry);
+  };
+
+  const searchResults =
+    search.trim() === ""
+      ? []
+      : registry.filter((t) => t.name.toLowerCase().includes(search.trim().toLowerCase()));
+
+  return (
+    <ToolDropZone onFiles={(files) => void handleDrop(files)} className="flex flex-col gap-4">
+      {/* Candidates */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-1.5 text-[13px] font-medium text-white/70">
+          <Sparkles size={13} className="text-amber-300/70" />
+          Suggested for your goal
+          {suggestBusy && <span className="text-[12px] font-normal text-white/30">— asking the AI…</span>}
+        </div>
+        {candidates.length === 0 && !suggestBusy && (
+          <div className="text-[13px] text-white/30">
+            No matches yet — search below, type a name, or drop an executable in.
+          </div>
+        )}
+        <div className="flex flex-col gap-1.5">
+          {candidates.map((c) => {
+            const isSelected = selected ? selected.execPath === c.execPath : pendingPick?.execPath === c.execPath;
+            return (
+              <button
+                key={c.key}
+                onClick={() => (c.entry ? void pickEntry(c.entry) : pickUnregistered(c.name, c.execPath))}
+                className={`flex items-start gap-2.5 rounded-lg border p-3 text-left transition-colors ${
+                  isSelected
+                    ? "border-white/30 bg-white/10"
+                    : "border-clide-border bg-clide-surface hover:border-white/20"
+                }`}
+              >
+                <span
+                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                    isSelected ? "bg-green-500/20 text-green-400" : "bg-white/5 text-white/20"
+                  }`}
+                >
+                  {isSelected ? <Check size={12} /> : <Wrench size={11} />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate text-[14px] text-white">{c.name}</span>
+                    {c.entry && (
+                      <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] uppercase text-white/40">
+                        {c.entry.source}
+                      </span>
+                    )}
+                    {!c.entry && (
+                      <span className="shrink-0 rounded-full bg-amber-400/10 px-1.5 py-0.5 text-[10px] uppercase text-amber-300/70">
+                        not registered
+                      </span>
+                    )}
+                    {c.suggested && (
+                      <Sparkles size={11} className="shrink-0 text-amber-300/50" aria-label="AI-suggested" />
+                    )}
+                  </span>
+                  <span className="block truncate text-[12px] text-white/40">
+                    {c.entry?.spec?.description || c.execPath}
+                  </span>
+                  {c.entry?.inspectedAt && (
+                    <span className="block text-[11px] text-white/25">
+                      Inspected {new Date(c.entry.inspectedAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Stale cache banner (ticket 60) */}
+      {selected && stale && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-400/5 px-3 py-2">
+          <RefreshCw size={13} className="shrink-0 text-amber-300" />
+          <span className="min-w-0 flex-1 text-[12px] text-amber-200">
+            {selected.name} changed since it was inspected — its cached info may be outdated.
+          </span>
+          {serviceModel.serviceId && (
+            <button
+              onClick={() => void reinspectStale()}
+              disabled={reinspectBusy}
+              className="shrink-0 rounded-md bg-amber-400/80 px-2.5 py-1 text-[12px] font-medium text-black hover:bg-amber-400 disabled:opacity-40"
+            >
+              {reinspectBusy ? "Re-inspecting…" : "Re-inspect"}
+            </button>
+          )}
+          <button
+            onClick={() => setStale(false)}
+            className="shrink-0 rounded-md px-2 py-1 text-[12px] text-white/50 hover:bg-white/5"
+          >
+            Keep cached
+          </button>
+        </div>
+      )}
+
+      {/* Register/inspect decision for an unregistered pick */}
+      {pendingPick && (
+        <div className="flex flex-col gap-2 rounded-lg border border-clide-border bg-clide-surface p-3">
+          <div className="text-[13px] text-white/70">
+            Use <span className="font-mono text-white">{pendingPick.execPath}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => void registerBare()}
+              disabled={manualBusy}
+              className="rounded-md px-3 py-1.5 text-[13px] text-white/70 hover:bg-white/5 hover:text-white disabled:opacity-40"
+            >
+              Use without inspecting
+            </button>
+            {serviceModel.serviceId && (
+              <div className="flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-400/5 px-2.5 py-1.5">
+                <AlertTriangle size={13} className="shrink-0 text-amber-300" />
+                <span className="text-[12px] text-amber-200">
+                  Inspecting runs <span className="font-mono">--help</span>
+                </span>
+                <button
+                  onClick={() => void inspectAndPick()}
+                  disabled={inspectBusy}
+                  className="shrink-0 rounded-md bg-amber-400/80 px-2.5 py-1 text-[12px] font-medium text-black hover:bg-amber-400 disabled:opacity-40"
+                >
+                  {inspectBusy ? "Running…" : "Inspect with AI"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {error && <span className="text-[12px] text-red-400">{error}</span>}
+
+      {/* Manual paths — always available, AI never gates. */}
+      <div className="flex flex-col gap-2 border-t border-clide-border pt-4">
+        <div className="flex items-center gap-1.5 text-[13px] font-medium text-white/70">
+          <Search size={13} className="text-white/40" />
+          Search registered tools
+        </div>
+        <input
+          className={inputBase}
+          placeholder="Search…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {searchResults.length > 0 && (
+          <div className="clide-scroll flex max-h-40 flex-col gap-0.5 overflow-y-auto">
+            {searchResults.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => void pickEntry(t)}
+                className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-[13px] text-white/70 hover:bg-white/5 hover:text-white"
+              >
+                <Wrench size={12} className="shrink-0 text-white/30" />
+                <span className="truncate">{t.name}</span>
+                <span className="truncate text-[11px] text-white/30">{t.spec?.description}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-1 flex items-center gap-1.5 text-[13px] font-medium text-white/70">
+          <Terminal size={13} className="text-white/40" />
+          Or type an executable name / path — or drag one in
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            className={`${inputBase} min-w-0 flex-1`}
+            placeholder="ffmpeg, /usr/local/bin/mytool…"
+            value={manualInput}
+            onChange={(e) => setManualInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void resolveManual(manualInput);
+            }}
+          />
+          <button
+            onClick={() => void resolveManual(manualInput)}
+            disabled={manualBusy || !manualInput.trim()}
+            className="shrink-0 rounded-md bg-white/10 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-white/20 disabled:opacity-40"
+          >
+            {manualBusy ? "Resolving…" : "Resolve"}
+          </button>
+        </div>
+      </div>
+    </ToolDropZone>
+  );
+}

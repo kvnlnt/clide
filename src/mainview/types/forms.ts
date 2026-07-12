@@ -51,5 +51,5 @@ export {
 
 // Pure command builder/preview — shared by the runner and the UI so the
 // preview shown always matches what will actually execute (ticket 52).
-export { buildCommand, formatCommandPreview } from "../../shared/command";
+export { buildCommand, describeFieldMapping, formatCommandPreview } from "../../shared/command";
 export type { BuiltCommand } from "../../shared/command";

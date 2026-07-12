@@ -91,6 +91,7 @@ function validateField(raw: unknown): FormField | null {
     id: raw.id,
     label: raw.label,
     type,
+    description: typeof raw.description === "string" && raw.description.trim() ? raw.description : undefined,
     placeholder: typeof raw.placeholder === "string" ? raw.placeholder : undefined,
     required: raw.required === true,
     options: Array.isArray(raw.options) ? raw.options.filter((o): o is string => typeof o === "string") : undefined,

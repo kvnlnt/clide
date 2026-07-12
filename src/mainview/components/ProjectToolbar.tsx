@@ -1,4 +1,4 @@
-import { CalendarDays, FileText, Layers, Play, Settings, Wrench } from "lucide-react";
+import { CalendarDays, FileText, Layers, Play, Settings } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import Toolbar from "./Toolbar";
 
@@ -23,6 +23,7 @@ export default function ProjectToolbar() {
       </button>
       <button
         onClick={() => setProjectSurface(projectSurface === "calendar" ? "thread" : "calendar")}
+        title="Calendar (⌘⇧C)"
         className={`${btnBase} ${projectSurface === "calendar" ? btnActive : btnInactive}`}
       >
         <CalendarDays size={13} />
@@ -30,6 +31,7 @@ export default function ProjectToolbar() {
       </button>
       <button
         onClick={() => setProjectSurface(projectSurface === "forms" ? "thread" : "forms")}
+        title="Forms (⌘P)"
         className={`${btnBase} ${projectSurface === "forms" ? btnActive : btnInactive}`}
       >
         <FileText size={13} />
@@ -37,20 +39,15 @@ export default function ProjectToolbar() {
       </button>
       <button
         onClick={() => setProjectSurface(projectSurface === "views" ? "thread" : "views")}
+        title="Views (⌘⇧V)"
         className={`${btnBase} ${projectSurface === "views" ? btnActive : btnInactive}`}
       >
         <Layers size={13} />
         Views
       </button>
       <button
-        onClick={() => setProjectSurface(projectSurface === "tools" ? "thread" : "tools")}
-        className={`${btnBase} ${projectSurface === "tools" ? btnActive : btnInactive}`}
-      >
-        <Wrench size={13} />
-        Tools
-      </button>
-      <button
         onClick={() => setProjectSurface(projectSurface === "project-settings" ? "thread" : "project-settings")}
+        title="Project settings (⌘,)"
         className={`${btnBase} ${projectSurface === "project-settings" ? btnActive : btnInactive}`}
       >
         <Settings size={13} />

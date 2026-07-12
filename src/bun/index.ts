@@ -1,9 +1,8 @@
 import { ApplicationMenu, BrowserView, BrowserWindow, Updater, Utils } from "electrobun/bun";
-import { createHash } from "node:crypto";
-import { rmSync } from "node:fs";
+import { rmSync, statSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
 import type { ClideRPC, OutputChunk, Project, RunStatusUpdate, ToolRegistryEntry, ToolSource } from "../shared/types";
-import { getAIService, listAIServices, saveAIServices, testAIService } from "./ai/aiServices";
+import { getAIService, listAIServices, listServiceModels, saveAIServices, testAIService } from "./ai/aiServices";
 import { hasCredential, saveCredential } from "./ai/credentials";
 import { draftFormSpec, generateForm, generateFormFromSpec, runDependencyCheck } from "./ai/formGenerator";
 import { fillMagicFields } from "./ai/magicFill";
@@ -29,15 +28,14 @@ import { writeCommandForm, writeForm } from "./forms/writer";
 import { formDir, projectFormsDir } from "./paths";
 import { cancelRun, startRun, type RunEmitters } from "./runner/execute";
 import { cancelScheduled, disposeScheduler, initScheduler, rescheduleRun, runScheduledNow, schedule } from "./scheduler";
-import { captureHelp, resolveTool as resolveToolPath } from "./tools/inspect";
+import { captureFingerprint, captureHelp, resolveTool as resolveToolPath } from "./tools/inspect";
 import {
-  findByHash,
   findByRealPath,
   getTool,
   listTools as listRegisteredTools,
+  registerBinaryBytes,
   removeTool,
   saveTool,
-  storeDroppedBinary,
 } from "./tools/registry";
 import { readUIState, writeUIState } from "./uiState";
 
@@ -368,7 +366,10 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         if (!service) return { ok: false, error: "Selected AI service not found." };
 
         const captured = await captureHelp(resolved.entry.execPath);
-        let entry = resolved.entry;
+        // Fingerprint alongside the help capture (ticket 60) — the consent the
+        // user just gave covers both probes of the same binary.
+        const fingerprint = await captureFingerprint(resolved.entry.execPath);
+        let entry = { ...resolved.entry, fingerprint };
         if (captured) entry = { ...entry, helpText: captured.text };
 
         try {
@@ -387,6 +388,27 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
 
         await saveTool(entry);
         return { ok: true, entry };
+      },
+
+      checkToolFreshness: async ({ id }) => {
+        const entry = await getTool(id);
+        if (!entry) return { ok: false, error: "Tool not found." };
+        try {
+          // Only run the --version probe if a prior inspection proves the user
+          // already consented to executing this binary; otherwise stat-only.
+          const consented = entry.inspectedAt !== undefined || entry.helpText !== undefined;
+          const current = await captureFingerprint(entry.execPath, consented);
+          if (!entry.fingerprint) {
+            // Pre-fingerprint entry (or never inspected): backfill without
+            // flagging stale — there's no baseline to have drifted from.
+            const updated = { ...entry, fingerprint: current };
+            await saveTool(updated);
+            return { ok: true, stale: false, entry: updated };
+          }
+          return { ok: true, stale: entry.fingerprint !== current, entry };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
       },
 
       redistillTool: async ({ id, helpText, serviceId, model }) => {
@@ -421,26 +443,42 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         return { ok: true, entry };
       },
 
-      removeTool: ({ id }) => {
-        removeTool(id);
+      removeTool: async ({ id, deleteBinary }) => {
+        await removeTool(id, deleteBinary === true);
       },
 
       registerDroppedTool: async ({ fileName, base64 }) => {
         try {
           const bytes = new Uint8Array(Buffer.from(base64, "base64"));
-          const hash = createHash("sha256").update(bytes).digest("hex");
-          const existing = await findByHash(hash);
-          if (existing) return { ok: true, entry: existing };
+          const entry = await registerBinaryBytes(fileName, bytes);
+          return { ok: true, entry };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
 
-          const stored = await storeDroppedBinary(fileName, bytes);
-          const entry: ToolRegistryEntry = {
-            id: crypto.randomUUID(),
-            name: fileName.replace(/\.[^.]+$/, "") || fileName,
-            execPath: stored.execPath,
-            source: "custom",
-            sourceHash: stored.hash,
-          };
-          await saveTool(entry);
+      chooseFile: async ({ startingFolder }) => {
+        const paths = await Utils.openFileDialog({
+          startingFolder: startingFolder ?? "~/",
+          canChooseDirectory: false,
+          canChooseFiles: true,
+          allowsMultipleSelection: false,
+        });
+        return paths?.[0] ?? null;
+      },
+
+      installToolFromPath: async ({ path }) => {
+        try {
+          const st = statSync(path);
+          if (st.isDirectory()) {
+            return {
+              ok: false,
+              error: "That's a folder (app bundles are folders too) — pick the executable file itself.",
+            };
+          }
+          const bytes = new Uint8Array(await Bun.file(path).arrayBuffer());
+          if (bytes.length === 0) return { ok: false, error: "That file is empty." };
+          const entry = await registerBinaryBytes(basename(path), bytes);
           return { ok: true, entry };
         } catch (err) {
           return { ok: false, error: String(err) };
@@ -459,11 +497,21 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
-      draftCommandFields: async ({ toolName, actionName, spec, serviceId, model }) => {
+      listServiceModels: async ({ serviceId }) => {
+        try {
+          const models = await listServiceModels(serviceId);
+          if (models.length === 0) return { ok: false, error: "Service not found" };
+          return { ok: true, models };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      draftCommandFields: async ({ goal, toolName, actionName, spec, serviceId, model }) => {
         const service = await getAIService(serviceId);
         if (!service) return { ok: false, error: "Selected AI service not found." };
         try {
-          const fields = await draftCommandFields(toolName, actionName, spec, service, model);
+          const fields = await draftCommandFields(goal, toolName, actionName, spec, service, model);
           return { ok: true, fields };
         } catch (err) {
           return { ok: false, error: String(err) };
@@ -735,7 +783,30 @@ ApplicationMenu.setApplicationMenu([
       { role: "selectAll" },
     ],
   },
+  // Surface jumps + run picker, mirroring the renderer's keyboard shortcuts
+  // (ticket 70) so users can discover them from the menu bar.
+  {
+    label: "View",
+    submenu: [
+      { label: "Forms", action: "view:forms", accelerator: "CommandOrControl+P" },
+      { label: "Calendar", action: "view:calendar", accelerator: "CommandOrControl+Shift+C" },
+      { label: "Views", action: "view:views", accelerator: "CommandOrControl+Shift+V" },
+      { label: "Project Settings", action: "view:project-settings", accelerator: "CommandOrControl+," },
+      { type: "separator" },
+      { label: "Run a Form…", action: "view:run-picker", accelerator: "CommandOrControl+K" },
+    ],
+  },
 ]);
+
+// Forward View-menu clicks to the renderer, which owns surface state. The
+// renderer dedupes against its own keydown handler in case a platform
+// delivers both the menu accelerator and the webview key event.
+ApplicationMenu.on("application-menu-clicked", (event) => {
+  const action = (event as { data?: { action?: string } })?.data?.action;
+  if (typeof action === "string" && action.startsWith("view:")) {
+    sendToView("onMenuAction", { action });
+  }
+});
 
 const url = await getMainViewUrl();
 

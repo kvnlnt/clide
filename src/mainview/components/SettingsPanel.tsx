@@ -1,6 +1,9 @@
 import { Check, ChevronDown, ChevronRight, Loader, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../rpc";
+import { useEscapeToClose } from "./Modal";
+import ToolsSection from "./ToolsSection";
+import { useUIFeedback } from "./UIFeedback";
 import { AI_SERVICE_KIND_LABEL, AI_SERVICE_KIND_NEEDS_BASE_URL } from "../types/forms";
 import type { AIService, AIServiceKind } from "../types/forms";
 
@@ -15,11 +18,11 @@ function needsCredential(kind: AIServiceKind): boolean {
 }
 
 export default function SettingsPanel({ onClose }: SettingsPanelProps) {
+  const { confirm, toast } = useUIFeedback();
   const [services, setServices] = useState<AIService[] | null>(null);
   const [savedKeys, setSavedKeys] = useState<Record<string, boolean>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const list = await api.listAIServices();
@@ -33,15 +36,9 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
     void refresh();
   }, [refresh]);
 
-  // Escape closes the page, same as the top-right ×.
+  // Escape closes the page, same as the top-right × — paused while an editor is open (ticket 75).
   const handleClose = useCallback(() => onClose(), [onClose]);
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !editingId && !creating) handleClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleClose, editingId, creating]);
+  useEscapeToClose(handleClose, !editingId && !creating);
 
   const persist = async (next: AIService[]) => {
     setServices(next);
@@ -53,16 +50,25 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
     await persist(services.map((s) => ({ ...s, isDefault: s.id === id })));
   };
 
-  const remove = async (id: string) => {
+  const remove = async (service: AIService) => {
     if (!services) return;
-    const remaining = services.filter((s) => s.id !== id);
+    const res = await confirm({
+      title: `Delete AI service "${service.name}"?`,
+      message: "Features using it fall back to the default service; its saved API key stays in the keychain.",
+      confirmLabel: "Delete",
+    });
+    if (!res.ok) return;
+    const remaining = services.filter((s) => s.id !== service.id);
     if (remaining.length > 0 && !remaining.some((s) => s.isDefault)) remaining[0]!.isDefault = true;
     await persist(remaining);
-    setConfirmingId(null);
+    toast("Service deleted");
   };
 
   return (
-    <div className="flex flex-1 flex-col">
+    // min-h-0: as a flex child of the full-window overlay column, the default
+    // min-height:auto let this grow past the window instead of the body
+    // scrolling once sections expanded (ticket 68).
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Page header — stays put while the body scrolls, keeping × reachable. */}
       <div className="flex shrink-0 items-center justify-between px-8 pb-4 pt-7">
         <h1 className="text-[20px] font-bold text-white">Settings</h1>
@@ -135,20 +141,22 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                     key={service.id}
                     service={service}
                     hasSavedKey={savedKeys[service.id] === true}
-                    confirming={confirmingId === service.id}
                     onEdit={() => {
                       setEditingId(service.id);
                       setCreating(false);
                     }}
                     onSetDefault={() => void setDefault(service.id)}
-                    onConfirmDelete={() => setConfirmingId((cur) => (cur === service.id ? null : service.id))}
-                    onDelete={() => void remove(service.id)}
-                    onCancelDelete={() => setConfirmingId(null)}
+                    onDelete={() => void remove(service)}
                   />
                 ),
               )}
             </div>
           )}
+
+          {/* Tools registry (ticket 57) — machine-global, so it lives here, not on a project toolbar. */}
+          <div className="mt-6">
+            <ToolsSection />
+          </div>
         </div>
       </div>
     </div>
@@ -158,24 +166,13 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
 interface ServiceRowProps {
   service: AIService;
   hasSavedKey: boolean;
-  confirming: boolean;
   onEdit: () => void;
   onSetDefault: () => void;
-  onConfirmDelete: () => void;
+  /** Confirmation happens upstream (shared confirm dialog) — this fires the delete directly. */
   onDelete: () => void;
-  onCancelDelete: () => void;
 }
 
-function ServiceRow({
-  service,
-  hasSavedKey,
-  confirming,
-  onEdit,
-  onSetDefault,
-  onConfirmDelete,
-  onDelete,
-  onCancelDelete,
-}: ServiceRowProps) {
+function ServiceRow({ service, hasSavedKey, onEdit, onSetDefault, onDelete }: ServiceRowProps) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
 
@@ -225,45 +222,30 @@ function ServiceRow({
           )}
         </div>
 
-        {confirming ? (
-          <div className="flex shrink-0 items-center gap-1.5">
-            <span className="text-[12px] text-white/50">Delete?</span>
-            <button
-              onClick={onDelete}
-              className="rounded-md bg-red-500/80 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-red-500"
-            >
-              Delete
-            </button>
-            <button onClick={onCancelDelete} className="rounded-md px-2.5 py-1 text-[12px] text-white/50 hover:bg-white/5">
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              onClick={() => void runTest()}
-              disabled={testing}
-              title="Test this service"
-              className="flex h-7 w-7 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-40"
-            >
-              {testing ? <Loader size={13} className="animate-spin" /> : <Check size={13} />}
-            </button>
-            <button
-              onClick={onEdit}
-              title="Edit"
-              className="flex h-7 w-7 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
-            >
-              <Pencil size={13} />
-            </button>
-            <button
-              onClick={onConfirmDelete}
-              title="Delete"
-              className="flex h-7 w-7 items-center justify-center rounded text-red-400/70 hover:bg-white/10 hover:text-red-400"
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            onClick={() => void runTest()}
+            disabled={testing}
+            title="Test this service"
+            className="flex h-7 w-7 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-40"
+          >
+            {testing ? <Loader size={13} className="animate-spin" /> : <Check size={13} />}
+          </button>
+          <button
+            onClick={onEdit}
+            title="Edit"
+            className="flex h-7 w-7 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            onClick={onDelete}
+            title="Delete"
+            className="flex h-7 w-7 items-center justify-center rounded text-red-400/70 hover:bg-white/10 hover:text-red-400"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
       </div>
     </div>
   );

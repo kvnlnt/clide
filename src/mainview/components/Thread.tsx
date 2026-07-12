@@ -5,6 +5,7 @@ import type { RunRecord } from "../types/forms";
 import FormCard from "./FormCard";
 import ThreadDateGroup from "./ThreadDateGroup";
 import ThreadEmpty from "./ThreadEmpty";
+import { useUIFeedback } from "./UIFeedback";
 
 export default function Thread() {
   const {
@@ -21,8 +22,21 @@ export default function Thread() {
     activeViewId,
   } = useApp();
   const { groups, visibleRuns } = useThread();
+  const { confirm, toast } = useUIFeedback();
 
   const isEmpty = drafts.length === 0 && visibleRuns.length === 0;
+
+  // Persisted runs get a confirm; unsubmitted drafts dismiss without one (nothing saved yet).
+  const removeRun = async (runId: string) => {
+    const res = await confirm({
+      title: "Delete this run?",
+      message: "Its output and history entry are removed.",
+      confirmLabel: "Delete",
+    });
+    if (!res.ok) return;
+    await deleteRun(runId);
+    toast("Run deleted");
+  };
 
   const renderGroup = (group: RunGroup) => {
     const folder = formsBySlug.get(group.formSlug);
@@ -40,7 +54,7 @@ export default function Thread() {
         onCancel={() => void cancelRun(latestRun.id)}
         onSchedule={(values, at, repeat) => void scheduleRun(group.formSlug, values, at, repeat)}
         onPin={() => void setPinned(latestRun.id, !latestRun.pinned)}
-        onDelete={(runId) => void deleteRun(runId)}
+        onDelete={(runId) => void removeRun(runId)}
         onRerun={() => void rerun(latestRun)}
       />
     );

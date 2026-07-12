@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import AutoSizeOutput from "./AutoSizeOutput";
 
 interface TableData {
   columns: string[];
@@ -80,7 +81,7 @@ export default function TableOutput({ text }: TableOutputProps) {
     setSort((prev) => (prev && prev.col === col ? { col, dir: prev.dir === 1 ? -1 : 1 } : { col, dir: 1 }));
 
   return (
-    <div className="clide-scroll resize-y overflow-auto" style={{ height: 400, minHeight: 120, maxHeight: 1000 }}>
+    <AutoSizeOutput>
       <table className="w-full border-collapse text-[13px]">
         <thead className="sticky top-0 bg-clide-bg">
           <tr>
@@ -108,6 +109,6 @@ export default function TableOutput({ text }: TableOutputProps) {
           ))}
         </tbody>
       </table>
-    </div>
+    </AutoSizeOutput>
   );
 }

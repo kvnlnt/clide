@@ -34,6 +34,8 @@ type EventMap = {
   forms: FormFolder[];
   chunk: OutputChunk;
   status: RunStatusUpdate;
+  /** Native app-menu action id, e.g. "view:forms". */
+  menuAction: string;
 };
 
 type Listener<K extends keyof EventMap> = (payload: EventMap[K]) => void;
@@ -43,6 +45,7 @@ const listeners: { [K in keyof EventMap]: Set<Listener<K>> } = {
   forms: new Set(),
   chunk: new Set(),
   status: new Set(),
+  menuAction: new Set(),
 };
 
 function emit<K extends keyof EventMap>(key: K, payload: EventMap[K]): void {
@@ -66,6 +69,7 @@ const rpcDef = Electroview.defineRPC<ClideRPC>({
       onFormsChanged: ({ forms }) => emit("forms", forms),
       onOutputChunk: (chunk) => emit("chunk", chunk),
       onRunStatus: (update) => emit("status", update),
+      onMenuAction: ({ action }) => emit("menuAction", action),
     },
   },
 });
@@ -499,8 +503,28 @@ export const api = {
     }
   },
 
-  async removeTool(id: string): Promise<void> {
-    await request()?.removeTool({ id });
+  async removeTool(id: string, deleteBinary = false): Promise<void> {
+    await request()?.removeTool({ id, deleteBinary });
+  },
+
+  async chooseFile(startingFolder?: string): Promise<string | null> {
+    const r = request();
+    if (!r) return null;
+    try {
+      return await r.chooseFile({ startingFolder });
+    } catch {
+      return null;
+    }
+  },
+
+  async installToolFromPath(path: string): Promise<{ ok: boolean; entry?: ToolRegistryEntry; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.installToolFromPath({ path });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
   },
 
   async suggestTools(
@@ -517,7 +541,30 @@ export const api = {
     }
   },
 
+  async listServiceModels(serviceId: string): Promise<{ ok: boolean; models?: string[]; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.listServiceModels({ serviceId });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async checkToolFreshness(
+    id: string,
+  ): Promise<{ ok: boolean; stale?: boolean; entry?: ToolRegistryEntry; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.checkToolFreshness({ id });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
   async draftCommandFields(
+    goal: string,
     toolName: string,
     actionName: string,
     spec: ToolSpec,
@@ -527,7 +574,7 @@ export const api = {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
-      return await r.draftCommandFields({ toolName, actionName, spec, serviceId, model });
+      return await r.draftCommandFields({ goal, toolName, actionName, spec, serviceId, model });
     } catch (err) {
       return { ok: false, error: String(err) };
     }

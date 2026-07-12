@@ -2,6 +2,7 @@ import { FolderOpen, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
+import { useUIFeedback } from "./UIFeedback";
 
 interface ProjectSettingsPageProps {
   path: string;
@@ -17,9 +18,9 @@ interface ProjectSettingsPageProps {
  */
 export default function ProjectSettingsPage({ path, name, onDone }: ProjectSettingsPageProps) {
   const { renameProject, deleteProject } = useApp();
+  const { confirm, toast } = useUIFeedback();
   const [newName, setNewName] = useState(name);
   const [error, setError] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
@@ -36,9 +37,16 @@ export default function ProjectSettingsPage({ path, name, onDone }: ProjectSetti
   };
 
   const remove = async () => {
+    const res = await confirm({
+      title: `Remove "${name}" from CLIDE?`,
+      message: "Files on disk are kept — only the project registration is removed. Delete the folder yourself if you want it gone.",
+      confirmLabel: "Remove",
+    });
+    if (!res.ok) return;
     setBusy(true);
     await deleteProject(path);
     setBusy(false);
+    toast("Project removed");
     onDone();
   };
 
@@ -109,45 +117,25 @@ export default function ProjectSettingsPage({ path, name, onDone }: ProjectSetti
 
           <div className="flex flex-col gap-3 border-t border-white/5 pt-4">
             <span className="text-[12px] font-bold uppercase tracking-wider text-white/40">Danger zone</span>
-            {!confirmDelete ? (
+            <button
+              disabled={busy}
+              onClick={() => void remove()}
+              className="flex items-center gap-1.5 self-start text-[13px] text-red-400/80 hover:text-red-400 disabled:opacity-40"
+            >
+              <Trash2 size={14} />
+              Delete project
+            </button>
+            <span className="text-[12px] text-white/40">
+              Files on disk are kept. To delete them,{" "}
               <button
-                onClick={() => setConfirmDelete(true)}
-                className="flex items-center gap-1.5 self-start text-[13px] text-red-400/80 hover:text-red-400"
+                type="button"
+                onClick={() => void api.openFolder(containingFolder(path))}
+                className="text-white/60 underline underline-offset-2 hover:text-white"
               >
-                <Trash2 size={14} />
-                Delete project
-              </button>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <span className="text-[13px] text-white/70">Remove “{name}” from CLIDE?</span>
-                <span className="text-[12px] text-white/40">
-                  Files on disk are kept. To delete them,{" "}
-                  <button
-                    type="button"
-                    onClick={() => void api.openFolder(containingFolder(path))}
-                    className="text-white/60 underline underline-offset-2 hover:text-white"
-                  >
-                    open the containing folder
-                  </button>{" "}
-                  and remove it yourself.
-                </span>
-                <div className="flex gap-1.5">
-                  <button
-                    disabled={busy}
-                    onClick={() => void remove()}
-                    className="rounded-md bg-red-500/80 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-red-500 disabled:opacity-40"
-                  >
-                    Remove
-                  </button>
-                  <button
-                    onClick={() => setConfirmDelete(false)}
-                    className="rounded-md px-3 py-1.5 text-[13px] text-white/50 hover:bg-white/5"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+                open the containing folder
+              </button>{" "}
+              and remove it yourself.
+            </span>
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { FolderOpen, FolderPlus, X } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
+import Modal from "./Modal";
 
 interface NewProjectModalProps {
   onClose: () => void;
@@ -86,14 +87,7 @@ export default function NewProjectModal({ onClose }: NewProjectModalProps) {
     "w-full rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30";
 
   return (
-    <div
-      className="absolute inset-0 z-40 flex items-start justify-center bg-black/50 pt-16"
-      onMouseDown={onClose}
-    >
-      <div
-        className="w-[460px] overflow-hidden rounded-lg border border-clide-border bg-clide-panel shadow-2xl"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+    <Modal onClose={onClose} widthClassName="w-[460px]" panelClassName="overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-clide-border px-5 py-4">
           <span className="text-[14px] font-bold text-white">Add project</span>
@@ -145,7 +139,6 @@ export default function NewProjectModal({ onClose }: NewProjectModalProps) {
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && canSubmit) void submit();
-                    if (e.key === "Escape") onClose();
                   }}
                   placeholder="My project"
                   className={inputBase}
@@ -221,7 +214,6 @@ export default function NewProjectModal({ onClose }: NewProjectModalProps) {
                     onChange={(e) => setName(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && canSubmit) void submit();
-                      if (e.key === "Escape") onClose();
                     }}
                     placeholder={basename(path)}
                     className={inputBase}
@@ -250,7 +242,6 @@ export default function NewProjectModal({ onClose }: NewProjectModalProps) {
             {mode === "new" ? "Create" : "Open"}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
