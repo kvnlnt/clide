@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useFormSearch } from "../hooks/useFormSearch";
 import { api } from "../rpc";
-import { useUIFeedback } from "./UIFeedback";
 import type { FormFolder } from "../types/forms";
+import { useUIFeedback } from "./UIFeedback";
 
 /**
  * Unified forms CRUD surface for the active project (or all projects when no
@@ -23,7 +23,9 @@ export default function FormsPanel() {
     deleteForm,
     updateFormMeta,
   } = useApp();
-  const scopedForms = activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms;
+  const scopedForms = activeProject
+    ? forms.filter((f) => f.meta.project === activeProject)
+    : forms;
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
@@ -69,19 +71,27 @@ export default function FormsPanel() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-baseline gap-2 px-8 pb-4 pt-7">
-        <h1 className="text-[20px] font-bold text-white">Forms</h1>
-        <span className="text-[13px] text-white/40">{activeProject ?? "All projects"}</span>
-        <button
-          onClick={() => choose(createIndex)}
-          onMouseEnter={() => setActive(createIndex)}
-          className={`mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-[14px] ${
-            active === createIndex ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"
-          }`}
-        >
-          <Plus size={15} className="text-white/60" />
-          <span className="italic text-white/70">Create new form...</span>
-        </button>
+      <div className="flex shrink-0 items-baseline gap-2 px-8 pb-4 pt-7 justify-between">
+        <div className="flex flex-row gap-1 items-baseline gap-3">
+          <h1 className="text-[20px] font-bold text-white">Forms</h1>
+          <span className="text-[13px] text-white/40">
+            {activeProject ?? "All projects"}
+          </span>
+        </div>
+        <div>
+          <button
+            onClick={() => choose(createIndex)}
+            onMouseEnter={() => setActive(createIndex)}
+            className={`mt-1 flex items-center gap-2 rounded-md px-3 py-2.5 text-[14px] ${
+              active === createIndex
+                ? "bg-[rgba(86,86,86,0.3)]"
+                : "hover:bg-white/5"
+            }`}
+          >
+            <Plus size={15} className="text-white/60" />
+            <span className="italic text-white/70">Create Form</span>
+          </button>
+        </div>
       </div>
 
       <div className="px-8 pb-4">
@@ -91,13 +101,15 @@ export default function FormsPanel() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="Search forms…"
-          className="w-full max-w-[480px] rounded-md border border-clide-border bg-clide-surface px-4 py-2.5 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-white/30"
+          className="w-full rounded-md border border-clide-border bg-clide-surface px-4 py-2.5 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-white/30"
         />
       </div>
 
       <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">
         {results.length === 0 && query.trim() !== "" && (
-          <div className="px-1 py-3 text-[13px] italic text-white/30">No forms match “{query}”</div>
+          <div className="px-1 py-3 text-[13px] italic text-white/30">
+            No forms match “{query}”
+          </div>
         )}
         {results.length > 0 && (
           <div className="flex flex-col divide-y divide-white/5 border-t border-white/5">
@@ -111,7 +123,9 @@ export default function FormsPanel() {
                 onSelect={() => choose(i)}
                 onHover={() => setActive(i)}
                 onEdit={() => {
-                  setEditingSlug((cur) => (cur === form.meta.slug ? null : form.meta.slug));
+                  setEditingSlug((cur) =>
+                    cur === form.meta.slug ? null : form.meta.slug,
+                  );
                 }}
                 onCloseEditors={() => {
                   setEditingSlug(null);
@@ -136,7 +150,10 @@ interface FormsPanelRowProps {
   onHover: () => void;
   onEdit: () => void;
   onCloseEditors: () => void;
-  deleteForm: (projectPath: string, slug: string) => Promise<{ ok: boolean; error?: string }>;
+  deleteForm: (
+    projectPath: string,
+    slug: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
   updateFormMeta: (
     projectPath: string,
     slug: string,
@@ -163,7 +180,8 @@ function FormsPanelRow({
   const remove = async () => {
     const res = await confirm({
       title: `Delete form "${form.meta.name}"?`,
-      message: "Files on disk are removed and history cards in the thread lose their form.",
+      message:
+        "Files on disk are removed and history cards in the thread lose their form.",
       confirmLabel: "Delete",
     });
     if (!res.ok) return;
@@ -175,16 +193,30 @@ function FormsPanelRow({
   };
 
   return (
-    <div className={`group ${active ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"}`} onMouseEnter={onHover}>
+    <div
+      className={`group ${active ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"}`}
+      onMouseEnter={onHover}
+    >
       <div className="flex w-full items-center gap-4 px-3 py-2.5">
-        <button onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-4 text-left">
-          <span className="w-[220px] shrink-0 truncate text-[14px] text-white">{form.meta.name}</span>
-          <span className="min-w-0 flex-1 truncate text-[12px] text-white/40">{form.meta.description || "—"}</span>
+        <button
+          onClick={onSelect}
+          className="flex min-w-0 flex-1 items-center gap-4 text-left"
+        >
+          <span className="w-[220px] shrink-0 truncate text-[14px] text-white">
+            {form.meta.name}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[12px] text-white/40">
+            {form.meta.description || "—"}
+          </span>
           {form.meta.tags.length > 0 && (
-            <span className="w-[160px] shrink-0 truncate text-[11px] text-white/30">{form.meta.tags.join(" · ")}</span>
+            <span className="w-[160px] shrink-0 truncate text-[11px] text-white/30">
+              {form.meta.tags.join(" · ")}
+            </span>
           )}
           {showProject && (
-            <span className="w-[100px] shrink-0 truncate text-[12px] text-clide-muted">{form.meta.project}</span>
+            <span className="w-[100px] shrink-0 truncate text-[12px] text-clide-muted">
+              {form.meta.project}
+            </span>
           )}
         </button>
         <div className="flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100">
@@ -198,7 +230,9 @@ function FormsPanelRow({
           </button>
           <button
             type="button"
-            onClick={() => void api.openFolder(`${form.projectPath}/forms/${form.meta.slug}`)}
+            onClick={() =>
+              void api.openFolder(`${form.projectPath}/forms/${form.meta.slug}`)
+            }
             title="Reveal folder in Finder"
             className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
           >
@@ -216,7 +250,9 @@ function FormsPanelRow({
         </div>
       </div>
 
-      {error && <div className="px-3 pb-2 text-[11px] text-red-400">{error}</div>}
+      {error && (
+        <div className="px-3 pb-2 text-[11px] text-red-400">{error}</div>
+      )}
 
       {editing && (
         <FormMetaEditor
@@ -225,7 +261,11 @@ function FormsPanelRow({
           onSave={async (patch) => {
             setBusy(true);
             setError(null);
-            const res = await updateFormMeta(form.projectPath, form.meta.slug, patch);
+            const res = await updateFormMeta(
+              form.projectPath,
+              form.meta.slug,
+              patch,
+            );
             setBusy(false);
             if (res.ok) {
               onCloseEditors();
@@ -236,7 +276,6 @@ function FormsPanelRow({
           onCancel={onCloseEditors}
         />
       )}
-
     </div>
   );
 }
@@ -244,7 +283,11 @@ function FormsPanelRow({
 interface FormMetaEditorProps {
   form: FormFolder;
   busy: boolean;
-  onSave: (patch: { name?: string; description?: string; tags?: string[] }) => Promise<void>;
+  onSave: (patch: {
+    name?: string;
+    description?: string;
+    tags?: string[];
+  }) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -283,18 +326,36 @@ function FormMetaEditor({ form, busy, onSave, onCancel }: FormMetaEditorProps) {
     >
       <div className="flex flex-col gap-1">
         <label className="text-[11px] font-medium text-white/50">Name</label>
-        <input autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputBase} />
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className={inputBase}
+        />
       </div>
       <div className="flex flex-col gap-1">
-        <label className="text-[11px] font-medium text-white/50">Description</label>
-        <input value={description} onChange={(e) => setDescription(e.target.value)} className={inputBase} />
+        <label className="text-[11px] font-medium text-white/50">
+          Description
+        </label>
+        <input
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className={inputBase}
+        />
       </div>
       <div className="flex flex-col gap-1">
-        <label className="text-[11px] font-medium text-white/50">Tags (comma-separated)</label>
-        <input value={tags} onChange={(e) => setTags(e.target.value)} className={inputBase} />
+        <label className="text-[11px] font-medium text-white/50">
+          Tags (comma-separated)
+        </label>
+        <input
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          className={inputBase}
+        />
       </div>
       <span className="text-[11px] text-white/30">
-        Fields and the script are edited on disk — use “Reveal folder in Finder”.
+        Fields and the script are edited on disk — use “Reveal folder in
+        Finder”.
       </span>
       {error && <span className="text-[11px] text-red-400">{error}</span>}
       <div className="flex gap-1.5">
@@ -305,7 +366,10 @@ function FormMetaEditor({ form, busy, onSave, onCancel }: FormMetaEditorProps) {
         >
           Save
         </button>
-        <button onClick={onCancel} className="rounded-md px-2.5 py-1 text-[11px] text-white/50 hover:bg-white/5">
+        <button
+          onClick={onCancel}
+          className="rounded-md px-2.5 py-1 text-[11px] text-white/50 hover:bg-white/5"
+        >
           Cancel
         </button>
       </div>

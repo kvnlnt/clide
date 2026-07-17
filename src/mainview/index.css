@@ -29,29 +29,30 @@ body {
   overflow: hidden;
 }
 
-* {
-  scrollbar-color: red orange;
-  scrollbar-width: thin;
-}
-
-/* Scrollbars: hidden until hover. */
+/* Canonical scrollbar treatment (ticket 81) — thin, transparent track, a
+   near-invisible thumb that brightens on hover. Applied via .clide-scroll to
+   every scrollable surface (thread, settings, popovers, output boxes, forms
+   panel, calendar); nothing should reach for a bare overflow-auto without it. */
 .clide-scroll {
   scrollbar-width: thin;
-  scrollbar-color: var(--bg) var(--bg);
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 .clide-scroll::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
+.clide-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
 .clide-scroll::-webkit-scrollbar-thumb {
-  background: var(--bg);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 4px;
 }
 .clide-scroll:hover {
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
 }
 .clide-scroll:hover::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.25);
 }
 
 /* Selected sidebar row radial highlight (from Figma). */

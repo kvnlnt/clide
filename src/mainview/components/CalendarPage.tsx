@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import CalendarComposer from "./CalendarComposer";
 import Modal from "./Modal";
+import MonthYearPicker from "./MonthYearPicker";
 import { useUIFeedback } from "./UIFeedback";
 import type { RepeatInterval, RunRecord } from "../types/forms";
 
@@ -134,9 +135,7 @@ export default function CalendarPage() {
             <ChevronRight size={15} />
           </button>
         </div>
-        <span className="w-36 text-right text-[13px] font-medium text-white/70">
-          {month.toLocaleDateString([], { month: "long", year: "numeric" })}
-        </span>
+        <MonthYearPicker value={month} onChange={setMonth} />
       </div>
 
       <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">

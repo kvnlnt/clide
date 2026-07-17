@@ -121,6 +121,15 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 73  | Native View Menu                      | App menu-bar View menu lists the surface shortcuts (⌘P, ⌘⇧C, ⌘⇧V, ⌘,, ⌘K) and triggers them | ✅ Done       |
 | 74  | Calendar Modals, Confirms & Toasts    | Composer/editor become modals; all confirmations are popup dialogs; results shown as toasts | ✅ Done       |
 | 75  | Escape Always Closes Modals           | Shared Modal component + window-level Escape hook; all modals converted, pattern enforced   | ✅ Done       |
+| 76  | First-Run AI Service Wizard           | "First things first" full-window takeover when no AI service is registered; guided setup    | ✅ Done       |
+| 77  | Welcome Projects List                 | "Recent projects" → "Projects": all known projects on the home page, search filter for long lists | ✅ Done       |
+| 78  | First-Project Welcome Flow            | Full-screen zero-clutter first-run experience when no project exists; chains into ticket 76 | ✅ Done       |
+| 79  | Dev User Profiles                     | `bun run dev:hmr:<profile>` launches seeded personas: newbie/beginner/regular/power/edge    | ✅ Done       |
+| 80  | Calendar Month-Year Picker            | Calendar's "Month Year" label opens a month/year popover for fast long-range navigation     | ✅ Done       |
+| 81  | Scroll Fix & Themed Scrollbars        | Body scroll reliable with expanded run items; one theme-matched scrollbar style everywhere  | ✅ Done       |
+| 82  | Delete View Focuses Previous          | Deleting the active view activates its left neighbor instead of jumping to the title tab    | ✅ Done       |
+| 83  | New-Tab Browser Shortcut              | ⌘T / Ctrl+T creates a new view tab, matching the browser convention                         | ✅ Done       |
+| 84  | View Menu Tab Navigation              | New/Close/Next/Previous Tab shortcuts listed & wired in the native application View menu    | ✅ Done       |
 
 ¹ Ticket 54: create flow (all 4 steps) is complete; reopening the wizard to
   edit an existing command-backed form (section 5) is not wired — "Edit" on

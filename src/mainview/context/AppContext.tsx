@@ -46,6 +46,17 @@ interface AppState {
   openAppSettings: () => void;
   closeAppSettings: () => void;
 
+  /** First-run AI service wizard (ticket 76) — full-window takeover shown when zero AI services are registered. */
+  aiWizardOpen: boolean;
+  /** Quietly dismiss for this launch only; re-evaluated on next boot. */
+  dismissAIWizard: () => void;
+  /** Wizard finished (a service now exists) — closes the takeover. */
+  notifyAIServiceAdded: () => void;
+  /** Explicit trigger for callers (e.g. the first-project flow, ticket 78) that need to chain into this step themselves. Pass `true` when it's step 2 of one onboarding flow, so the wizard can say so. */
+  openAIWizard: (chained?: boolean) => void;
+  /** True while the AI wizard is open *because* the first-project flow just chained into it. */
+  aiWizardChained: boolean;
+
   /** Quick-run form picker (⌘K/Ctrl+K or the toolbar Run button) — drops a draft into the current tab's thread. */
   runPickerOpen: boolean;
   openRunPicker: () => void;
@@ -159,6 +170,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const [runPickerOpen, setRunPickerOpen] = useState(false);
   const [viewSettingsOpen, setViewSettingsOpen] = useState(false);
+  const [aiWizardOpen, setAiWizardOpen] = useState(false);
+  const [aiWizardChained, setAiWizardChained] = useState(false);
+  /** Skipped for this launch — don't re-open until the app restarts. */
+  const aiWizardSkippedRef = useRef(false);
 
   const [views, setViews] = useState<ThreadView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
@@ -251,12 +266,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [views, persistViews],
   );
 
+  /** The visible tab immediately left of `id` (browser-style), or null (title tab) if `id` is leftmost/not visible. */
+  const previousVisibleTab = useCallback(
+    (id: string): string | null => {
+      const visible = views.filter((v) => !v.hidden);
+      const idx = visible.findIndex((v) => v.id === id);
+      return idx > 0 ? visible[idx - 1]!.id : null;
+    },
+    [views],
+  );
+
   const deleteView = useCallback(
     (id: string) => {
+      const wasActive = activeViewId === id;
+      const nextActive = wasActive ? previousVisibleTab(id) : null;
       persistViews(views.filter((v) => v.id !== id));
-      setActiveViewId((cur) => (cur === id ? null : cur));
+      if (wasActive) setActiveViewId(nextActive);
     },
-    [views, persistViews],
+    [views, activeViewId, persistViews, previousVisibleTab],
   );
 
   const reorderView = useCallback(
@@ -288,9 +315,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!activeViewId) return;
     const view = views.find((v) => v.id === activeViewId);
     if (!view) return;
+    const prev = previousVisibleTab(activeViewId);
     updateView({ ...view, hidden: true });
-    setActiveView(null);
-  }, [activeViewId, views, updateView, setActiveView]);
+    setActiveView(prev);
+  }, [activeViewId, views, updateView, setActiveView, previousVisibleTab]);
 
   const refreshForms = useCallback(async () => {
     const f = await api.listForms();
@@ -312,12 +340,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // always launches on the welcome screen.
   useEffect(() => {
     void (async () => {
-      const [projects, ui] = await Promise.all([api.listProjects(), api.getUIState()]);
+      const [projects, ui, aiServices] = await Promise.all([
+        api.listProjects(),
+        api.getUIState(),
+        api.listAIServices(),
+      ]);
       setProjectList(projects);
       viewByProjectRef.current = { ...ui.activeViewByProject };
       recentsRef.current = ui.recentProjects;
       setRecentProjects(ui.recentProjects);
       bootedRef.current = true;
+      // Existing users with projects but no AI service (ticket 76). A brand
+      // new install (zero projects too) is instead handled by the
+      // first-project flow (ticket 78), which chains into this wizard
+      // itself once project setup finishes — don't stack both takeovers.
+      if (projects.length > 0 && aiServices.length === 0) setAiWizardOpen(true);
     })();
     void refreshForms();
     void refreshRuns();
@@ -377,6 +414,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
   const openAppSettings = useCallback(() => setAppSettingsOpen(true), []);
   const closeAppSettings = useCallback(() => setAppSettingsOpen(false), []);
+  const dismissAIWizard = useCallback(() => {
+    aiWizardSkippedRef.current = true;
+    setAiWizardOpen(false);
+  }, []);
+  const notifyAIServiceAdded = useCallback(() => setAiWizardOpen(false), []);
+  const openAIWizard = useCallback((chained = false) => {
+    if (aiWizardSkippedRef.current) return;
+    setAiWizardChained(chained);
+    setAiWizardOpen(true);
+  }, []);
   const openRunPicker = useCallback(() => setRunPickerOpen(true), []);
   const closeRunPicker = useCallback(() => setRunPickerOpen(false), []);
   const openViewSettings = useCallback(() => setViewSettingsOpen(true), []);
@@ -544,6 +591,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     appSettingsOpen,
     openAppSettings,
     closeAppSettings,
+    aiWizardOpen,
+    dismissAIWizard,
+    notifyAIServiceAdded,
+    openAIWizard,
+    aiWizardChained,
     runPickerOpen,
     openRunPicker,
     closeRunPicker,

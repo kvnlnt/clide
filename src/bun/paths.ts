@@ -6,16 +6,22 @@ import { join } from "node:path";
  * App-scoped data directory. Holds the projects registry and any auto-created
  * (default) projects. This is NOT where a user's project data lives — each
  * project is its own folder on disk (see config.ts).
+ *
+ * When `CLIDE_PROFILE` is set (dev profiles, ticket 79), this resolves to an
+ * isolated sibling directory instead of the real dev app-data — so seeding a
+ * profile can never touch your actual projects/services/history.
  */
 export function appDataDir(): string {
   const home = homedir();
+  const profile = process.env.CLIDE_PROFILE?.trim();
+  const appId = profile ? join("dev.clide-profiles", profile) : "dev.clide";
   switch (platform()) {
     case "darwin":
-      return join(home, "Library", "Application Support", "dev.clide");
+      return join(home, "Library", "Application Support", appId);
     case "win32":
-      return join(process.env.LOCALAPPDATA ?? join(home, "AppData", "Local"), "dev.clide");
+      return join(process.env.LOCALAPPDATA ?? join(home, "AppData", "Local"), appId);
     default:
-      return join(process.env.XDG_DATA_HOME ?? join(home, ".local", "share"), "dev.clide");
+      return join(process.env.XDG_DATA_HOME ?? join(home, ".local", "share"), appId);
   }
 }
 

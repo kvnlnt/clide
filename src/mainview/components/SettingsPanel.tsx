@@ -251,16 +251,18 @@ function ServiceRow({ service, hasSavedKey, onEdit, onSetDefault, onDelete }: Se
   );
 }
 
-interface AIServiceEditorProps {
+export interface AIServiceEditorProps {
   existing?: AIService;
   hasSavedKey?: boolean;
+  /** Pre-selects the kind dropdown for a fresh (non-`existing`) service — the first-run wizard (ticket 76) seeds this from the local/remote choice. */
+  initialKind?: AIServiceKind;
   onSave: (service: AIService, apiKey: string) => Promise<void>;
   onCancel: () => void;
 }
 
-function AIServiceEditor({ existing, hasSavedKey, onSave, onCancel }: AIServiceEditorProps) {
+export function AIServiceEditor({ existing, hasSavedKey, initialKind, onSave, onCancel }: AIServiceEditorProps) {
   const [name, setName] = useState(existing?.name ?? "");
-  const [kind, setKind] = useState<AIServiceKind>(existing?.kind ?? "anthropic");
+  const [kind, setKind] = useState<AIServiceKind>(existing?.kind ?? initialKind ?? "anthropic");
   const [baseUrl, setBaseUrl] = useState(existing?.baseUrl ?? "");
   const [apiKey, setApiKey] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);

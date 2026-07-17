@@ -1,4 +1,4 @@
-import { PanelLeft, Settings } from "lucide-react";
+import { PanelLeft, Settings2 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import TrafficLights from "./TrafficLights";
 import ViewTabs from "./ViewTabs";
@@ -16,7 +16,7 @@ export default function WindowControls() {
             title="Settings"
             className="text-white/30 transition-colors hover:text-white flex items-center justify-center rounded-full"
           >
-            <Settings size={18} />
+            <Settings2 size={18} />
           </button>
           <button
             onClick={toggleSidebar}

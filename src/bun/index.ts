@@ -21,7 +21,6 @@ import { deleteRun as dbDeleteRun, getAllRuns, getRun, getRunHistory, indexRuns,
 import { rebuildListenerIndex, registerHop, resolvePayloadMapping, setAutoSubmitHandler } from "./events/bus";
 import { readLayout, writeLayout } from "./forms/layout";
 import { listForms, loadFormFolder, resolveFormProject } from "./forms/loader";
-import { seedExampleProjects } from "./forms/seed";
 import { readViews, writeViews } from "./forms/views";
 import { watchForms } from "./forms/watcher";
 import { writeCommandForm, writeForm } from "./forms/writer";
@@ -43,11 +42,12 @@ const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
 
 // ---------------------------------------------------------------------------
-// Bootstrap on-disk state. Projects are folders on disk; seed example projects
-// on first launch, then index existing run history.
+// Bootstrap on-disk state. Projects are folders on disk; a genuinely empty
+// registry is now a real, reachable state — the first-project takeover
+// (ticket 78) owns that experience, so we no longer auto-seed demo projects
+// on top of it (see forms/seed.ts, kept for dev-profile fixtures, ticket 79).
 // ---------------------------------------------------------------------------
 await loadProjects();
-await seedExampleProjects();
 indexRuns(await projectPaths());
 
 /** Resolve a project name to its folder path. */
@@ -794,6 +794,12 @@ ApplicationMenu.setApplicationMenu([
       { label: "Project Settings", action: "view:project-settings", accelerator: "CommandOrControl+," },
       { type: "separator" },
       { label: "Run a Form…", action: "view:run-picker", accelerator: "CommandOrControl+K" },
+      { type: "separator" },
+      // Browser-style view tab navigation (tickets 43, 83, 84).
+      { label: "New Tab", action: "view:new-tab", accelerator: "CommandOrControl+T" },
+      { label: "Close Tab", action: "view:close-tab", accelerator: "CommandOrControl+W" },
+      { label: "Next Tab", action: "view:next-tab", accelerator: "Ctrl+Tab" },
+      { label: "Previous Tab", action: "view:prev-tab", accelerator: "Ctrl+Shift+Tab" },
     ],
   },
 ]);

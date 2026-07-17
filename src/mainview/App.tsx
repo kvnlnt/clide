@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import CalendarPage from "./components/CalendarPage";
+import FirstRunAIWizard from "./components/FirstRunAIWizard";
+import FirstRunWelcome from "./components/FirstRunWelcome";
 import FormsPanel from "./components/FormsPanel";
 import NewFormPage from "./components/NewFormPage";
 import NewProjectModal from "./components/NewProjectModal";
@@ -27,6 +29,7 @@ function Workspace() {
     activeProject,
     activeViewId,
     views,
+    projects,
     projectSurface,
     setProjectSurface,
     projectMeta,
@@ -34,8 +37,13 @@ function Workspace() {
     closeNewForm,
     appSettingsOpen,
     closeAppSettings,
+    aiWizardOpen,
+    aiWizardChained,
+    dismissAIWizard,
+    notifyAIServiceAdded,
     cycleTab,
     closeActiveTab,
+    createView,
     runPickerOpen,
     openRunPicker,
     closeRunPicker,
@@ -57,7 +65,7 @@ function Workspace() {
   // keydown handler and the native View menu (which lists these shortcuts).
   const dispatchViewAction = useCallback(
     (action: string) => {
-      const overlayOpen = newFormOpen || appSettingsOpen || newProjectOpen || viewSettingsOpen;
+      const overlayOpen = newFormOpen || appSettingsOpen || newProjectOpen || viewSettingsOpen || aiWizardOpen;
       if (overlayOpen || !activeProject) return;
       const now = Date.now();
       if (lastActionRef.current.action === action && now - lastActionRef.current.at < 400) return;
@@ -67,11 +75,40 @@ function Workspace() {
         openRunPicker();
         return;
       }
+      if (action === "view:new-tab") {
+        createView();
+        return;
+      }
+      if (action === "view:close-tab") {
+        closeActiveTab();
+        return;
+      }
+      if (action === "view:next-tab") {
+        cycleTab(1);
+        return;
+      }
+      if (action === "view:prev-tab") {
+        cycleTab(-1);
+        return;
+      }
       // Surface jumps toggle like their toolbar buttons: press again → thread.
       const surface = action.slice("view:".length) as ProjectSurface;
       setProjectSurface(projectSurface === surface ? "thread" : surface);
     },
-    [newFormOpen, appSettingsOpen, newProjectOpen, viewSettingsOpen, activeProject, openRunPicker, setProjectSurface, projectSurface],
+    [
+      newFormOpen,
+      appSettingsOpen,
+      newProjectOpen,
+      viewSettingsOpen,
+      aiWizardOpen,
+      activeProject,
+      openRunPicker,
+      setProjectSurface,
+      projectSurface,
+      createView,
+      closeActiveTab,
+      cycleTab,
+    ],
   );
 
   // Native app-menu clicks (View → Forms/Calendar/…) route through the same dispatcher.
@@ -80,7 +117,7 @@ function Workspace() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       // All shortcuts are inert while a blocking overlay is open or no project is active.
-      const overlayOpen = newFormOpen || appSettingsOpen || newProjectOpen || viewSettingsOpen;
+      const overlayOpen = newFormOpen || appSettingsOpen || newProjectOpen || viewSettingsOpen || aiWizardOpen;
       if (overlayOpen || !activeProject) return;
 
       // ⌘P Forms, ⌘⇧C Calendar, ⌘⇧V Views, ⌘, Settings (plain C/V stay copy/paste).
@@ -97,16 +134,23 @@ function Workspace() {
         if (key === "k") return act("view:run-picker");
       }
 
+      // Ctrl+Tab / Ctrl+Shift+Tab: browser-style tab cycling (same on every platform).
       if (e.ctrlKey && e.key === "Tab") {
         e.preventDefault();
-        cycleTab(e.shiftKey ? -1 : 1);
+        dispatchViewAction(e.shiftKey ? "view:prev-tab" : "view:next-tab");
         return;
       }
 
+      // ⌘W / Ctrl+W close tab, ⌘T / Ctrl+T new tab — the browser convention (ticket 43, 83).
       const closeChord = isMac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
       if (closeChord && e.key.toLowerCase() === "w") {
         e.preventDefault();
-        closeActiveTab();
+        dispatchViewAction("view:close-tab");
+        return;
+      }
+      if (closeChord && e.key.toLowerCase() === "t") {
+        e.preventDefault();
+        dispatchViewAction("view:new-tab");
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -117,21 +161,20 @@ function Workspace() {
     appSettingsOpen,
     newProjectOpen,
     viewSettingsOpen,
+    aiWizardOpen,
     activeProject,
-    cycleTab,
-    closeActiveTab,
     isMac,
   ]);
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden rounded-[15px] border border-white/10 bg-clide-bg text-white p-2.5">
-      <header className="flex electrobun-webkit-app-region-drag">
+      <header className="flex shrink-0 electrobun-webkit-app-region-drag">
         <WindowControls />
       </header>
-      <div className="flex h-screen text-white">
-        <div className="relative flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 text-white">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           {!activeProject ? (
-            <WelcomeScreen />
+            projects.length === 0 ? <FirstRunWelcome /> : <WelcomeScreen />
           ) : activeView ? (
             <>
               <ViewToolbar view={activeView} />
@@ -167,6 +210,17 @@ function Workspace() {
             <TrafficLights />
           </div>
           <SettingsPanel onClose={closeAppSettings} />
+        </div>
+      )}
+
+      {/* First-run AI service setup (ticket 76) — same full-window takeover
+          mechanic as Settings above, shown whenever zero AI services are registered. */}
+      {aiWizardOpen && (
+        <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg">
+          <div className="flex electrobun-webkit-app-region-drag">
+            <TrafficLights />
+          </div>
+          <FirstRunAIWizard onSkip={dismissAIWizard} onDone={notifyAIServiceAdded} chained={aiWizardChained} />
         </div>
       )}
 

@@ -208,7 +208,7 @@ export default function ViewToolbar({ view }: Props) {
               placeholder="Search forms…"
               className={popoverInput}
             />
-            <div className="mt-1 max-h-40 space-y-0.5 overflow-y-auto">
+            <div className="clide-scroll mt-1 max-h-40 space-y-0.5 overflow-y-auto">
               {formSuggestions.length === 0 && (
                 <div className="px-1 py-0.5 text-[12px] italic text-white/30">No forms match</div>
               )}

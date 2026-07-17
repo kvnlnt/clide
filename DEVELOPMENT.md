@@ -64,6 +64,36 @@ When you run `bun run dev` (without HMR):
 - **Window settings**: Edit `src/bun/index.ts`
 - **App metadata**: Edit `electrobun.config.ts`
 
+## Dev Profiles
+
+`bun run dev:hmr` always uses your real dev app-data
+(`~/Library/Application Support/dev.clide`), which accumulates whatever
+you've been testing. To boot into a realistic, repeatable scenario instead,
+use one of the profile scripts — each seeds an isolated app-data dir
+(`dev.clide-profiles/<name>`, never touching your real data) with a
+persona-shaped set of projects, forms, run history, AI services, views, and
+schedules, then launches HMR against it:
+
+| Script                    | Persona     | What's seeded                                                                          |
+| ------------------------- | ----------- | --------------------------------------------------------------------------------------- |
+| `bun run dev:hmr:newbie`  | First launch | Nothing — no projects, no AI service. Exercises the first-run onboarding takeovers.     |
+| `bun run dev:hmr:beginner`| A week in    | 2 projects, a few forms each, 1 AI service, a dozen runs, no views/schedules.           |
+| `bun run dev:hmr:regular` | Comfortable  | 4 projects, ~5 forms each, 2 AI services, a few views per project, upcoming schedules, ~60 runs/project. |
+| `bun run dev:hmr:power`   | Heavy daily  | 16 projects (some with 25+ forms), many views (some hidden), dozens of schedules, ~150+ runs/project. |
+| `bun run dev:hmr:edge`    | Chaos        | Emoji/CJK/very-long project names, a form with a missing script, an orphaned schedule, 45 chips stacked on one calendar day. |
+
+Each run **resets and reseeds from scratch** by default, so you always start
+from the same known state. To keep whatever a profile's last run left behind
+(e.g. after you've made manual changes you want to preserve), prefix with
+`CLIDE_PROFILE_KEEP=1`:
+
+```bash
+CLIDE_PROFILE_KEEP=1 bun run dev:hmr:regular
+```
+
+To seed a profile without launching the app, run
+`CLIDE_PROFILE=<name> bun run seed:profile` directly.
+
 ## Marketing Site
 
 The marketing website is generated from a self-contained script:
