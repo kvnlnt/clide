@@ -1,10 +1,10 @@
 import { AlertTriangle, ChevronDown, ChevronRight, Terminal, Trash2, Upload, Wrench } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../rpc";
+import type { ToolRegistryEntry } from "../types/tasks";
 import ServiceModelPicker, { type ServiceModelValue } from "./ServiceModelPicker";
 import ToolDropZone, { fileToBase64 } from "./ToolDropZone";
 import { useUIFeedback } from "./UIFeedback";
-import type { ToolRegistryEntry } from "../types/tasks";
 
 const inputBase =
   "rounded-md border border-clide-border bg-clide-bg px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30";
@@ -177,7 +177,9 @@ export default function ToolsSection() {
   const remove = async (tool: ToolRegistryEntry) => {
     const res = await confirm({
       title: `Remove tool "${tool.name}"?`,
-      message: "Forms that use it will fail at run time until it's registered again.",
+      message: tool.installedVia
+        ? `Forms that use it will fail at run time until it's registered again. This only removes it from CLIDE's registry — the "${tool.installedVia.package}" package installed via ${tool.installedVia.manager} stays on your system (ticket 103: uninstall is out of scope).`
+        : "Forms that use it will fail at run time until it's registered again.",
       confirmLabel: "Remove",
       // Only copied-in custom installs own a binary CLIDE may delete (ticket 58).
       checkboxLabel: tool.sourceHash ? "Also delete the copied executable" : undefined,

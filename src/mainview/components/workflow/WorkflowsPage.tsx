@@ -1,4 +1,4 @@
-import { FlaskConical, ListChecks, Pencil, Play, Plus, Trash2, Copy } from "lucide-react";
+import { Copy, FlaskConical, ListChecks, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context/AppContext";
 import { api, on } from "../../rpc";

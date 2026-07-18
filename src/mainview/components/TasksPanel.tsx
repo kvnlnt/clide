@@ -70,7 +70,7 @@ export default function TasksPanel() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex shrink-0 items-baseline gap-2 px-8 pb-4 pt-7 justify-between">
-        <div className="flex flex-row gap-1 items-baseline gap-3">
+        <div className="flex flex-row items-baseline gap-3">
           <h1 className="text-[20px] font-bold text-white">Tasks</h1>
           <span className="text-[13px] text-white/40">{activeProject ?? "All projects"}</span>
         </div>

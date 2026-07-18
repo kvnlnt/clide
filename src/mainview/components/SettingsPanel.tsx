@@ -1,11 +1,12 @@
 import { Check, ChevronDown, ChevronRight, Loader, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../rpc";
+import type { AIService, AIServiceKind } from "../types/tasks";
+import { AI_SERVICE_KIND_LABEL, AI_SERVICE_KIND_NEEDS_BASE_URL } from "../types/tasks";
 import { useEscapeToClose } from "./Modal";
+import PackageManagersSection from "./PackageManagersSection";
 import ToolsSection from "./ToolsSection";
 import { useUIFeedback } from "./UIFeedback";
-import { AI_SERVICE_KIND_LABEL, AI_SERVICE_KIND_NEEDS_BASE_URL } from "../types/tasks";
-import type { AIService, AIServiceKind } from "../types/tasks";
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -156,6 +157,9 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
           {/* Tools registry (ticket 57) — machine-global, so it lives here, not on a project toolbar. */}
           <div className="mt-6">
             <ToolsSection />
+          </div>
+          <div className="mt-6">
+            <PackageManagersSection />
           </div>
         </div>
       </div>

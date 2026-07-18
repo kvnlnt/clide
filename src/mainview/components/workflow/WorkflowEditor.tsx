@@ -4,6 +4,7 @@ import {
   ArrowUp,
   ChevronDown,
   ChevronRight,
+  Copy,
   GitBranch,
   Play,
   Plus,
@@ -12,9 +13,8 @@ import {
   Terminal,
   Trash2,
   X,
-  Copy,
 } from "lucide-react";
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { STEP_NAME_RE, allSteps, computeScopes, expressionRefs, templateRefs } from "../../../shared/workflowExpr";
 import { useApp } from "../../context/AppContext";
 import { api } from "../../rpc";

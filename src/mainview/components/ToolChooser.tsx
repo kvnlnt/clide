@@ -1,9 +1,11 @@
 import { AlertTriangle, Check, RefreshCw, Search, Sparkles, Terminal, Wrench } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { api } from "../rpc";
-import ToolDropZone, { fileToBase64 } from "./ToolDropZone";
-import type { ServiceModelValue } from "./ServiceModelPicker";
+import { api, on } from "../rpc";
 import type { ToolRegistryEntry } from "../types/tasks";
+import InstallProgressModal from "./InstallProgressModal";
+import type { ServiceModelValue } from "./ServiceModelPicker";
+import ToolDropZone, { fileToBase64 } from "./ToolDropZone";
+import { useUIFeedback } from "./UIFeedback";
 
 const inputBase =
   "rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30";
@@ -29,7 +31,10 @@ interface Props {
 
 /** Loose goal→tool matching over the cached registry: any goal word appearing in the name or description. */
 function matchesGoal(entry: ToolRegistryEntry, goal: string): boolean {
-  const words = goal.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4);
+  const words = goal
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 4);
   if (words.length === 0) return false;
   const hay = `${entry.name} ${entry.spec?.description ?? ""}`.toLowerCase();
   return words.some((w) => hay.includes(w));
@@ -51,6 +56,7 @@ export default function ToolChooser({ goal, serviceModel, selected, onSelect }: 
   const [manualInput, setManualInput] = useState("");
   const [manualBusy, setManualBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, toast } = useUIFeedback();
 
   /** Unregistered pick awaiting the register/inspect decision. */
   const [pendingPick, setPendingPick] = useState<{ name: string; execPath: string } | null>(null);
@@ -90,7 +96,13 @@ export default function ToolChooser({ goal, serviceModel, selected, onSelect }: 
         const registered = tools.find((t) => t.execPath === resolved.execPath);
         additions.push(
           registered
-            ? { key: registered.id, entry: registered, name: registered.name, execPath: registered.execPath, suggested: true }
+            ? {
+                key: registered.id,
+                entry: registered,
+                name: registered.name,
+                execPath: registered.execPath,
+                suggested: true,
+              }
             : { key: `path:${resolved.execPath}`, name, execPath: resolved.execPath, suggested: true },
         );
       }
@@ -115,9 +127,7 @@ export default function ToolChooser({ goal, serviceModel, selected, onSelect }: 
   const mergeEntry = (entry: ToolRegistryEntry) => {
     setRegistry((prev) => [...prev.filter((t) => t.id !== entry.id), entry]);
     setCandidates((prev) =>
-      prev.map((c) =>
-        c.execPath === entry.execPath ? { ...c, key: entry.id, entry, name: entry.name } : c,
-      ),
+      prev.map((c) => (c.execPath === entry.execPath ? { ...c, key: entry.id, entry, name: entry.name } : c)),
     );
   };
 
@@ -155,6 +165,11 @@ export default function ToolChooser({ goal, serviceModel, selected, onSelect }: 
     setPendingPick(null);
     mergeEntry(res.entry);
     onSelect(res.entry);
+    if (provenancePending.current) {
+      const { manager, pkg, version } = provenancePending.current;
+      provenancePending.current = null;
+      void stampProvenance(res.entry.id, manager, pkg, version);
+    }
   };
 
   const inspectAndPick = async () => {
@@ -176,6 +191,11 @@ export default function ToolChooser({ goal, serviceModel, selected, onSelect }: 
     setPendingPick(null);
     mergeEntry(res.entry);
     onSelect(res.entry);
+    if (provenancePending.current) {
+      const { manager, pkg, version } = provenancePending.current;
+      provenancePending.current = null;
+      void stampProvenance(res.entry.id, manager, pkg, version);
+    }
   };
 
   const reinspectStale = async () => {
@@ -231,10 +251,74 @@ export default function ToolChooser({ goal, serviceModel, selected, onSelect }: 
     onSelect(res.entry);
   };
 
+  // Package manager search
+  const [pmResults, setPmResults] = useState<any[] | null>(null);
+  const [pmBusy, setPmBusy] = useState(false);
+  const [installingId, setInstallingId] = useState<string | null>(null);
+  /** installId → { manager, package } so we know what to bubble up on completion (ticket 103 §4). */
+  const installTargets = useRef<Map<string, { manager: string; pkg: string }>>(new Map());
+  /** Multiple binaries resolved from one install — user picks which to register. */
+  const [binaryChoice, setBinaryChoice] = useState<{
+    manager: string;
+    pkg: string;
+    binaries: { name: string; path: string }[];
+  } | null>(null);
+
+  const searchPackageManagers = async (q: string) => {
+    setPmBusy(true);
+    setPmResults(null);
+    const res = await api.searchPackageManagers(q);
+    setPmBusy(false);
+    if (!res.ok) return setPmResults([]);
+    setPmResults(res.results || []);
+  };
+
+  /** Stamps installedVia on a freshly registered/inspected entry (ticket 103 §4). */
+  const stampProvenance = async (entryId: string, manager: string, pkg: string, version?: string) => {
+    const res = await api.setToolInstalledVia(entryId, { manager, package: pkg, version });
+    if (res.ok && res.entry) mergeEntry(res.entry);
+  };
+
+  /** After a successful install, resolve its binaries and hand off to the existing register/inspect flow. */
+  const bubbleUpInstalledBinaries = async (manager: string, pkg: string) => {
+    const res = await api.resolvePackageBinaries(manager, pkg);
+    if (!res.ok || !res.binaries || res.binaries.length === 0) {
+      toast(res.error || `No executables found for "${pkg}"`, "error");
+      return;
+    }
+    if (res.binaries.length === 1) {
+      const bin = res.binaries[0]!;
+      pickUnregistered(bin.name, bin.path);
+      provenancePending.current = { manager, pkg };
+      return;
+    }
+    setBinaryChoice({ manager, pkg, binaries: res.binaries });
+  };
+
+  /** Set right before pickUnregistered() when the pick originated from a package install; consumed once
+   *  registerBare/inspectAndPick finishes so the resulting entry gets installedVia stamped. */
+  const provenancePending = useRef<{ manager: string; pkg: string; version?: string } | null>(null);
+
+  useEffect(() => {
+    // listen for install completion — toast, then bubble the binary up into the pick flow
+    const unsub = on("status", (update) => {
+      if (typeof update.runId === "string" && update.runId.startsWith("install:")) {
+        const installId = update.runId.slice("install:".length);
+        const target = installTargets.current.get(installId);
+        if (update.status === "success") {
+          toast("Package installed", "success");
+          if (target) void bubbleUpInstalledBinaries(target.manager, target.pkg);
+        }
+        if (update.status === "error") toast("Package install failed", "error");
+        installTargets.current.delete(installId);
+      }
+    });
+    return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const searchResults =
-    search.trim() === ""
-      ? []
-      : registry.filter((t) => t.name.toLowerCase().includes(search.trim().toLowerCase()));
+    search.trim() === "" ? [] : registry.filter((t) => t.name.toLowerCase().includes(search.trim().toLowerCase()));
 
   return (
     <ToolDropZone onFiles={(files) => void handleDrop(files)} className="flex flex-col gap-4">
@@ -368,12 +452,7 @@ export default function ToolChooser({ goal, serviceModel, selected, onSelect }: 
           <Search size={13} className="text-white/40" />
           Search registered tools
         </div>
-        <input
-          className={inputBase}
-          placeholder="Search…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <input className={inputBase} placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} />
         {searchResults.length > 0 && (
           <div className="clide-scroll flex max-h-40 flex-col gap-0.5 overflow-y-auto">
             {searchResults.map((t) => (
@@ -412,7 +491,114 @@ export default function ToolChooser({ goal, serviceModel, selected, onSelect }: 
             {manualBusy ? "Resolving…" : "Resolve"}
           </button>
         </div>
+        <div className="border-t border-clide-border pt-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[13px] font-medium text-white/70">
+              <Search size={13} className="text-white/40" />
+              Search package managers
+            </div>
+            <div className="text-[12px] text-white/40">{pmBusy ? "Searching…" : null}</div>
+          </div>
+          <div className="mt-2 flex gap-2">
+            <input
+              className={`${inputBase} min-w-0 flex-1`}
+              placeholder="search package managers…"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") searchPackageManagers((e.target as HTMLInputElement).value);
+              }}
+            />
+            <button
+              onClick={async () => searchPackageManagers((document.activeElement as HTMLInputElement)?.value || "")}
+              className="shrink-0 rounded-md bg-white/10 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-white/20"
+            >
+              Search
+            </button>
+          </div>
+          {pmResults && (
+            <div className="mt-3 flex flex-col gap-2">
+              {pmResults.length === 0 && <div className="text-[13px] text-white/30">No results</div>}
+              {pmResults.map((mgr) => (
+                <div key={mgr.id} className="rounded-md border border-clide-border p-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-white font-medium">{mgr.name}</div>
+                    <div className="text-[12px] text-white/40">{mgr.ok ? "available" : "unavailable"}</div>
+                  </div>
+                  <div className="mt-2 flex flex-col gap-1">
+                    {(mgr.results || []).map((r: any) => (
+                      <div key={r.name} className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-white">{r.name}</div>
+                          <div className="text-[12px] text-white/40 truncate">{r.desc}</div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              const cmd =
+                                mgr.id === "homebrew"
+                                  ? `brew install ${r.name}`
+                                  : mgr.id === "npm"
+                                    ? `bun add -g ${r.name} (or npm install -g --yes ${r.name})`
+                                    : mgr.id === "pipx"
+                                      ? `pipx install ${r.name}`
+                                      : mgr.id === "cargo"
+                                        ? `cargo install ${r.name}`
+                                        : `${mgr.id} install ${r.name}`;
+                              const confirmed = await confirm({
+                                title: "Install package",
+                                message: `Command: ${cmd}`,
+                                confirmLabel: "Install",
+                              });
+                              if (!confirmed.ok) return;
+                              const res = await api.installPackage(mgr.id, r.name);
+                              if (!res.ok) {
+                                toast(res.error || "Install failed", "error");
+                                return;
+                              }
+                              if (res.installId) {
+                                installTargets.current.set(res.installId, { manager: mgr.id, pkg: r.name });
+                                setInstallingId(res.installId);
+                              }
+                            }}
+                            className="rounded-md bg-white/10 px-3 py-1 text-[13px] text-white hover:bg-white/20"
+                          >
+                            Install
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+      {installingId && <InstallProgressModal installId={installingId} onClose={() => setInstallingId(null)} />}
+      {binaryChoice && (
+        <div className="mt-3 rounded-md border border-clide-border p-3">
+          <div className="text-[13px] font-medium text-white/70">
+            "{binaryChoice.pkg}" provided {binaryChoice.binaries.length} executables — pick one to register:
+          </div>
+          <div className="mt-2 flex flex-col gap-1">
+            {binaryChoice.binaries.map((bin) => (
+              <button
+                key={bin.path}
+                onClick={() => {
+                  pickUnregistered(bin.name, bin.path);
+                  provenancePending.current = { manager: binaryChoice.manager, pkg: binaryChoice.pkg };
+                  setBinaryChoice(null);
+                }}
+                className="rounded-md border border-clide-border px-3 py-1.5 text-left text-[13px] text-white hover:bg-white/5"
+              >
+                <span className="font-medium">{bin.name}</span> <span className="text-white/40">{bin.path}</span>
+              </button>
+            ))}
+          </div>
+          <button onClick={() => setBinaryChoice(null)} className="mt-2 text-[12px] text-white/40 hover:text-white/70">
+            Cancel
+          </button>
+        </div>
+      )}
     </ToolDropZone>
   );
 }

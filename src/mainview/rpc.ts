@@ -536,6 +536,107 @@ export const api = {
     }
   },
 
+  // Package manager API (ticket 103)
+  async listPackageManagers(): Promise<import("../shared/types").PackageManagerInfo[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.listPackageManagers({});
+    } catch {
+      return [];
+    }
+  },
+
+  async detectPackageManagers(): Promise<import("../shared/types").PackageManagerInfo[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.detectPackageManagers({});
+    } catch {
+      return [];
+    }
+  },
+
+  async addCustomPackageManager(
+    id: string,
+    name: string,
+    path: string,
+    enabled = true,
+  ): Promise<{ ok: boolean; manager?: any; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.addCustomPackageManager({ id, name, path, enabled });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async removeCustomPackageManager(id: string): Promise<void> {
+    await request()?.removeCustomPackageManager({ id });
+  },
+
+  async savePackageManagers(list: any[]): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.savePackageManagers({ list });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async searchPackageManagers(
+    query: string,
+  ): Promise<{ ok: boolean; results?: import("../shared/types").PackageCatalogItem[]; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, results: [], error: "Bridge unavailable" };
+    try {
+      return await r.searchPackageManagers({ query });
+    } catch (err) {
+      return { ok: false, results: [], error: String(err) };
+    }
+  },
+
+  async installPackage(
+    managerId: string,
+    packageName: string,
+  ): Promise<{ ok: boolean; installId?: string; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.installPackage({ managerId, packageName });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async resolvePackageBinaries(
+    managerId: string,
+    packageName: string,
+  ): Promise<{ ok: boolean; binaries?: import("../shared/types").PackageBinary[]; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, binaries: [], error: "Bridge unavailable" };
+    try {
+      return await r.resolvePackageBinaries({ managerId, packageName });
+    } catch (err) {
+      return { ok: false, binaries: [], error: String(err) };
+    }
+  },
+
+  async setToolInstalledVia(
+    id: string,
+    installedVia: { manager: string; package: string; version?: string },
+  ): Promise<{ ok: boolean; entry?: import("../shared/types").ToolRegistryEntry; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.setToolInstalledVia({ id, installedVia });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
   async suggestTools(
     query: string,
     serviceId: string,

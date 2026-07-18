@@ -216,6 +216,9 @@ export interface ToolRegistryEntry {
   /** Resolved absolute path at last successful resolve. */
   execPath: string;
   source: ToolSource;
+  /** When present, records which package manager installed this binary. */
+  installedVia?: { manager: string; package: string; version?: string };
+
   /** Raw captured `--help`/`man` text (or user-pasted docs), kept even if distillation fails. */
   helpText?: string;
   /** AI-distilled structure, when distillation has succeeded. */
@@ -312,6 +315,33 @@ export interface RunStatusUpdate {
   finishedAt: string | null;
   /** AI-generated summary (ticket 98), streamed when available. */
   summary?: string | null;
+}
+
+// Package manager discovery/search/install ----------------------------------
+
+export interface PackageManagerInfo {
+  id: string; // internal id, e.g. "homebrew" or custom name
+  name: string; // display name
+  path?: string; // absolute path to manager binary when detected or registered
+  version?: string; // detected version string
+  enabled: boolean; // user-controlled
+  detectedAt?: string; // ISO timestamp when detection last ran
+  custom?: boolean; // true for user-registered managers
+}
+
+export interface PackageCatalogItem {
+  managerId: string;
+  packageName: string;
+  title?: string;
+  description?: string;
+  homepage?: string;
+  installed?: boolean;
+  version?: string;
+}
+
+export interface PackageBinary {
+  name: string;
+  path: string; // absolute path to the executable file
 }
 
 // Grid layout persistence ----------------------------------------------------
@@ -637,6 +667,34 @@ export type ClideRPC = {
       /** Picker-path custom-tool install (ticket 58): main process reads the bytes directly, no base64 round-trip. */
       installToolFromPath: {
         params: { path: string };
+        response: { ok: boolean; entry?: ToolRegistryEntry; error?: string };
+      };
+
+      // Package manager discovery / search / install (ticket 103)
+      listPackageManagers: { params: Record<string, never>; response: PackageManagerInfo[] };
+      detectPackageManagers: { params: Record<string, never>; response: PackageManagerInfo[] };
+      addCustomPackageManager: {
+        params: { id: string; name: string; path: string; enabled?: boolean };
+        response: { ok: boolean; manager?: PackageManagerInfo; error?: string };
+      };
+      removeCustomPackageManager: { params: { id: string }; response: void };
+      savePackageManagers: { params: { list: any[] }; response: { ok: boolean; error?: string } };
+      searchPackageManagers: {
+        params: { query: string };
+        response: { ok: boolean; results?: PackageCatalogItem[]; error?: string };
+      };
+      installPackage: {
+        params: { managerId: string; packageName: string };
+        response: { ok: boolean; installId?: string; error?: string };
+      };
+      cancelPackageInstall: { params: { installId: string }; response: { ok: boolean } };
+      resolvePackageBinaries: {
+        params: { managerId: string; packageName: string };
+        response: { ok: boolean; binaries?: PackageBinary[]; error?: string };
+      };
+      /** Stamps provenance on a registry entry after a package-manager-driven install (ticket 103 §4). */
+      setToolInstalledVia: {
+        params: { id: string; installedVia: { manager: string; package: string; version?: string } };
         response: { ok: boolean; entry?: ToolRegistryEntry; error?: string };
       };
 

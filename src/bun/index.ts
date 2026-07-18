@@ -66,10 +66,10 @@ import {
 import {
   getWorkflow,
   deleteWorkflow as storeDeleteWorkflow,
+  duplicateWorkflow as storeDuplicateWorkflow,
   listWorkflows as storeListWorkflows,
   saveWorkflow as storeSaveWorkflow,
   validateForSave,
-  duplicateWorkflow as storeDuplicateWorkflow,
 } from "./workflows/store";
 import {
   disposeWorkflowTriggers,
@@ -428,6 +428,15 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         return { ok: true, entry };
       },
 
+      // Provenance stamp after a package-manager-driven install (ticket 103 §4).
+      setToolInstalledVia: async ({ id, installedVia }) => {
+        const entry = await getTool(id);
+        if (!entry) return { ok: false, error: "Tool not found." };
+        const updated = { ...entry, installedVia };
+        await saveTool(updated);
+        return { ok: true, entry: updated };
+      },
+
       checkToolFreshness: async ({ id }) => {
         const entry = await getTool(id);
         if (!entry) return { ok: false, error: "Tool not found." };
@@ -520,6 +529,104 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           return { ok: true, entry };
         } catch (err) {
           return { ok: false, error: String(err) };
+        }
+      },
+
+      // Package manager RPCs (ticket 103)
+      listPackageManagers: async () => {
+        try {
+          const pm = await import("./tools/packageManagers");
+          return await pm.listPackageManagers();
+        } catch (err) {
+          return [];
+        }
+      },
+
+      detectPackageManagers: async () => {
+        try {
+          const pm = await import("./tools/packageManagers");
+          return await pm.detectPackageManagers();
+        } catch (err) {
+          return [];
+        }
+      },
+
+      addCustomPackageManager: async ({ id, name, path, enabled }) => {
+        try {
+          const pm = await import("./tools/packageManagers");
+          const mgr = await pm.addCustomPackageManager(id, name, path, enabled === true);
+          return { ok: true, manager: mgr };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      removeCustomPackageManager: async ({ id }) => {
+        try {
+          const pm = await import("./tools/packageManagers");
+          await pm.removeCustomPackageManager(id);
+        } catch {
+          /* ignore */
+        }
+      },
+
+      savePackageManagers: async ({ list }) => {
+        try {
+          const pm = await import("./tools/packageManagers");
+          await pm.savePackageManagersOrder(list);
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      searchPackageManagers: async ({ query }) => {
+        try {
+          const pm = await import("./tools/packageManagers");
+          return await pm.searchPackageManagers(query);
+        } catch (err) {
+          return { ok: false, results: [], error: String(err) };
+        }
+      },
+
+      installPackage: async ({ managerId, packageName }) => {
+        try {
+          const pm = await import("./tools/packageManagers");
+          // start install and stream via onOutputChunk emitter
+          const installId = crypto.randomUUID();
+          (async () => {
+            await pm.installPackage(managerId, packageName, (chunk: string) => {
+              sendToView("onOutputChunk", {
+                runId: `install:${installId}`,
+                type: "stdout",
+                data: chunk,
+                timestamp: Date.now(),
+              });
+            });
+            sendToView("onRunStatus", {
+              runId: `install:${installId}`,
+              status: "success",
+              exitCode: 0,
+              finishedAt: new Date().toISOString(),
+            });
+          })();
+          return { ok: true, installId };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      cancelPackageInstall: async ({ installId: _installId }) => {
+        // Cancellation not implemented in this simplified adapter set.
+        return { ok: false };
+      },
+
+      resolvePackageBinaries: async ({ managerId, packageName }) => {
+        try {
+          const pm = await import("./tools/packageManagers");
+          return await pm.resolvePackageBinaries(managerId, packageName);
+        } catch (err) {
+          return { ok: false, binaries: [], error: String(err) };
         }
       },
 
