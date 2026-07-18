@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Copy,
   GitBranch,
+  Lock,
   Play,
   Plus,
   Repeat,
@@ -213,26 +214,52 @@ function TaskStepBody({ step, onChange, ctx }: { step: TaskStep; onChange: (s: T
     return formatCommandPreview(built.tool, built.argv);
   }, [folder, step.inputs]);
 
+  const pinnedVersion = step.taskVersion;
+  const latestVersion = folder?.meta.version;
+  const hasUpdate = pinnedVersion && latestVersion && pinnedVersion < latestVersion;
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
         <label className={fieldLabel}>Form</label>
-        <select
-          className={`${inputBase} appearance-none`}
-          value={step.taskSlug}
-          onChange={(e) => onChange({ ...step, taskSlug: e.target.value, inputs: {} })}
-        >
-          {!ctx.formsBySlug.has(step.taskSlug) && (
-            <option value={step.taskSlug} className="bg-clide-panel">
-              (missing) {step.taskSlug}
-            </option>
+        <div className="flex items-center gap-2">
+          <select
+            className={`${inputBase} flex-1 appearance-none`}
+            value={step.taskSlug}
+            onChange={(e) => onChange({ ...step, taskSlug: e.target.value, inputs: {} })}
+          >
+            {!ctx.formsBySlug.has(step.taskSlug) && (
+              <option value={step.taskSlug} className="bg-clide-panel">
+                (missing) {step.taskSlug}
+              </option>
+            )}
+            {ctx.projectForms.map((f) => (
+              <option key={f.meta.slug} value={f.meta.slug} className="bg-clide-panel">
+                {f.meta.name}
+              </option>
+            ))}
+          </select>
+          {folder && (
+            <div className="flex shrink-0 items-center gap-1.5">
+              <span className="text-[11px] text-white/40">
+                v{pinnedVersion ?? latestVersion}
+                {!pinnedVersion && " (latest)"}
+              </span>
+              {folder.meta.lifecycle === "draft" ? (
+                <span className="rounded-full bg-yellow-500/20 px-1.5 py-0.5 text-[9px] font-medium text-yellow-400">
+                  draft
+                </span>
+              ) : (
+                <Lock size={10} className="text-white/30" />
+              )}
+              {hasUpdate && (
+                <span className="text-[11px] text-blue-400" title={`v${latestVersion} available`}>
+                  ↑ v{latestVersion}
+                </span>
+              )}
+            </div>
           )}
-          {ctx.projectForms.map((f) => (
-            <option key={f.meta.slug} value={f.meta.slug} className="bg-clide-panel">
-              {f.meta.name}
-            </option>
-          ))}
-        </select>
+        </div>
       </div>
 
       {folder &&

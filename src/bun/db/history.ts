@@ -19,6 +19,7 @@ interface RunRow {
   triggered_by: string | null;
   read_at: string | null;
   summary: string | null;
+  form_version: number;
 }
 
 /** projectPath -> open Database. */
@@ -97,6 +98,7 @@ function rowToRecord(row: RunRow): RunRecord {
     readAt: row.read_at,
     triggeredBy,
     summary: row.summary,
+    taskVersion: row.form_version ?? 1, // Disk: form_version → Memory: taskVersion
   };
 }
 
@@ -112,12 +114,14 @@ export interface CreateRunInput {
   triggeredBy?: unknown;
   /** When not null, the run is created pre-read (ticket 97). */
   readAt?: string | null;
+  /** Task version executed (ticket 105). */
+  taskVersion?: number;
 }
 
 export function createRun(projectPath: string, input: CreateRunInput): RunRecord {
   getDb(projectPath).run(
-    `INSERT INTO runs (id, form_slug, inputs, status, started_at, output_path, scheduled_at, repeat_interval, pinned, triggered_by, read_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    `INSERT INTO runs (id, form_slug, inputs, status, started_at, output_path, scheduled_at, repeat_interval, pinned, triggered_by, read_at, form_version)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
     [
       input.id,
       input.taskSlug, // Memory: taskSlug → Disk: form_slug column
@@ -129,6 +133,7 @@ export function createRun(projectPath: string, input: CreateRunInput): RunRecord
       input.repeatInterval ?? null,
       input.triggeredBy ? JSON.stringify(input.triggeredBy) : null,
       input.readAt ?? null,
+      input.taskVersion ?? 1, // Memory: taskVersion → Disk: form_version column
     ],
   );
   runIndex.set(input.id, projectPath);

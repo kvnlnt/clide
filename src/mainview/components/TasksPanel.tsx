@@ -1,9 +1,10 @@
-import { FolderOpen, Pencil, Plus, Trash2 } from "lucide-react";
+import { CheckCircle, FolderOpen, History, Lock, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useTaskSearch } from "../hooks/useTaskSearch";
 import { api } from "../rpc";
 import type { TaskFolder } from "../types/tasks";
+import TaskVersionHistoryModal from "./TaskVersionHistoryModal";
 import { useUIFeedback } from "./UIFeedback";
 
 /**
@@ -161,26 +162,57 @@ function TasksPanelRow({
   updateTaskMeta,
 }: TasksPanelRowProps) {
   const { confirm, toast } = useUIFeedback();
-  const { workflows } = useApp();
+  const { workflows, runs, refreshForms } = useApp();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+  const [dismissedAdopt, setDismissedAdopt] = useState(false);
+
+  const menuRef = useRef<HTMLButtonElement>(null);
 
   // "Starts workflows" (ticket 90): visible wherever the form is managed.
   const startsWorkflows = workflows.filter(
     (w) => w.enabled && w.triggers.some((t) => t.type === "task-submitted" && t.taskSlug === form.meta.slug),
   );
 
+  // Check if task has a successful run (for adoption affordance)
+  const hasSuccessfulRun = runs.some((r) => r.taskSlug === form.meta.slug && r.status === "success");
+  const showAdoptAffordance = form.meta.lifecycle === "draft" && hasSuccessfulRun && !dismissedAdopt;
+
+  const adopt = async () => {
+    setBusy(true);
+    setError(null);
+    const res = await api.adoptTask(form.projectPath, form.meta.slug);
+    setBusy(false);
+    if (res.ok) {
+      toast("Task adopted");
+      await refreshForms();
+    } else {
+      setError(res.error ?? "Adoption failed");
+    }
+    setMenuOpen(false);
+  };
+
   const remove = async () => {
+    // Check for workflow references
+    const refs = await api.getWorkflowsReferencingTask(form.projectPath, form.meta.slug);
+    let message = "Files on disk are removed and history cards in the thread lose their form.";
+    if (refs.workflows.length > 0) {
+      const workflowNames = refs.workflows.map((w) => w.workflowName).join(", ");
+      message += ` WARNING: This task is pinned by ${refs.workflows.length} workflow${refs.workflows.length === 1 ? "" : "s"}: ${workflowNames}`;
+    }
+
     const res = await confirm({
-      title: `Delete form "${form.meta.name}"?`,
-      message: "Files on disk are removed and history cards in the thread lose their form.",
+      title: `Delete task "${form.meta.name}"?`,
+      message,
       confirmLabel: "Delete",
     });
     if (!res.ok) return;
     setBusy(true);
     const result = await deleteForm(form.projectPath, form.meta.slug);
     setBusy(false);
-    if (result.ok) toast("Form deleted");
+    if (result.ok) toast("Task deleted");
     else toast(result.error ?? "Delete failed", "error");
   };
 
@@ -188,7 +220,17 @@ function TasksPanelRow({
     <div className={`group ${active ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"}`} onMouseEnter={onHover}>
       <div className="flex w-full items-center gap-4 px-3 py-2.5">
         <button onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-4 text-left">
-          <span className="w-[220px] shrink-0 truncate text-[14px] text-white">{form.meta.name}</span>
+          <div className="flex w-[220px] shrink-0 items-center gap-2">
+            <span className="truncate text-[14px] text-white">{form.meta.name}</span>
+            <span className="text-[11px] text-white/40">v{form.meta.version}</span>
+            {form.meta.lifecycle === "draft" ? (
+              <span className="rounded-full bg-yellow-500/20 px-1.5 py-0.5 text-[9px] font-medium text-yellow-400">
+                draft
+              </span>
+            ) : (
+              <Lock size={10} className="text-white/30" />
+            )}
+          </div>
           <span className="min-w-0 flex-1 truncate text-[12px] text-white/40">{form.meta.description || "—"}</span>
           {form.meta.tags.length > 0 && (
             <span className="w-[160px] shrink-0 truncate text-[11px] text-white/30">{form.meta.tags.join(" · ")}</span>
@@ -207,6 +249,18 @@ function TasksPanelRow({
             <Pencil size={13} />
           </button>
           <button
+            ref={menuRef}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen(!menuOpen);
+            }}
+            title="More actions"
+            className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
+          >
+            <MoreVertical size={13} />
+          </button>
+          <button
             type="button"
             onClick={() => void api.openFolder(`${form.projectPath}/forms/${form.meta.slug}`)}
             title="Reveal folder in Finder"
@@ -218,7 +272,7 @@ function TasksPanelRow({
             type="button"
             disabled={busy}
             onClick={() => void remove()}
-            title="Delete form"
+            title="Delete task"
             className="flex h-6 w-6 items-center justify-center rounded text-red-400/70 hover:bg-white/10 hover:text-red-400 disabled:opacity-40"
           >
             <Trash2 size={13} />
@@ -227,6 +281,26 @@ function TasksPanelRow({
       </div>
 
       {error && <div className="px-3 pb-2 text-[11px] text-red-400">{error}</div>}
+
+      {showAdoptAffordance && (
+        <div className="mx-3 mb-2 flex items-center gap-2 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2">
+          <CheckCircle size={14} className="shrink-0 text-blue-400" />
+          <span className="flex-1 text-[12px] text-blue-300">
+            This task has run successfully. Ready to adopt it? Adoption locks this version; future edits create new
+            versions.
+          </span>
+          <button
+            onClick={() => void adopt()}
+            disabled={busy}
+            className="rounded-md bg-blue-500/20 px-2.5 py-1 text-[11px] font-medium text-blue-300 hover:bg-blue-500/30 disabled:opacity-40"
+          >
+            Adopt
+          </button>
+          <button onClick={() => setDismissedAdopt(true)} className="text-[11px] text-blue-300/60 hover:text-blue-300">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {startsWorkflows.length > 0 && (
         <div className="px-3 pb-2 text-[11px] text-white/40">
@@ -251,6 +325,52 @@ function TasksPanelRow({
             }
           }}
           onCancel={onCloseEditors}
+        />
+      )}
+
+      {menuOpen && (
+        <div
+          className="absolute z-50"
+          style={{
+            left: menuRef.current?.getBoundingClientRect().right,
+            top: menuRef.current?.getBoundingClientRect().bottom,
+          }}
+        >
+          <div className="fixed inset-0" onClick={() => setMenuOpen(false)} />
+          <div className="relative mt-1 w-48 overflow-hidden rounded-md border border-clide-border bg-clide-panel py-1 shadow-xl">
+            {form.meta.lifecycle === "draft" && hasSuccessfulRun && (
+              <button
+                onClick={() => void adopt()}
+                disabled={busy}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-white hover:bg-white/10 disabled:opacity-40"
+              >
+                <CheckCircle size={14} />
+                Adopt task
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setVersionHistoryOpen(true);
+                setMenuOpen(false);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-white hover:bg-white/10"
+            >
+              <History size={14} />
+              Version history
+            </button>
+          </div>
+        </div>
+      )}
+
+      {versionHistoryOpen && (
+        <TaskVersionHistoryModal
+          projectPath={form.projectPath}
+          slug={form.meta.slug}
+          currentVersion={form.meta.version}
+          onClose={() => setVersionHistoryOpen(false)}
+          onRollback={async () => {
+            await refreshForms();
+          }}
         />
       )}
     </div>

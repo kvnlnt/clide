@@ -668,7 +668,7 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           const resolvedProject = (await resolveProjectByName(project)) ?? (await addProject(project));
           const slug = await writeCommandTask(
             resolvedProject.path,
-            { name, description, project: resolvedProject.name, tags },
+            { name, description, project: resolvedProject.name, tags, lifecycle: "draft", version: 1 },
             { fields, outputType, outputs, command },
           );
           await pushProjectsChanged();
@@ -819,7 +819,7 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
       scheduleRun: async ({ taskSlug, inputs, scheduledAt, repeatInterval }) => {
         const project = await projectForSlug(taskSlug);
         if (!project) throw new Error(`Task not found: ${taskSlug}`);
-        const runId = schedule(project.path, taskSlug, inputs, scheduledAt, repeatInterval);
+        const runId = await schedule(project.path, taskSlug, inputs, scheduledAt, repeatInterval);
         return { runId };
       },
 
@@ -919,6 +919,129 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           };
           await Bun.write(metaPath, JSON.stringify(next, null, 2));
           await pushTasksChanged();
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      // Task adoption & versioning (ticket 105) -------------------------------
+
+      adoptTask: async ({ projectPath, slug }) => {
+        try {
+          const projects = await listProjects();
+          const project = projects.find((p) => p.path === projectPath);
+          if (!project) return { ok: false, error: "Project not found" };
+          const folder = await loadTaskFolder(projectPath, slug, project.name);
+          if (!folder) return { ok: false, error: "Task not found" };
+          const { adoptTask } = await import("./tasks/writer");
+          const adopted = await adoptTask(projectPath, slug, folder.meta);
+          if (!adopted) return { ok: false, error: "Task is already adopted" };
+          await pushTasksChanged();
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      saveTaskVersion: async ({ projectPath, slug, meta, task }) => {
+        try {
+          const projects = await listProjects();
+          const project = projects.find((p) => p.path === projectPath);
+          if (!project) return { ok: false, error: "Project not found" };
+          const folder = await loadTaskFolder(projectPath, slug, project.name);
+          if (!folder) return { ok: false, error: "Task not found" };
+          const { saveTaskVersion } = await import("./tasks/writer");
+          const newVersion = await saveTaskVersion(
+            projectPath,
+            slug,
+            folder.meta.version,
+            meta,
+            task,
+            folder.meta.createdAt,
+          );
+          await pushTasksChanged();
+          return { ok: true, version: newVersion };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      listTaskVersions: async ({ projectPath, slug }) => {
+        try {
+          const { listTaskVersions } = await import("./tasks/loader");
+          const versions = await listTaskVersions(projectPath, slug);
+          return { ok: true, versions };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      loadTaskVersion: async ({ projectPath, slug, version }) => {
+        try {
+          const projects = await listProjects();
+          const project = projects.find((p) => p.path === projectPath);
+          if (!project) return { ok: false, error: "Project not found" };
+          const { loadTaskVersion } = await import("./tasks/loader");
+          const folder = await loadTaskVersion(projectPath, slug, version, project.name);
+          if (!folder) return { ok: false, error: "Version not found" };
+          return { ok: true, folder };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      rollbackTaskVersion: async ({ projectPath, slug, version }) => {
+        try {
+          const projects = await listProjects();
+          const project = projects.find((p) => p.path === projectPath);
+          if (!project) return { ok: false, error: "Project not found" };
+          const { loadTaskVersion } = await import("./tasks/loader");
+          const { saveTaskVersion } = await import("./tasks/writer");
+          const oldFolder = await loadTaskVersion(projectPath, slug, version, project.name);
+          if (!oldFolder) return { ok: false, error: "Version not found" };
+          const currentFolder = await loadTaskFolder(projectPath, slug, project.name);
+          if (!currentFolder) return { ok: false, error: "Task not found" };
+          // Create a new version from the old one's definition
+          const newVersion = await saveTaskVersion(
+            projectPath,
+            slug,
+            currentFolder.meta.version,
+            {
+              name: oldFolder.meta.name,
+              description: oldFolder.meta.description,
+              tags: oldFolder.meta.tags,
+              project: oldFolder.meta.project,
+              interpreter: oldFolder.meta.interpreter,
+              aiProvider: oldFolder.meta.aiProvider,
+              aiModel: oldFolder.meta.aiModel,
+              lifecycle: oldFolder.meta.lifecycle,
+              version: oldFolder.meta.version,
+            },
+            oldFolder.task,
+            currentFolder.meta.createdAt,
+          );
+          await pushTasksChanged();
+          return { ok: true, newVersion };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      getWorkflowsReferencingTask: async ({ projectPath, slug }) => {
+        try {
+          const { getWorkflowsReferencingTask } = await import("./workflows/store");
+          const workflows = await getWorkflowsReferencingTask(projectPath, slug);
+          return { workflows };
+        } catch (err) {
+          return { workflows: [] };
+        }
+      },
+
+      upgradeWorkflowTaskVersion: async ({ projectPath, workflowId, stepNames, newVersion }) => {
+        try {
+          const { upgradeWorkflowTaskVersion } = await import("./workflows/store");
+          await upgradeWorkflowTaskVersion(projectPath, workflowId, stepNames, newVersion);
           return { ok: true };
         } catch (err) {
           return { ok: false, error: String(err) };

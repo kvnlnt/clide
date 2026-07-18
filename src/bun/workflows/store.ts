@@ -7,7 +7,7 @@
 
 import { readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import type { Workflow, WorkflowStep, WorkflowTrigger } from "../../shared/types";
+import type { TaskStep, Workflow, WorkflowStep, WorkflowTrigger } from "../../shared/types";
 import { STEP_NAME_RE, allSteps } from "../../shared/workflowExpr";
 import { ensureDir, projectWorkflowsDir, workflowPath } from "../paths";
 
@@ -35,6 +35,8 @@ export function validateSteps(raw: unknown): WorkflowStep[] {
                 string
               >)
             : {},
+          // Ticket 105: disk says formVersion, memory says taskVersion
+          taskVersion: typeof item.formVersion === "number" ? item.formVersion : undefined,
         });
         break;
       case "decision":
@@ -158,7 +160,15 @@ export function validateForSave(workflow: Workflow): string | null {
 function stepsToDisk(steps: WorkflowStep[]): unknown[] {
   return steps.map((step) => {
     if (step.type === "form") {
-      return { type: "form", name: step.name, formSlug: step.taskSlug, inputs: step.inputs };
+      // Ticket 105: memory taskSlug/taskVersion → disk formSlug/formVersion
+      const diskStep: Record<string, unknown> = {
+        type: "form",
+        name: step.name,
+        formSlug: step.taskSlug,
+        inputs: step.inputs,
+      };
+      if (step.taskVersion !== undefined) diskStep.formVersion = step.taskVersion;
+      return diskStep;
     } else if (step.type === "decision") {
       return {
         type: "decision",
@@ -270,4 +280,69 @@ export async function duplicateWorkflow(projectPath: string, id: string): Promis
   // Persist
   await saveWorkflow(projectPath, next);
   return next;
+}
+
+/**
+ * Find all workflows that reference a given task slug, and return which steps
+ * use it at which versions (ticket 105).
+ */
+export async function getWorkflowsReferencingTask(
+  projectPath: string,
+  taskSlug: string,
+): Promise<{ workflowId: string; workflowName: string; steps: Record<string, number | undefined> }[]> {
+  const workflows = await listWorkflows(projectPath);
+  const results: { workflowId: string; workflowName: string; steps: Record<string, number | undefined> }[] = [];
+
+  for (const workflow of workflows) {
+    const steps = allSteps(workflow.steps);
+    const taskSteps = steps.filter((s) => s.type === "form" && s.taskSlug === taskSlug) as TaskStep[];
+    if (taskSteps.length === 0) continue;
+
+    const stepVersions: Record<string, number | undefined> = {};
+    for (const step of taskSteps) {
+      stepVersions[step.name] = step.taskVersion;
+    }
+    results.push({ workflowId: workflow.id, workflowName: workflow.name, steps: stepVersions });
+  }
+
+  return results;
+}
+
+/**
+ * Upgrade specified steps in a workflow to a new task version (ticket 105).
+ * stepNames lists which steps to upgrade; all must be task steps referencing
+ * the same task slug.
+ */
+export async function upgradeWorkflowTaskVersion(
+  projectPath: string,
+  workflowId: string,
+  stepNames: string[],
+  newVersion: number,
+): Promise<void> {
+  const workflow = await getWorkflow(projectPath, workflowId);
+  if (!workflow) throw new Error(`Workflow ${workflowId} not found`);
+
+  const upgradeStep = (step: WorkflowStep): WorkflowStep => {
+    if (step.type === "form" && stepNames.includes(step.name)) {
+      return { ...step, taskVersion: newVersion };
+    } else if (step.type === "decision") {
+      return {
+        ...step,
+        then: step.then.map(upgradeStep),
+        else: step.else?.map(upgradeStep),
+      };
+    } else if (step.type === "loop") {
+      return { ...step, steps: step.steps.map(upgradeStep) };
+    } else if (step.type === "parallel") {
+      return { ...step, branches: step.branches.map((b) => b.map(upgradeStep)) };
+    }
+    return step;
+  };
+
+  const upgraded: Workflow = {
+    ...workflow,
+    steps: workflow.steps.map(upgradeStep),
+  };
+
+  await saveWorkflow(projectPath, upgraded);
 }

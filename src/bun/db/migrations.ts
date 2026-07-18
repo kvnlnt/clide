@@ -34,6 +34,8 @@ export function migrate(db: Database): void {
     read_at: "ALTER TABLE runs ADD COLUMN read_at TEXT",
     // Ticket 98: AI-generated one-line status report.
     summary: "ALTER TABLE runs ADD COLUMN summary TEXT",
+    // Ticket 105: version of the task that was executed (defaults to 1 for legacy runs).
+    form_version: "ALTER TABLE runs ADD COLUMN form_version INTEGER DEFAULT 1",
   };
 
   for (const [column, sql] of Object.entries(additions)) {

@@ -24,6 +24,7 @@ import type {
   TaskField,
   TaskFolder,
   TaskMeta,
+  TaskVersionInfo,
 } from "../../shared/types";
 import { listProjects } from "../config";
 import { ensureProjectDirs, projectFormsDir } from "../paths";
@@ -68,6 +69,9 @@ function validateMeta(raw: unknown, slug: string, projectName: string): TaskMeta
     aiModel: typeof raw.aiModel === "string" && raw.aiModel.trim() ? raw.aiModel : undefined,
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date().toISOString(),
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
+    // Ticket 105: default existing tasks to draft/1 on load (no disk migration needed).
+    lifecycle: raw.lifecycle === "adopted" ? "adopted" : "draft",
+    version: typeof raw.version === "number" && raw.version > 0 ? raw.version : 1,
   };
 }
 
@@ -261,6 +265,53 @@ export async function loadTaskFolder(
     return null;
   }
   return { meta, task, projectPath };
+}
+
+/**
+ * Load a specific version of a task (ticket 105). Version folders live at
+ * `forms/<slug>/versions/<n>/`. Returns null if the version doesn't exist.
+ */
+export async function loadTaskVersion(
+  projectPath: string,
+  slug: string,
+  version: number,
+  projectName: string,
+): Promise<TaskFolder | null> {
+  const versionDir = join(projectFormsDir(projectPath), slug, "versions", String(version));
+  const metaRaw = await readJson(join(versionDir, "meta.json"));
+  const formRaw = await readJson(join(versionDir, "form.json"));
+  const meta = validateMeta(metaRaw, slug, projectName);
+  const task = validateForm(formRaw);
+  if (!meta || !task) return null;
+  return { meta, task, projectPath };
+}
+
+/**
+ * List all versions of a task (ticket 105). Scans `versions/<n>/` and returns
+ * version number + createdAt + lifecycle for each.
+ */
+export async function listTaskVersions(projectPath: string, slug: string): Promise<TaskVersionInfo[]> {
+  const versionsDir = join(projectFormsDir(projectPath), slug, "versions");
+  let entries: string[];
+  try {
+    entries = readdirSync(versionsDir);
+  } catch {
+    return [];
+  }
+  const versions: TaskVersionInfo[] = [];
+  for (const entry of entries) {
+    const versionNum = Number(entry);
+    if (!Number.isInteger(versionNum) || versionNum < 1) continue;
+    const metaRaw = await readJson(join(versionsDir, entry, "meta.json"));
+    if (!isObject(metaRaw)) continue;
+    versions.push({
+      version: versionNum,
+      createdAt: typeof metaRaw.createdAt === "string" ? metaRaw.createdAt : new Date().toISOString(),
+      lifecycle: metaRaw.lifecycle === "adopted" ? "adopted" : "draft",
+    });
+  }
+  versions.sort((a, b) => a.version - b.version);
+  return versions;
 }
 
 /** Scan every registered project's tasks directory and return all valid tasks. */

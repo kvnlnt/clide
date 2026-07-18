@@ -254,6 +254,10 @@ export interface TaskMeta {
   aiModel?: string;
   createdAt: string;
   updatedAt: string;
+  /** Lifecycle state: draft = freely editable, adopted = read-only definition (ticket 105). */
+  lifecycle: "draft" | "adopted";
+  /** Version number; starts at 1, incremented on each edit of an adopted task (ticket 105). */
+  version: number;
 }
 
 /** A fully-loaded task folder: metadata + field definition. */
@@ -299,6 +303,8 @@ export interface RunRecord {
   triggeredBy?: unknown;
   /** AI-generated one-line status report (ticket 98). */
   summary?: string | null;
+  /** Version of the task that was executed (ticket 105). */
+  taskVersion: number;
 }
 
 export interface OutputChunk {
@@ -428,6 +434,8 @@ export interface TaskStep extends WorkflowStepBase {
   type: "form";
   taskSlug: string;
   inputs: Record<string, string>;
+  /** Pinned task version; absent = latest version (ticket 105). */
+  taskVersion?: number;
 }
 
 export interface DecisionStep extends WorkflowStepBase {
@@ -543,6 +551,23 @@ export interface ScheduleInput {
   inputs: Record<string, unknown>;
   scheduledAt: string;
   repeatInterval: RepeatInterval;
+}
+
+// Task versioning (ticket 105) ------------------------------------------------
+
+/** One version's metadata in the version history view. */
+export interface TaskVersionInfo {
+  version: number;
+  createdAt: string;
+  lifecycle: "draft" | "adopted";
+}
+
+/** Which workflows reference a task and at which steps/versions. */
+export interface WorkflowTaskReference {
+  workflowId: string;
+  workflowName: string;
+  /** Step name → version pinned (or undefined = latest). */
+  steps: Record<string, number | undefined>;
 }
 
 // ---------------------------------------------------------------------------
@@ -839,6 +864,40 @@ export type ClideRPC = {
       };
       updateTaskMeta: {
         params: { projectPath: string; slug: string; patch: TaskMetaPatch };
+        response: { ok: boolean; error?: string };
+      };
+      // Task adoption & versioning (ticket 105) -------------------------------
+      adoptTask: {
+        params: { projectPath: string; slug: string };
+        response: { ok: boolean; error?: string };
+      };
+      saveTaskVersion: {
+        params: {
+          projectPath: string;
+          slug: string;
+          meta: Omit<TaskMeta, "slug" | "createdAt" | "updatedAt">;
+          task: TaskDefinition;
+        };
+        response: { ok: boolean; version?: number; error?: string };
+      };
+      listTaskVersions: {
+        params: { projectPath: string; slug: string };
+        response: { ok: boolean; versions?: TaskVersionInfo[]; error?: string };
+      };
+      loadTaskVersion: {
+        params: { projectPath: string; slug: string; version: number };
+        response: { ok: boolean; folder?: TaskFolder; error?: string };
+      };
+      rollbackTaskVersion: {
+        params: { projectPath: string; slug: string; version: number };
+        response: { ok: boolean; newVersion?: number; error?: string };
+      };
+      getWorkflowsReferencingTask: {
+        params: { projectPath: string; slug: string };
+        response: { workflows: WorkflowTaskReference[] };
+      };
+      upgradeWorkflowTaskVersion: {
+        params: { projectPath: string; workflowId: string; stepNames: string[]; newVersion: number };
         response: { ok: boolean; error?: string };
       };
     };

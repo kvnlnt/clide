@@ -562,26 +562,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [refreshForms],
   );
 
-  const submitRun = useCallback(async (taskSlug: string, inputs: Record<string, unknown>) => {
-    const runId = await api.runTask(taskSlug, inputs);
-    if (!runId) return;
-    const optimistic: RunRecord = {
-      id: runId,
-      taskSlug,
-      inputs,
-      status: "running",
-      exitCode: null,
-      startedAt: new Date().toISOString(),
-      finishedAt: null,
-      outputPath: null,
-      pinned: false,
-      scheduledAt: null,
-      repeatInterval: null,
-      readAt: null,
-    };
-    setRuns((prev) => [optimistic, ...prev.filter((r) => r.id !== runId)]);
-    setRecentSlugs((prev) => [taskSlug, ...prev.filter((s) => s !== taskSlug)].slice(0, 5));
-  }, []);
+  const submitRun = useCallback(
+    async (taskSlug: string, inputs: Record<string, unknown>) => {
+      const runId = await api.runTask(taskSlug, inputs);
+      if (!runId) return;
+      const optimistic: RunRecord = {
+        id: runId,
+        taskSlug,
+        inputs,
+        status: "running",
+        exitCode: null,
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        outputPath: null,
+        pinned: false,
+        scheduledAt: null,
+        repeatInterval: null,
+        readAt: null,
+        taskVersion: formsBySlug.get(taskSlug)?.meta.version ?? 1,
+      };
+      setRuns((prev) => [optimistic, ...prev.filter((r) => r.id !== runId)]);
+      setRecentSlugs((prev) => [taskSlug, ...prev.filter((s) => s !== taskSlug)].slice(0, 5));
+    },
+    [formsBySlug],
+  );
 
   const scheduleRun = useCallback(
     async (taskSlug: string, inputs: Record<string, unknown>, scheduledAt: string, repeat: RepeatInterval) => {

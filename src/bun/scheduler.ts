@@ -1,5 +1,5 @@
 import type { RepeatInterval, RunRecord } from "../shared/types";
-import { projectPaths } from "./config";
+import { projectPaths, resolveProjectByName } from "./config";
 import {
   createRun,
   deleteRun,
@@ -8,6 +8,7 @@ import {
   resolveRunProject,
   updateRunSchedule,
 } from "./db/history";
+import { loadTaskFolder } from "./tasks/loader";
 
 export type TriggerRun = (
   projectPath: string,
@@ -80,20 +81,27 @@ function fire(projectPath: string, run: RunRecord, late: boolean): void {
       startedAt: new Date().toISOString(),
       scheduledAt: next.toISOString(),
       repeatInterval: run.repeatInterval,
+      taskVersion: run.taskVersion, // Keep the same version for recurring runs (ticket 105)
     });
     arm(projectPath, created);
   }
 }
 
 /** Persist a new scheduled run and arm its timer. */
-export function schedule(
+export async function schedule(
   projectPath: string,
   taskSlug: string,
   inputs: Record<string, unknown>,
   scheduledAt: string,
   repeatInterval: RepeatInterval,
-): string {
+): Promise<string> {
   const id = crypto.randomUUID();
+
+  // Load task to get current version (ticket 105: schedules created against "latest" pick up new versions).
+  const project = await resolveProjectByName(projectPath);
+  const projectName = project?.name ?? projectPath;
+  const folder = await loadTaskFolder(projectPath, taskSlug, projectName);
+
   const run = createRun(projectPath, {
     id,
     taskSlug,
@@ -102,6 +110,7 @@ export function schedule(
     startedAt: new Date().toISOString(),
     scheduledAt,
     repeatInterval,
+    taskVersion: folder?.meta.version ?? 1, // Capture version at schedule-creation time
   });
   arm(projectPath, run);
   return id;

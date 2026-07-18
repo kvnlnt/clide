@@ -86,6 +86,7 @@ export default function Thread() {
                 scheduledAt: null,
                 repeatInterval: null,
                 readAt: null,
+                taskVersion: folder.meta.version,
               };
               return (
                 <TaskCard

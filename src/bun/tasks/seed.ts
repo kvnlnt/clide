@@ -18,6 +18,8 @@ const SEEDS: Seed[] = [
       project: "Abounding Grace",
       tags: ["social", "publish"],
       interpreter: "bash",
+      lifecycle: "draft",
+      version: 1,
     },
     task: {
       fields: [
@@ -66,6 +68,8 @@ echo "Done."
       project: "Utilities",
       tags: ["files"],
       interpreter: "bash",
+      lifecycle: "draft",
+      version: 1,
     },
     task: {
       fields: [
@@ -108,6 +112,8 @@ done
       project: "Utilities",
       tags: ["system"],
       interpreter: "bash",
+      lifecycle: "draft",
+      version: 1,
     },
     task: {
       fields: [],

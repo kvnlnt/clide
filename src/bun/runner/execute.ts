@@ -120,6 +120,7 @@ export async function startRun(
       inputs,
       status: "running",
       startedAt,
+      taskVersion: folder.meta.version, // Ticket 105: record the version executed
     });
   }
 

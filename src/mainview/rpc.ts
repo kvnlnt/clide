@@ -849,4 +849,100 @@ export const api = {
       return { ok: false, error: String(err) };
     }
   },
+
+  // Task adoption & versioning (ticket 105) -----------------------------------
+
+  async adoptTask(projectPath: string, slug: string): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.adoptTask({ projectPath, slug });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async saveTaskVersion(
+    projectPath: string,
+    slug: string,
+    meta: Omit<import("../shared/types").TaskMeta, "slug" | "createdAt" | "updatedAt">,
+    task: import("../shared/types").TaskDefinition,
+  ): Promise<{ ok: boolean; version?: number; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.saveTaskVersion({ projectPath, slug, meta, task });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async listTaskVersions(
+    projectPath: string,
+    slug: string,
+  ): Promise<{ ok: boolean; versions?: import("../shared/types").TaskVersionInfo[]; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.listTaskVersions({ projectPath, slug });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async loadTaskVersion(
+    projectPath: string,
+    slug: string,
+    version: number,
+  ): Promise<{ ok: boolean; folder?: TaskFolder; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.loadTaskVersion({ projectPath, slug, version });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async rollbackTaskVersion(
+    projectPath: string,
+    slug: string,
+    version: number,
+  ): Promise<{ ok: boolean; newVersion?: number; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.rollbackTaskVersion({ projectPath, slug, version });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async getWorkflowsReferencingTask(
+    projectPath: string,
+    slug: string,
+  ): Promise<{ workflows: import("../shared/types").WorkflowTaskReference[] }> {
+    const r = request();
+    if (!r) return { workflows: [] };
+    try {
+      return await r.getWorkflowsReferencingTask({ projectPath, slug });
+    } catch {
+      return { workflows: [] };
+    }
+  },
+
+  async upgradeWorkflowTaskVersion(
+    projectPath: string,
+    workflowId: string,
+    stepNames: string[],
+    newVersion: number,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.upgradeWorkflowTaskVersion({ projectPath, workflowId, stepNames, newVersion });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
 };
