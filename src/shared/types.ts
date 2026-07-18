@@ -722,6 +722,12 @@ export type ClideRPC = {
         response: { ok: boolean; workflow?: Workflow; notes?: string[]; error?: string };
       };
 
+      /** Duplicate an existing workflow into a new one and return the new workflow. */
+      duplicateWorkflow: {
+        params: { project: string; id: string };
+        response: { ok: boolean; workflow?: Workflow; error?: string };
+      };
+
       setPinned: {
         params: { runId: string; pinned: boolean };
         response: void;

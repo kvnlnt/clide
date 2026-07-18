@@ -738,4 +738,14 @@ export const api = {
       return { ok: false, error: String(err) };
     }
   },
+
+  async duplicateWorkflow(project: string, id: string): Promise<{ ok: boolean; workflow?: Workflow; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.duplicateWorkflow({ project, id });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
 };

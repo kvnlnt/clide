@@ -90,8 +90,8 @@ interface AppState {
   saveWorkflow: (workflow: Workflow) => Promise<{ ok: boolean; error?: string }>;
   deleteWorkflowById: (id: string) => Promise<void>;
   /** Full-window workflow editor/wizard hosting (tickets 91/92). */
-  workflowEditor: { mode: "new" } | { mode: "edit"; workflow: Workflow } | null;
-  openWorkflowEditor: (workflow?: Workflow) => void;
+  workflowEditor: { mode: "new" } | { mode: "edit"; workflow: Workflow; focusName?: boolean } | null;
+  openWorkflowEditor: (workflow?: Workflow, focusName?: boolean) => void;
   closeWorkflowEditor: () => void;
 
   setActiveProject: (p: string | null) => void;
@@ -188,9 +188,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /** Skipped for this launch — don't re-open until the app restarts. */
   const aiWizardSkippedRef = useRef(false);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
-  const [workflowEditor, setWorkflowEditor] = useState<{ mode: "new" } | { mode: "edit"; workflow: Workflow } | null>(
-    null,
-  );
+  const [workflowEditor, setWorkflowEditor] = useState<
+    { mode: "new" } | { mode: "edit"; workflow: Workflow; focusName?: boolean } | null
+  >(null);
 
   const [views, setViews] = useState<ThreadView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
@@ -474,8 +474,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [activeProject, refreshWorkflows],
   );
 
-  const openWorkflowEditor = useCallback((workflow?: Workflow) => {
-    setWorkflowEditor(workflow ? { mode: "edit", workflow } : { mode: "new" });
+  const openWorkflowEditor = useCallback((workflow?: Workflow, focusName?: boolean) => {
+    setWorkflowEditor(workflow ? { mode: "edit", workflow, focusName } : { mode: "new" });
   }, []);
   const closeWorkflowEditor = useCallback(() => setWorkflowEditor(null), []);
 

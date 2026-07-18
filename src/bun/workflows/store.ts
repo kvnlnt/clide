@@ -232,3 +232,42 @@ export async function deleteWorkflow(projectPath: string, id: string): Promise<v
     }
   }
 }
+
+/** Deep-copy a workflow within the project. Returns the new workflow or null if not found. */
+export async function duplicateWorkflow(projectPath: string, id: string): Promise<Workflow | null> {
+  ensureDir(projectWorkflowsDir(projectPath));
+  const existing = await listWorkflows(projectPath);
+  const src = existing.find((w) => w.id === id);
+  if (!src) return null;
+
+  // Deep clone steps and triggers (safe JSON round-trip for our shapes).
+  const cloneSteps = (s: WorkflowStep[]): WorkflowStep[] => JSON.parse(JSON.stringify(s));
+  const cloneTriggers = (t: WorkflowTrigger[]): WorkflowTrigger[] => JSON.parse(JSON.stringify(t));
+
+  // Name dedupe: "<Original> copy", then "copy 2", "copy 3", ... against ALL existing names.
+  const base = `${src.name} copy`;
+  const names = new Set(existing.map((w) => w.name));
+  let name = base;
+  if (names.has(name)) {
+    let i = 2;
+    while (names.has(`${base} ${i}`)) i++;
+    name = `${base} ${i}`;
+  }
+
+  const now = new Date().toISOString();
+  const next: Workflow = {
+    ...src,
+    id: crypto.randomUUID(),
+    name,
+    steps: cloneSteps(src.steps),
+    triggers: cloneTriggers(src.triggers),
+    // preserve params/description verbatim; duplicated copy must start disabled
+    enabled: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  // Persist
+  await saveWorkflow(projectPath, next);
+  return next;
+}

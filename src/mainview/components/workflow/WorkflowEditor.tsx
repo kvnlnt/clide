@@ -12,10 +12,12 @@ import {
   Terminal,
   Trash2,
   X,
+  Copy,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { STEP_NAME_RE, allSteps, computeScopes, expressionRefs, templateRefs } from "../../../shared/workflowExpr";
 import { useApp } from "../../context/AppContext";
+import { api } from "../../rpc";
 import type { DecisionStep, TaskFolder, TaskStep, Workflow, WorkflowStep, WorkflowTrigger } from "../../types/tasks";
 import { buildCommand, formatCommandPreview } from "../../types/tasks";
 import { useEscapeToClose } from "../Modal";
@@ -632,10 +634,12 @@ interface WorkflowEditorProps {
   onClose: () => void;
   /** Notes from the AI draft (ticket 92), shown as a hint bar. */
   draftNotes?: string[];
+  /** When true, focus and select the name field on open. */
+  focusName?: boolean;
 }
 
-export default function WorkflowEditor({ initial, onClose, draftNotes }: WorkflowEditorProps) {
-  const { forms, activeProject, formsBySlug, saveWorkflow } = useApp();
+export default function WorkflowEditor({ initial, onClose, draftNotes, focusName }: WorkflowEditorProps) {
+  const { forms, activeProject, formsBySlug, saveWorkflow, openWorkflowEditor, refreshWorkflows } = useApp();
   const { confirm, toast } = useUIFeedback();
   const [wf, setWf] = useState<Workflow>(initial);
   const [saving, setSaving] = useState(false);
@@ -674,6 +678,23 @@ export default function WorkflowEditor({ initial, onClose, draftNotes }: Workflo
 
   const ctx: StepCtx = { workflow: wf, formsBySlug, projectForms, problems };
 
+  // Focus name input when requested (for duplicate flow). Select text so first
+  // keystroke replaces it.
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (focusName) {
+      // Defer to next tick so the element is mounted and visible in the overlay.
+      setTimeout(() => {
+        try {
+          nameRef.current?.focus();
+          nameRef.current?.select();
+        } catch {
+          /* best-effort */
+        }
+      }, 30);
+    }
+  }, [focusName]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-4 px-8 pb-4 pt-7">
@@ -688,6 +709,24 @@ export default function WorkflowEditor({ initial, onClose, draftNotes }: Workflo
             <AlertTriangle size={12} /> {totalIssues} issue{totalIssues === 1 ? "" : "s"}
           </span>
         )}
+        <button
+          onClick={async () => {
+            if (!activeProject) return;
+            const res = await api.duplicateWorkflow(activeProject, wf.id);
+            if (!res.ok || !res.workflow) {
+              toast(res.error ?? "Couldn't duplicate workflow", "error");
+              return;
+            }
+            toast(`Duplicated '${wf.name}'`);
+            // Open the duplicated workflow in the editor and focus its name
+            openWorkflowEditor(res.workflow, true);
+            await refreshWorkflows();
+          }}
+          title="Duplicate"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
+        >
+          <Copy size={16} />
+        </button>
         <button
           onClick={() => void requestClose()}
           title="Close"
@@ -712,7 +751,12 @@ export default function WorkflowEditor({ initial, onClose, draftNotes }: Workflo
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <label className={fieldLabel}>Name</label>
-              <input className={inputBase} value={wf.name} onChange={(e) => setWf({ ...wf, name: e.target.value })} />
+              <input
+                ref={nameRef}
+                className={inputBase}
+                value={wf.name}
+                onChange={(e) => setWf({ ...wf, name: e.target.value })}
+              />
             </div>
             <div className="flex flex-col gap-1">
               <label className={fieldLabel}>Manual-run parameters</label>

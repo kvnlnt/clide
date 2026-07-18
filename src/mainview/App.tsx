@@ -267,7 +267,12 @@ function Workspace() {
           {workflowEditor.mode === "new" ? (
             <NewWorkflowWizard onClose={closeWorkflowEditor} />
           ) : (
-            <WorkflowEditor initial={workflowEditor.workflow} onClose={closeWorkflowEditor} />
+            <WorkflowEditor
+              initial={workflowEditor.workflow}
+              onClose={closeWorkflowEditor}
+              // forward focusName if the opener requested it
+              {...(workflowEditor.focusName ? { focusName: true } : {})}
+            />
           )}
         </div>
       )}

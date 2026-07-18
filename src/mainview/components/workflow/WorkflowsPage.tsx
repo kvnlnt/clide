@@ -1,4 +1,4 @@
-import { FlaskConical, ListChecks, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { FlaskConical, ListChecks, Pencil, Play, Plus, Trash2, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context/AppContext";
 import { api, on } from "../../rpc";
@@ -71,7 +71,7 @@ type PageView =
  * tab (ticket 94) and dry-run plan (ticket 95) hosted as drill-in views.
  */
 export default function WorkflowsPage() {
-  const { activeProject, workflows, saveWorkflow, deleteWorkflowById, openWorkflowEditor } = useApp();
+  const { activeProject, workflows, saveWorkflow, deleteWorkflowById, openWorkflowEditor, refreshWorkflows } = useApp();
   const { confirm, toast } = useUIFeedback();
   const [view, setView] = useState<PageView>({ kind: "list" });
   const [runs, setRuns] = useState<WorkflowRunSummary[]>([]);
@@ -285,6 +285,23 @@ export default function WorkflowsPage() {
                         className="flex h-7 w-7 items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
                       >
                         <Pencil size={13} />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!activeProject) return;
+                          const res = await api.duplicateWorkflow(activeProject, w.id);
+                          if (!res.ok || !res.workflow) {
+                            toast(res.error ?? "Couldn't duplicate workflow", "error");
+                            return;
+                          }
+                          toast(`Duplicated '${w.name}'`);
+                          await refreshWorkflows();
+                          openWorkflowEditor(res.workflow, true);
+                        }}
+                        title="Duplicate"
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
+                      >
+                        <Copy size={13} />
                       </button>
                       <button
                         onClick={() => void remove(w)}

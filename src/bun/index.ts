@@ -69,6 +69,7 @@ import {
   listWorkflows as storeListWorkflows,
   saveWorkflow as storeSaveWorkflow,
   validateForSave,
+  duplicateWorkflow as storeDuplicateWorkflow,
 } from "./workflows/store";
 import {
   disposeWorkflowTriggers,
@@ -666,6 +667,20 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         try {
           const { workflow, notes } = await draftWorkflow(goal, name, tasks, service, model);
           return { ok: true, workflow, notes };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      duplicateWorkflow: async ({ project, id }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return { ok: false, error: "Project not found" };
+        try {
+          const dup = await storeDuplicateWorkflow(resolved.path, id);
+          if (!dup) return { ok: false, error: "Workflow not found" };
+          // Refresh triggers so the new (disabled) workflow is known; list refresh happens in client.
+          await refreshWorkflowTriggers(await listProjects());
+          return { ok: true, workflow: dup };
         } catch (err) {
           return { ok: false, error: String(err) };
         }
