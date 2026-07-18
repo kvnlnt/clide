@@ -252,16 +252,7 @@ async function execute(
   // Fire-and-forget AI summary generation (ticket 98) — skip workflow child runs.
   const runRecord = getRun(runId);
   if (runRecord && !runRecord.triggeredBy) {
-    void generateAndSetSummary(
-      runId,
-      folder,
-      inputs,
-      exitCode,
-      capture.text,
-      stderrText,
-      outputs,
-      emitters,
-    );
+    void generateAndSetSummary(runId, folder, inputs, exitCode, capture.text, stderrText, outputs, emitters);
   }
 
   // Workflow form-submitted triggers (ticket 90) fire on successful

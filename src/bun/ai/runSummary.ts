@@ -161,10 +161,7 @@ export function fallbackSummary(
  * Generate an AI summary for a completed workflow run (ticket 98).
  * One summary per workflow run, not per step.
  */
-export async function generateWorkflowSummary(
-  workflow: Workflow,
-  run: WorkflowRun,
-): Promise<string | null> {
+export async function generateWorkflowSummary(workflow: Workflow, run: WorkflowRun): Promise<string | null> {
   try {
     const service = await getDefaultAIService();
     if (!service) return null; // No AI configured — skip silently
@@ -186,7 +183,10 @@ export async function generateWorkflowSummary(
       `Status: ${run.status}`,
       `Steps: ${succeededSteps.length} succeeded${failedSteps.length > 0 ? `, ${failedSteps.length} failed` : ""}`,
       failedSteps.length > 0
-        ? `Failed steps:\n${failedSteps.map((s) => `- ${s.name}${s.note ? `: ${s.note}` : ""}`).slice(0, 5).join("\n")}`
+        ? `Failed steps:\n${failedSteps
+            .map((s) => `- ${s.name}${s.note ? `: ${s.note}` : ""}`)
+            .slice(0, 5)
+            .join("\n")}`
         : null,
     ]
       .filter(Boolean)
@@ -238,4 +238,3 @@ export function fallbackWorkflowSummary(run: WorkflowRun): string {
 
   return "Succeeded";
 }
-

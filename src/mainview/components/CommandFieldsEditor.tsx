@@ -1,7 +1,7 @@
 import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { describeFieldMapping } from "../types/tasks";
 import type { ArgMapping, ArgMappingKind, FieldType, TaskField, ToolSpec } from "../types/tasks";
+import { describeFieldMapping } from "../types/tasks";
 
 const FIELD_TYPES: FieldType[] = ["text", "textarea", "select", "multicheck", "number", "file", "date"];
 const TYPE_HINT: Record<FieldType, string> = {
@@ -102,9 +102,7 @@ export default function CommandFieldsEditor({ fields, onChange, toolSpec, openId
             field={field}
             toolSpec={toolSpec}
             open={openId === field.id}
-            duplicateFlag={
-              field.argMapping?.flag !== undefined && (flagCounts.get(field.argMapping.flag) ?? 0) > 1
-            }
+            duplicateFlag={field.argMapping?.flag !== undefined && (flagCounts.get(field.argMapping.flag) ?? 0) > 1}
             onToggle={() => onOpenChange(openId === field.id ? null : field.id)}
             onCollapse={() => onOpenChange(null)}
             onUpdate={(partial) => update(i, partial)}
@@ -148,11 +146,7 @@ function FieldCard({
   onMoveDown?: () => void;
 }) {
   const untitled = field.label.trim() === "";
-  const summary = [
-    field.type,
-    field.required ? "required" : "optional",
-    describeFieldMapping(field),
-  ].join(" · ");
+  const summary = [field.type, field.required ? "required" : "optional", describeFieldMapping(field)].join(" · ");
 
   const iconBtn =
     "flex h-6 w-6 shrink-0 items-center justify-center rounded text-white/30 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:hover:bg-transparent";
@@ -387,7 +381,11 @@ function MappingSection({
       {hasSpecChoices && (
         <div className="flex flex-col gap-1">
           <label className={fieldLabel}>This field fills…</label>
-          <select className={`${inputBase} appearance-none`} value={specValue} onChange={(e) => pickSpecEntry(e.target.value)}>
+          <select
+            className={`${inputBase} appearance-none`}
+            value={specValue}
+            onChange={(e) => pickSpecEntry(e.target.value)}
+          >
             {options.map((o, i) => (
               <option key={`opt:${i}`} value={`opt:${i}`} className="bg-clide-panel">
                 {o.flags.join(", ")}
@@ -447,7 +445,9 @@ function MappingSection({
                 className={`${inputBase} w-28`}
                 placeholder="0"
                 value={mapping.order ?? ""}
-                onChange={(e) => updateMapping({ ...mapping, order: e.target.value ? Number(e.target.value) : undefined })}
+                onChange={(e) =>
+                  updateMapping({ ...mapping, order: e.target.value ? Number(e.target.value) : undefined })
+                }
               />
               <span className={fieldHint}>Order among the bare arguments, lowest first</span>
             </div>
