@@ -1,4 +1,4 @@
-import { Braces, Eye, Zap } from "lucide-react";
+import { Braces, Eye } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import type { FormDefinition, FormMeta, RunRecord, RunStatus } from "../types/forms";
 import EllipsisMenu from "./EllipsisMenu";
@@ -60,18 +60,10 @@ export default function FormCardHeader({
   activeTab,
   onTabChange,
 }: FormCardHeaderProps) {
-  const { runs, formsBySlug, activeViewId } = useApp();
+  const { activeViewId } = useApp();
   // Pinning only has meaning inside saved views (ticket 27) — hide the
   // affordance entirely on the chronological title tab.
   const showPin = activeViewId !== null;
-
-  const trigger = run.triggeredBy;
-  let triggerTitle: string | null = null;
-  if (trigger) {
-    const sourceRun = runs.find((r) => r.id === trigger.sourceRunId);
-    const sourceName = sourceRun ? formsBySlug.get(sourceRun.formSlug)?.meta.name : undefined;
-    triggerTitle = `Triggered by ${trigger.event}${sourceName ? ` from ${sourceName}` : ""}`;
-  }
 
   const time =
     run.status === "scheduled" && run.scheduledAt
@@ -89,11 +81,6 @@ export default function FormCardHeader({
       onClick={onToggle}
     >
       <span className="shrink-0 text-[12px] font-medium text-white">{meta.name}</span>
-      {triggerTitle && (
-        <span className="flex shrink-0 items-center text-amber-300/80" title={triggerTitle}>
-          <Zap size={12} />
-        </span>
-      )}
       <div className="flex shrink-0 items-center gap-1">
         {STATUS_ORDER.filter((s) => (statusCounts[s] ?? 0) > 0).map((s) => (
           <span

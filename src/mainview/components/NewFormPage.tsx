@@ -5,12 +5,12 @@ import { api } from "../rpc";
 import CommandFieldsEditor from "./CommandFieldsEditor";
 import FormPreview from "./FormPreview";
 import { useEscapeToClose } from "./Modal";
-import { OutputKindPicker, TagEditor } from "./OutputsEvents";
+import OutputDefinitionsEditor from "./OutputDefinitionsEditor";
 import ServiceModelPicker, { type ServiceModelValue } from "./ServiceModelPicker";
 import ToolChooser from "./ToolChooser";
 import WizardSteps from "./WizardSteps";
 import { buildCommand, formatCommandPreview } from "../types/forms";
-import type { FormEvents, FormField, OutputSpec, OutputType, ToolRegistryEntry } from "../types/forms";
+import type { FormField, OutputDefinition, OutputType, ToolRegistryEntry } from "../types/forms";
 
 interface NewFormPageProps {
   onClose: () => void;
@@ -18,7 +18,7 @@ interface NewFormPageProps {
 
 type Step = 1 | 2 | 3 | 4;
 
-const STEP_LABELS = ["Describe", "Tool", "Fields", "Output & events"] as const;
+const STEP_LABELS = ["Describe", "Tool", "Fields", "Outputs"] as const;
 
 function isSampleFilled(value: unknown): boolean {
   if (Array.isArray(value)) return value.length > 0;
@@ -105,9 +105,8 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
     }
   }, [fields]);
 
-  // Step 4
-  const [outputs, setOutputs] = useState<OutputSpec[]>([{ kind: "text" }]);
-  const [events, setEvents] = useState<FormEvents>({ emits: [], listensFor: [] });
+  // Step 4 (ticket 78): raw output is always captured; definitions extract named pieces.
+  const [outputs, setOutputs] = useState<OutputDefinition[]>([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -164,7 +163,7 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
     if (!tool || !name.trim() || !project.trim()) return;
     setCreating(true);
     setCreateError(null);
-    const outputType = (outputs.find((o) => o.kind !== "effect")?.kind as OutputType | undefined) ?? "text";
+    const outputType: OutputType = outputs[0]?.kind ?? "text";
     const res = await api.createCommandForm({
       project: project.trim(),
       name: name.trim(),
@@ -174,7 +173,6 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
       fields,
       outputType,
       outputs,
-      events,
     });
     setCreating(false);
     if (res.ok && res.slug) {
@@ -417,19 +415,7 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
 
           {step === 4 && (
             <>
-              <OutputKindPicker outputs={outputs} onChange={setOutputs} />
-              <TagEditor
-                label="Emits"
-                hint="Events fired when a run succeeds — e.g. media:created"
-                tags={events.emits}
-                onChange={(emits) => setEvents({ ...events, emits })}
-              />
-              <TagEditor
-                label="Listens for"
-                hint="Events that auto-submit this form"
-                tags={events.listensFor}
-                onChange={(listensFor) => setEvents({ ...events, listensFor })}
-              />
+              <OutputDefinitionsEditor outputs={outputs} onChange={setOutputs} />
               {unlabeledField && (
                 <div className="rounded border border-amber-400/30 bg-amber-400/5 p-3 text-[13px] text-amber-200">
                   A field is missing its label — give it one in the Fields step before creating.

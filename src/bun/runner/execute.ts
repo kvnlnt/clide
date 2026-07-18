@@ -1,10 +1,18 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { buildCommand } from "../../shared/command";
-import type { FormDefinition, Interpreter, OutputChunk, RunRecord, RunStatusUpdate, RunTrigger } from "../../shared/types";
+import { buildCommand, formatCommandPreview } from "../../shared/command";
+import { evaluateOutputs } from "../../shared/outputs";
+import type {
+  FormFolder,
+  Interpreter,
+  OutputChunk,
+  OutputResult,
+  RunRecord,
+  RunStatusUpdate,
+} from "../../shared/types";
 import { createRun, getRun, setOutputPath, setResolvedCommand, updateRunStatus } from "../db/history";
-import { publishRunEvents } from "../events/bus";
 import { loadFormFolder } from "../forms/loader";
-import { formDir } from "../paths";
+import { formDir, runDir } from "../paths";
 import { buildArgs } from "./argBuilder";
 import { OutputCapture } from "./outputCapture";
 import * as registry from "./registry";
@@ -21,6 +29,32 @@ const INTERPRETER_CMD: Record<Interpreter, string> = {
   bun: "bun",
 };
 
+/** Cap in-memory stderr accumulation (streaming to the UI is unaffected). */
+const MAX_CAPTURE_CHARS = 256 * 1024;
+
+/**
+ * Fired when a standalone (user/scheduler-initiated) form run completes
+ * successfully — the workflow form-submitted trigger hook (ticket 81).
+ * Replaces the event bus: nothing implicit, one explicit listener.
+ */
+export interface RunCompletionInfo {
+  projectPath: string;
+  projectName: string;
+  formSlug: string;
+  runId: string;
+  exitCode: number | null;
+  inputs: Record<string, unknown>;
+  stdout: string;
+  stderr: string;
+  outputs: OutputResult[];
+}
+
+let completionListener: ((info: RunCompletionInfo) => void) | null = null;
+
+export function setRunCompletionListener(fn: (info: RunCompletionInfo) => void): void {
+  completionListener = fn;
+}
+
 /**
  * Create a run record and start executing it. Returns the run id immediately;
  * execution continues asynchronously, streaming output through `emitters`.
@@ -32,7 +66,6 @@ export async function startRun(
   inputs: Record<string, unknown>,
   emitters: RunEmitters,
   existingRunId?: string,
-  triggeredBy?: RunTrigger,
 ): Promise<{ runId: string }> {
   const folder = await loadFormFolder(projectPath, formSlug, projectName);
   if (!folder) {
@@ -51,7 +84,6 @@ export async function startRun(
       inputs,
       status: "running",
       startedAt,
-      triggeredBy: triggeredBy ?? null,
     });
   }
 
@@ -68,106 +100,71 @@ export async function startRun(
   });
 
   // Fire-and-forget the actual execution.
-  if (folder.form.command) {
-    void executeCommand(projectPath, projectName, runId, formSlug, inputs, emitters);
-  } else {
-    void executeScript(
-      projectPath,
-      projectName,
-      runId,
-      folder.form.scriptFile ?? "script.sh",
-      folder.meta.interpreter ?? "bash",
-      formSlug,
-      inputs,
-      emitters,
-    );
-  }
+  void execute(projectPath, projectName, runId, folder, inputs, emitters);
 
   return { runId };
 }
 
-/** Runs a command-backed form (ticket 52): spawns its tool directly, no interpreter, no script file. */
-async function executeCommand(
-  projectPath: string,
-  projectName: string,
-  runId: string,
-  formSlug: string,
-  inputs: Record<string, unknown>,
-  emitters: RunEmitters,
-): Promise<void> {
-  const folder = await loadFormFolder(projectPath, formSlug, projectName);
-  if (!folder?.form.command) return;
-
-  const built = buildCommand(folder.form, inputs);
-  const resolvedPath = Bun.which(built.tool);
-  if (!resolvedPath) {
-    finishWithError(runId, emitters, `Tool not installed: "${built.tool}" is not on PATH.`);
-    return;
-  }
-  setResolvedCommand(runId, built.tool, built.argv);
-
-  const capture = new OutputCapture(projectPath, runId);
-
-  let proc: ReturnType<typeof Bun.spawn>;
-  try {
-    proc = Bun.spawn([resolvedPath, ...built.argv], {
+/** Spawns a form's process — direct tool invocation for command forms, interpreter+script for legacy. */
+function spawnForm(folder: FormFolder, inputs: Record<string, unknown>): {
+  proc: ReturnType<typeof Bun.spawn>;
+  commandDisplay: string;
+  argv?: { tool: string; argv: string[] };
+} {
+  if (folder.form.command) {
+    const built = buildCommand(folder.form, inputs);
+    const resolvedPath = Bun.which(built.tool);
+    if (!resolvedPath) {
+      throw new Error(`Tool not installed: "${built.tool}" is not on PATH.`);
+    }
+    const proc = Bun.spawn([resolvedPath, ...built.argv], {
       stdout: "pipe",
       stderr: "pipe",
       stdin: built.stdin !== undefined ? new TextEncoder().encode(built.stdin) : undefined,
       env: Object.keys(built.env).length > 0 ? { ...process.env, ...built.env } : undefined,
     });
-  } catch (err) {
-    finishWithError(runId, emitters, `Failed to spawn: ${String(err)}`);
-    return;
+    return {
+      proc,
+      commandDisplay: formatCommandPreview(built.tool, built.argv),
+      argv: { tool: built.tool, argv: built.argv },
+    };
   }
 
-  registry.register(runId, proc);
-  await pumpAndFinish(proc, runId, formSlug, capture, folder.form, emitters);
+  const scriptFile = folder.form.scriptFile ?? "script.sh";
+  const scriptPath = join(formDir(folder.projectPath, folder.meta.slug), scriptFile);
+  const args = buildArgs(folder.form, inputs);
+  const cmd = INTERPRETER_CMD[folder.meta.interpreter ?? "bash"] ?? "bash";
+  const proc = Bun.spawn([cmd, scriptPath, ...args], {
+    stdout: "pipe",
+    stderr: "pipe",
+    cwd: formDir(folder.projectPath, folder.meta.slug),
+  });
+  return { proc, commandDisplay: formatCommandPreview(cmd, [scriptPath, ...args]) };
 }
 
-async function executeScript(
+async function execute(
   projectPath: string,
   projectName: string,
   runId: string,
-  scriptFile: string,
-  interpreter: Interpreter,
-  formSlug: string,
+  folder: FormFolder,
   inputs: Record<string, unknown>,
   emitters: RunEmitters,
 ): Promise<void> {
-  const folder = await loadFormFolder(projectPath, formSlug, projectName);
-  if (!folder) return;
-
-  const scriptPath = join(formDir(projectPath, formSlug), scriptFile);
-  const args = buildArgs(folder.form, inputs);
-  const cmd = INTERPRETER_CMD[interpreter] ?? "bash";
   const capture = new OutputCapture(projectPath, runId);
 
-  let proc: ReturnType<typeof Bun.spawn>;
+  let spawned: ReturnType<typeof spawnForm>;
   try {
-    proc = Bun.spawn([cmd, scriptPath, ...args], {
-      stdout: "pipe",
-      stderr: "pipe",
-      cwd: formDir(projectPath, formSlug),
-    });
+    spawned = spawnForm(folder, inputs);
   } catch (err) {
-    finishWithError(runId, emitters, `Failed to spawn: ${String(err)}`);
+    finishWithError(runId, emitters, err instanceof Error ? err.message : `Failed to spawn: ${String(err)}`);
     return;
   }
+  if (spawned.argv) setResolvedCommand(runId, spawned.argv.tool, spawned.argv.argv);
 
-  registry.register(runId, proc);
-  await pumpAndFinish(proc, runId, formSlug, capture, folder.form, emitters);
-}
+  registry.register(runId, spawned.proc);
 
-async function pumpAndFinish(
-  proc: ReturnType<typeof Bun.spawn>,
-  runId: string,
-  formSlug: string,
-  capture: OutputCapture,
-  form: FormDefinition,
-  emitters: RunEmitters,
-): Promise<void> {
   const decoder = new TextDecoder();
+  let stderrText = "";
 
   async function pump(stream: ReadableStream<Uint8Array> | undefined, type: "stdout" | "stderr"): Promise<void> {
     if (!stream) return;
@@ -177,20 +174,31 @@ async function pumpAndFinish(
       if (done) break;
       const text = decoder.decode(value);
       if (type === "stdout") capture.append(text);
+      else if (stderrText.length < MAX_CAPTURE_CHARS) stderrText += text;
       emitters.emitChunk({ runId, type, data: text, timestamp: Date.now() });
     }
   }
 
-  const pumpStdout = pump(proc.stdout as ReadableStream<Uint8Array> | undefined, "stdout");
-  const pumpStderr = pump(proc.stderr as ReadableStream<Uint8Array> | undefined, "stderr");
+  const pumpStdout = pump(spawned.proc.stdout as ReadableStream<Uint8Array> | undefined, "stdout");
+  const pumpStderr = pump(spawned.proc.stderr as ReadableStream<Uint8Array> | undefined, "stderr");
 
-  const exitCode = await proc.exited;
+  const exitCode = await spawned.proc.exited;
   await Promise.all([pumpStdout, pumpStderr]);
   registry.unregister(runId);
 
   const finishedAt = new Date().toISOString();
   const outputPath = await capture.flush();
   setOutputPath(runId, outputPath);
+
+  // Evaluate + persist named output definitions (ticket 77) — never blocks
+  // or fails the run itself.
+  let outputs: OutputResult[] = [];
+  try {
+    outputs = evaluateOutputs(folder.form.outputs ?? [], { stdout: capture.text, stderr: stderrText }, existsSync);
+    await Bun.write(join(runDir(projectPath, runId), "outputs.json"), JSON.stringify(outputs, null, 2));
+  } catch (err) {
+    console.warn(`[outputs] evaluation failed for ${runId}:`, err);
+  }
 
   // A cancelled process is killed and already marked error; don't override.
   const current = getRun(runId);
@@ -202,42 +210,86 @@ async function pumpAndFinish(
   updateRunStatus(runId, status, exitCode, finishedAt);
   emitters.emitStatus({ runId, status, exitCode, finishedAt });
 
-  // Fire the form's declared events on the internal bus (ticket 23), carrying
-  // any file artifacts this run produced (ticket 56).
-  if (status === "success") {
-    const emits = form.events?.emits ?? [];
-    if (emits.length > 0) {
-      const artifacts = await collectArtifacts(capture.text, form.outputType);
-      publishRunEvents({ runId, formSlug }, emits, capture.text, form.outputType, artifacts);
-    }
+  // Workflow form-submitted triggers (ticket 81) fire on successful
+  // standalone completion — outputs exist by now, which is the point.
+  if (status === "success" && completionListener) {
+    completionListener({
+      projectPath,
+      projectName,
+      formSlug: folder.meta.slug,
+      runId,
+      exitCode,
+      inputs,
+      stdout: capture.text,
+      stderr: stderrText,
+      outputs,
+    });
   }
 }
 
-/**
- * File paths a run produced, for the event bus's "artifacts" (ticket 56):
- * for image/audio/video outputs, the last printed line (the established
- * convention — see `readOutputFile`); plus any other line that's itself an
- * existing absolute path. Deliberately simple — not a general-purpose parser.
- */
-async function collectArtifacts(text: string, outputType: FormDefinition["outputType"]): Promise<string[]> {
-  const lines = text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l.startsWith("/"));
-  const candidates = new Set(lines);
-  if (outputType === "image" || outputType === "audio" || outputType === "video") {
-    const last = lines[lines.length - 1];
-    if (last) candidates.add(last);
+/** Reads the persisted output-definition results for a run (ticket 77). */
+export async function readRunOutputs(projectPath: string, runId: string): Promise<OutputResult[]> {
+  try {
+    const file = Bun.file(join(runDir(projectPath, runId), "outputs.json"));
+    if (!(await file.exists())) return [];
+    const parsed = JSON.parse(await file.text());
+    return Array.isArray(parsed) ? (parsed as OutputResult[]) : [];
+  } catch {
+    return [];
   }
-  const artifacts: string[] = [];
-  for (const candidate of Array.from(candidates).slice(0, 20)) {
-    try {
-      if (await Bun.file(candidate).exists()) artifacts.push(candidate);
-    } catch {
-      /* not a real path — skip */
+}
+
+// ---------------------------------------------------------------------------
+// One-shot execution for workflow form steps (ticket 80): same spawn path as
+// standalone runs — the single-compiler rule — but no history DB record, no
+// thread card, no completion trigger (workflow steps never cascade).
+// ---------------------------------------------------------------------------
+
+export interface ExecOnceResult {
+  commandDisplay: string;
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  outputs: OutputResult[];
+  durationMs: number;
+}
+
+export async function execFormOnce(
+  folder: FormFolder,
+  inputs: Record<string, unknown>,
+  /** Registry key for cancellation (the workflow run id); optional. */
+  procKey?: string,
+): Promise<ExecOnceResult> {
+  const started = Date.now();
+  const spawned = spawnForm(folder, inputs); // throws on tool-not-installed; caller records the failure
+
+  if (procKey) registry.register(procKey, spawned.proc);
+
+  const decoder = new TextDecoder();
+  let stdout = "";
+  let stderr = "";
+  const pump = async (stream: ReadableStream<Uint8Array> | undefined, sink: (t: string) => void) => {
+    if (!stream) return;
+    const reader = stream.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      sink(decoder.decode(value));
     }
-  }
-  return artifacts;
+  };
+  const p1 = pump(spawned.proc.stdout as ReadableStream<Uint8Array> | undefined, (t) => {
+    if (stdout.length < MAX_CAPTURE_CHARS) stdout += t;
+  });
+  const p2 = pump(spawned.proc.stderr as ReadableStream<Uint8Array> | undefined, (t) => {
+    if (stderr.length < MAX_CAPTURE_CHARS) stderr += t;
+  });
+
+  const exitCode = await spawned.proc.exited;
+  await Promise.all([p1, p2]);
+  if (procKey) registry.unregister(procKey);
+
+  const outputs = evaluateOutputs(folder.form.outputs ?? [], { stdout, stderr }, existsSync);
+  return { commandDisplay: spawned.commandDisplay, stdout, stderr, exitCode, outputs, durationMs: Date.now() - started };
 }
 
 function finishWithError(runId: string, emitters: RunEmitters, message: string): void {

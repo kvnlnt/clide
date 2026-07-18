@@ -7,7 +7,7 @@ import NewFormPage from "./components/NewFormPage";
 import NewProjectModal from "./components/NewProjectModal";
 import ProjectSettingsPage from "./components/ProjectSettingsPage";
 import ProjectToolbar from "./components/ProjectToolbar";
-import RunFormPicker from "./components/RunFormPicker";
+import RunPicker from "./components/RunPicker";
 import SettingsPanel from "./components/SettingsPanel";
 import Sidebar from "./components/Sidebar";
 import Thread from "./components/Thread";
@@ -17,6 +17,9 @@ import ViewSettingsModal from "./components/ViewSettingsModal";
 import ViewToolbar from "./components/ViewToolbar";
 import WelcomeScreen from "./components/WelcomeScreen";
 import WindowControls from "./components/WindowControls";
+import NewWorkflowWizard from "./components/workflow/NewWorkflowWizard";
+import WorkflowEditor from "./components/workflow/WorkflowEditor";
+import WorkflowsPage from "./components/workflow/WorkflowsPage";
 import { UIFeedbackLayer, UIFeedbackProvider } from "./components/UIFeedback";
 import { AppProvider, useApp, type ProjectSurface } from "./context/AppContext";
 import { on } from "./rpc";
@@ -49,6 +52,8 @@ function Workspace() {
     closeRunPicker,
     viewSettingsOpen,
     closeViewSettings,
+    workflowEditor,
+    closeWorkflowEditor,
   } = useApp();
 
   const activeProjectMeta = activeProject ? projectMeta.find((p) => p.name === activeProject) : undefined;
@@ -65,7 +70,11 @@ function Workspace() {
   // keydown handler and the native View menu (which lists these shortcuts).
   const dispatchViewAction = useCallback(
     (action: string) => {
+<<<<<<< HEAD
       const overlayOpen = newFormOpen || appSettingsOpen || newProjectOpen || viewSettingsOpen || aiWizardOpen;
+=======
+      const overlayOpen = newFormOpen || appSettingsOpen || newProjectOpen || viewSettingsOpen || workflowEditor !== null;
+>>>>>>> 1dbb9a8 (workflows)
       if (overlayOpen || !activeProject) return;
       const now = Date.now();
       if (lastActionRef.current.action === action && now - lastActionRef.current.at < 400) return;
@@ -95,6 +104,7 @@ function Workspace() {
       const surface = action.slice("view:".length) as ProjectSurface;
       setProjectSurface(projectSurface === surface ? "thread" : surface);
     },
+<<<<<<< HEAD
     [
       newFormOpen,
       appSettingsOpen,
@@ -109,6 +119,9 @@ function Workspace() {
       closeActiveTab,
       cycleTab,
     ],
+=======
+    [newFormOpen, appSettingsOpen, newProjectOpen, viewSettingsOpen, workflowEditor, activeProject, openRunPicker, setProjectSurface, projectSurface],
+>>>>>>> 1dbb9a8 (workflows)
   );
 
   // Native app-menu clicks (View → Forms/Calendar/…) route through the same dispatcher.
@@ -117,10 +130,14 @@ function Workspace() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       // All shortcuts are inert while a blocking overlay is open or no project is active.
+<<<<<<< HEAD
       const overlayOpen = newFormOpen || appSettingsOpen || newProjectOpen || viewSettingsOpen || aiWizardOpen;
+=======
+      const overlayOpen = newFormOpen || appSettingsOpen || newProjectOpen || viewSettingsOpen || workflowEditor !== null;
+>>>>>>> 1dbb9a8 (workflows)
       if (overlayOpen || !activeProject) return;
 
-      // ⌘P Forms, ⌘⇧C Calendar, ⌘⇧V Views, ⌘, Settings (plain C/V stay copy/paste).
+      // ⌘P Forms, ⌘⇧C Calendar, ⌘⇧V Views, ⌘⇧U Workflows, ⌘, Settings.
       if (e.ctrlKey || e.metaKey) {
         const key = e.key.toLowerCase();
         const act = (action: string) => {
@@ -130,6 +147,7 @@ function Workspace() {
         if (key === "p" && !e.shiftKey) return act("view:forms");
         if (key === "c" && e.shiftKey) return act("view:calendar");
         if (key === "v" && e.shiftKey) return act("view:views");
+        if (key === "u" && e.shiftKey) return act("view:workflows");
         if (key === ",") return act("view:project-settings");
         if (key === "k") return act("view:run-picker");
       }
@@ -161,7 +179,11 @@ function Workspace() {
     appSettingsOpen,
     newProjectOpen,
     viewSettingsOpen,
+<<<<<<< HEAD
     aiWizardOpen,
+=======
+    workflowEditor,
+>>>>>>> 1dbb9a8 (workflows)
     activeProject,
     isMac,
   ]);
@@ -185,6 +207,7 @@ function Workspace() {
               <ProjectToolbar />
               {projectSurface === "forms" && <FormsPanel />}
               {projectSurface === "views" && <ViewsPage />}
+              {projectSurface === "workflows" && <WorkflowsPage />}
               {projectSurface === "calendar" && <CalendarPage />}
               {projectSurface === "project-settings" && activeProjectMeta && (
                 <ProjectSettingsPage
@@ -196,7 +219,7 @@ function Workspace() {
               {projectSurface === "thread" && <Thread />}
             </>
           )}
-          {runPickerOpen && activeProject && <RunFormPicker onClose={closeRunPicker} />}
+          {runPickerOpen && activeProject && <RunPicker onClose={closeRunPicker} />}
         </div>
         {sidebarOpen && activeProject !== null && <Sidebar />}
       </div>
@@ -241,6 +264,21 @@ function Workspace() {
           here rather than inside the body pane makes its backdrop dim the
           header/tab strip and sidebar too, not just the body. */}
       {newProjectOpen && <NewProjectModal onClose={closeNewProject} />}
+
+      {/* Workflow creation/editing takes over the whole window like the form
+          wizard (tickets 82/83) — same overlay mechanic. */}
+      {workflowEditor && (
+        <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg">
+          <div className="flex electrobun-webkit-app-region-drag">
+            <TrafficLights />
+          </div>
+          {workflowEditor.mode === "new" ? (
+            <NewWorkflowWizard onClose={closeWorkflowEditor} />
+          ) : (
+            <WorkflowEditor initial={workflowEditor.workflow} onClose={closeWorkflowEditor} />
+          )}
+        </div>
+      )}
 
       {/* Same reasoning as NewProjectModal above — full-window backdrop dim. */}
       {viewSettingsOpen && activeView && (

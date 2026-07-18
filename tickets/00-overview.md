@@ -121,6 +121,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 73  | Native View Menu                      | App menu-bar View menu lists the surface shortcuts (⌘P, ⌘⇧C, ⌘⇧V, ⌘,, ⌘K) and triggers them | ✅ Done       |
 | 74  | Calendar Modals, Confirms & Toasts    | Composer/editor become modals; all confirmations are popup dialogs; results shown as toasts | ✅ Done       |
 | 75  | Escape Always Closes Modals           | Shared Modal component + window-level Escape hook; all modals converted, pattern enforced   | ✅ Done       |
+<<<<<<< HEAD
 | 76  | First-Run AI Service Wizard           | "First things first" full-window takeover when no AI service is registered; guided setup    | ✅ Done       |
 | 77  | Welcome Projects List                 | "Recent projects" → "Projects": all known projects on the home page, search filter for long lists | ✅ Done       |
 | 78  | First-Project Welcome Flow            | Full-screen zero-clutter first-run experience when no project exists; chains into ticket 76 | ✅ Done       |
@@ -130,6 +131,19 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 82  | Delete View Focuses Previous          | Deleting the active view activates its left neighbor instead of jumping to the title tab    | ✅ Done       |
 | 83  | New-Tab Browser Shortcut              | ⌘T / Ctrl+T creates a new view tab, matching the browser convention                         | ✅ Done       |
 | 84  | View Menu Tab Navigation              | New/Close/Next/Previous Tab shortcuts listed & wired in the native application View menu    | ✅ Done       |
+=======
+| 76  | Remove the Event Bus                  | Emits/listens-for, auto-submit, payload mapping & artifacts all removed; magic fill stays   | ✅ Done       \|
+| 77  | Output Definitions: Model & Engine    | Named, configurable outputs with explicit extraction (regex/jsonPath/file) + transforms     | ✅ Done       \|
+| 78  | Output Definitions: UI & Display      | Wizard step 4 authoring with live test; run card renders raw + each named output block      | ✅ Done       \|
+| 79  | Workflow Model, Schema & Expressions  | Epic: Workflow/Step/Trigger/Run types, JSON-on-disk schema doc, safe {{…}} expression lang  | ✅ Done       \|
+| 80  | Workflow Execution Engine             | Sequential/parallel/loop/decision execution via the one command compiler; full run traces   | ✅ Done       \|
+| 81  | Workflow Triggers                     | Manual (+params), cron-while-running, form-submitted; "Starts workflows" shown on the form  | ✅ Done       \|
+| 82  | Workflow Editor                       | Vertical list, nested expandable blocks, {{…}} autocomplete, compiled-command previews      | ✅ Done       \|
+| 83  | Workflow Creation Wizard              | Describe the goal → AI drafts steps/wiring from existing forms → fine-tune in the editor    | ✅ Done       \|
+| 84  | Workflows Surface & Run Dialog        | Toolbar button + list page; ⌘K searches forms AND workflows; distinct create actions; menu  | ✅ Done       \|
+| 85  | Workflow Run Log UI                   | Runs tab + CI-style live trace: per-step command, stdout/stderr, skipped-branch reasons     | ✅ Done       \|
+| 86  | Workflow Dry Run & Step Replay        | Plan-style dry run (nothing executes); replay one step from a past run's captured inputs    | ✅ Done       \|
+>>>>>>> 1dbb9a8 (workflows)
 
 ¹ Ticket 54: create flow (all 4 steps) is complete; reopening the wizard to
   edit an existing command-backed form (section 5) is not wired — "Edit" on

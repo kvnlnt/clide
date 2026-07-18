@@ -7,24 +7,29 @@ export type {
   ArgMapping,
   ArgMappingKind,
   CommandSpec,
-  DraftFormSpecInput,
-  DraftFormSpecResult,
+  DecisionStep,
+  Extraction,
+  ExtractionSelector,
+  ExtractionSource,
   FieldType,
   FilterEntry,
   FilterEntryType,
   FormDefinition,
-  FormEvents,
   FormField,
   FormFolder,
   FormMeta,
   FormMetaPatch,
-  FormSpecDraft,
+  FormStep,
   GridCardLayout,
   GridCardSize,
+  LoopStep,
   MagicField,
   OutputChunk,
-  OutputSpec,
+  OutputDefinition,
+  OutputResult,
+  OutputTransform,
   OutputType,
+  ParallelStep,
   Project,
   ProjectLayout,
   RepeatInterval,
@@ -40,6 +45,15 @@ export type {
   ToolSpecPositional,
   ToolSpecSubcommand,
   UIState,
+  Workflow,
+  WorkflowPlanEntry,
+  WorkflowRun,
+  WorkflowRunStatus,
+  WorkflowRunSummary,
+  WorkflowStep,
+  WorkflowStepRecord,
+  WorkflowStepStatus,
+  WorkflowTrigger,
 } from "../../shared/types";
 
 // Runtime value re-exports.
@@ -53,3 +67,7 @@ export {
 // preview shown always matches what will actually execute (ticket 52).
 export { buildCommand, describeFieldMapping, formatCommandPreview } from "../../shared/command";
 export type { BuiltCommand } from "../../shared/command";
+
+// Pure output-definition evaluator (ticket 77) — the wizard's live test runs
+// the very same code as the runner.
+export { evaluateOutputs } from "../../shared/outputs";

@@ -3,16 +3,12 @@ import type {
   AIService,
   ClideRPC,
   CommandSpec,
-  CreateFormInput,
-  CreateFormResult,
-  DraftFormSpecInput,
-  DraftFormSpecResult,
-  FormEvents,
   FormFolder,
   FormField,
   FormMetaPatch,
   OutputChunk,
-  OutputSpec,
+  OutputDefinition,
+  OutputResult,
   OutputType,
   Project,
   ProjectLayout,
@@ -24,6 +20,11 @@ import type {
   ToolSource,
   ToolSpec,
   UIState,
+  Workflow,
+  WorkflowPlanEntry,
+  WorkflowRun,
+  WorkflowRunSummary,
+  WorkflowStepRecord,
 } from "../shared/types";
 
 // ---------------------------------------------------------------------------
@@ -36,6 +37,8 @@ type EventMap = {
   status: RunStatusUpdate;
   /** Native app-menu action id, e.g. "view:forms". */
   menuAction: string;
+  /** Live workflow-run state (full record) on every step transition. */
+  workflowRun: WorkflowRun;
 };
 
 type Listener<K extends keyof EventMap> = (payload: EventMap[K]) => void;
@@ -46,6 +49,7 @@ const listeners: { [K in keyof EventMap]: Set<Listener<K>> } = {
   chunk: new Set(),
   status: new Set(),
   menuAction: new Set(),
+  workflowRun: new Set(),
 };
 
 function emit<K extends keyof EventMap>(key: K, payload: EventMap[K]): void {
@@ -70,6 +74,7 @@ const rpcDef = Electroview.defineRPC<ClideRPC>({
       onOutputChunk: (chunk) => emit("chunk", chunk),
       onRunStatus: (update) => emit("status", update),
       onMenuAction: ({ action }) => emit("menuAction", action),
+      onWorkflowRunUpdate: ({ run }) => emit("workflowRun", run),
     },
   },
 });
@@ -246,26 +251,6 @@ export const api = {
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
       return await r.testAIService({ serviceId });
-    } catch (err) {
-      return { ok: false, error: String(err) };
-    }
-  },
-
-  async createForm(input: CreateFormInput): Promise<CreateFormResult> {
-    const r = request();
-    if (!r) return { ok: false, error: "Bridge unavailable" };
-    try {
-      return await r.createForm(input);
-    } catch (err) {
-      return { ok: false, error: String(err) };
-    }
-  },
-
-  async draftFormSpec(input: DraftFormSpecInput): Promise<DraftFormSpecResult> {
-    const r = request();
-    if (!r) return { ok: false, error: "Bridge unavailable" };
-    try {
-      return await r.draftFormSpec(input);
     } catch (err) {
       return { ok: false, error: String(err) };
     }
@@ -598,13 +583,130 @@ export const api = {
     command: CommandSpec;
     fields: FormField[];
     outputType: OutputType;
-    outputs: OutputSpec[];
-    events: FormEvents;
+    outputs: OutputDefinition[];
   }): Promise<{ ok: boolean; slug?: string; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
       return await r.createCommandForm(input);
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async getRunOutputs(runId: string): Promise<OutputResult[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.getRunOutputs({ runId });
+    } catch {
+      return [];
+    }
+  },
+
+  // Workflows (tickets 79-86) -------------------------------------------------
+
+  async listWorkflows(project: string): Promise<Workflow[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.listWorkflows({ project });
+    } catch {
+      return [];
+    }
+  },
+
+  async saveWorkflow(project: string, workflow: Workflow): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.saveWorkflow({ project, workflow });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async deleteWorkflow(project: string, id: string): Promise<void> {
+    await request()?.deleteWorkflow({ project, id });
+  },
+
+  async startWorkflowRun(
+    project: string,
+    workflowId: string,
+    params?: Record<string, string>,
+  ): Promise<{ ok: boolean; runId?: string; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.startWorkflowRun({ project, workflowId, params });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async cancelWorkflowRun(project: string, runId: string): Promise<void> {
+    await request()?.cancelWorkflowRun({ project, runId });
+  },
+
+  async listWorkflowRuns(project: string, workflowId?: string): Promise<WorkflowRunSummary[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.listWorkflowRuns({ project, workflowId });
+    } catch {
+      return [];
+    }
+  },
+
+  async getWorkflowRun(project: string, runId: string): Promise<WorkflowRun | null> {
+    const r = request();
+    if (!r) return null;
+    try {
+      return await r.getWorkflowRun({ project, runId });
+    } catch {
+      return null;
+    }
+  },
+
+  async dryRunWorkflow(
+    project: string,
+    workflowId: string,
+    params?: Record<string, string>,
+  ): Promise<{ ok: boolean; plan?: WorkflowPlanEntry[]; problems?: string[]; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.dryRunWorkflow({ project, workflowId, params });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async replayWorkflowStep(
+    project: string,
+    runId: string,
+    recordIndex: number,
+  ): Promise<{ ok: boolean; record?: WorkflowStepRecord; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.replayWorkflowStep({ project, runId, recordIndex });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async draftWorkflow(
+    project: string,
+    goal: string,
+    name: string,
+    serviceId: string,
+    model: string,
+  ): Promise<{ ok: boolean; workflow?: Workflow; notes?: string[]; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.draftWorkflow({ project, goal, name, serviceId, model });
     } catch (err) {
       return { ok: false, error: String(err) };
     }

@@ -73,7 +73,7 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
 
     const magicFields: Record<string, string> = {};
     for (const f of folder.form.fields) {
-      if (f.magic?.source === "prompt" && f.magic.prompt) magicFields[f.id] = f.magic.prompt;
+      if (f.magic?.prompt) magicFields[f.id] = f.magic.prompt;
     }
     const ids = Object.keys(magicFields);
     if (ids.length === 0) return;

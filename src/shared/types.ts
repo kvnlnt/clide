@@ -58,42 +58,66 @@ export const DEFAULT_MODEL_FOR_KIND: Record<AIServiceKind, string> = {
   ollama: "llama3.2",
 };
 
-/** One output or side effect a form produces. A form may have several. */
-export interface OutputSpec {
-  kind: OutputType | "effect";
-  /** For kind "effect": human description, e.g. "updates the artifact index". */
-  description?: string;
+// Output definitions (ticket 77) ---------------------------------------------
+// The CLI's raw output is always captured as-is; each OutputDefinition
+// additionally EXTRACTS (and optionally transforms) a named piece of it.
+// These named outputs are the ports the workflow layer wires together.
+
+/** Where an extraction reads from. "file": the selector names a filesystem path. */
+export type ExtractionSource = "stdout" | "stderr" | "file";
+
+export type ExtractionSelector =
+  | { type: "whole" }
+  | { type: "regex"; pattern: string; group?: number }
+  | { type: "jsonPath"; path: string }
+  | { type: "lines"; from?: number; to?: number }
+  /** The last line of output that is an existing absolute path — the media convention, made explicit. */
+  | { type: "lastPathLine" };
+
+export interface Extraction {
+  source: ExtractionSource;
+  selector: ExtractionSelector;
+}
+
+/** Light, ordered reshaping applied after extraction. */
+export type OutputTransform =
+  | { type: "pickKeys"; mapping: Record<string, string> }
+  | { type: "template"; template: string }
+  | { type: "parseNumber" }
+  | { type: "trim" };
+
+/** A named, configured output of a form (ticket 77). */
+export interface OutputDefinition {
+  /** Stable within the form — the future pipeline wiring target. */
+  id: string;
+  /** User label, e.g. "Upload URL", "Size report". */
+  name: string;
+  /** How the extracted value is typed/rendered. */
+  kind: OutputType;
+  extraction: Extraction;
+  transforms?: OutputTransform[];
+}
+
+/** One evaluated output-definition result for a run. */
+export interface OutputResult {
+  id: string;
+  name: string;
+  kind: OutputType;
+  ok: boolean;
+  /** Extracted/transformed value; for media kinds, the resolved file path. */
+  value?: unknown;
+  /** Human-readable failure, e.g. "output wasn't valid JSON". */
+  error?: string;
 }
 
 /**
- * Deterministic source for a field's value from a triggering event's payload
- * (ticket 56) — tried before falling back to AI magic fill. "text" is the
- * emitting run's raw stdout; "json" walks a dot-path into the parsed JSON
- * payload; "artifact" picks the nth file path the emitting run produced.
+ * AI auto-fill configuration for a field (ticket 24). Prompt-based only —
+ * the event-payload fill path was removed with the event bus (ticket 76);
+ * workflow data wiring (tickets 79+) is its replacement.
  */
-export type PayloadMapping = { kind: "text" } | { kind: "json"; path: string } | { kind: "artifact"; index: number };
-
-/** Auto-fill configuration for a field. Runtime lands in ticket 24. */
 export interface MagicField {
   /** Associative prompt used to fill the field, e.g. "today's date in ISO". */
   prompt: string;
-  /**
-   * Where fill data comes from:
-   * - "prompt": the prompt alone is enough (AI completes it).
-   * - "event":  the payload of the event that triggered the form feeds the
-   *             prompt (ticket 23 supplies the payload).
-   */
-  source: "prompt" | "event";
-  /** When `source` is "event": try this deterministic mapping first, falling back to AI fill if it resolves to nothing (ticket 56). */
-  payloadMapping?: PayloadMapping;
-}
-
-/** Event wiring declared by a form. Runtime lands in ticket 23. */
-export interface FormEvents {
-  /** Event names fired when a run completes successfully, e.g. "media:created". */
-  emits: string[];
-  /** Event names that auto-submit this form when observed. */
-  listensFor: string[];
 }
 
 /** How a command-backed field's value becomes part of the argv (ticket 52). */
@@ -143,9 +167,8 @@ export interface FormDefinition {
   aiPromptField?: boolean;
   /** Primary output kind, kept for backward compatibility with old readers. */
   outputType: OutputType;
-  /** All outputs/effects. Normalized on load from outputType when absent. */
-  outputs?: OutputSpec[];
-  events?: FormEvents;
+  /** Named output definitions (ticket 77). Legacy kind-lists normalize to these on load. */
+  outputs?: OutputDefinition[];
   /** Present on command-backed forms (ticket 52); mutually exclusive with `scriptFile` in practice. */
   command?: CommandSpec;
   /** @deprecated Legacy script-backed forms only. Absent on command-backed forms. */
@@ -214,16 +237,6 @@ export interface ToolRegistryEntry {
   sourceHash?: string;
 }
 
-/** AI-drafted, user-editable plan for a form. Never persisted to disk. */
-export interface FormSpecDraft {
-  inputs: FormField[];
-  /** Step-by-step description of what the script should do. */
-  procedure: string;
-  outputs: OutputSpec[];
-  events: FormEvents;
-  interpreter: Interpreter;
-}
-
 export interface FormMeta {
   name: string;
   slug: string;
@@ -261,16 +274,6 @@ export interface Project {
   name: string;
 }
 
-/** Provenance of an auto-submitted run (internal event bus, ticket 23). */
-export interface RunTrigger {
-  /** Event name that triggered the run, e.g. "media:created". */
-  event: string;
-  /** Run id of the emitting run (its output is the event payload). */
-  sourceRunId: string;
-  /** File paths the emitting run produced, passed along in the event payload (ticket 56). */
-  artifacts?: string[];
-}
-
 export interface RunRecord {
   id: string;
   formSlug: string;
@@ -283,8 +286,6 @@ export interface RunRecord {
   pinned: boolean;
   scheduledAt: string | null;
   repeatInterval: RepeatInterval | null;
-  /** Set when the run was auto-submitted by the event bus. */
-  triggeredBy?: RunTrigger | null;
   /** Resolved tool + argv actually executed, for command-backed forms (ticket 52). */
   command?: { tool: string; argv: string[] } | null;
 }
@@ -371,52 +372,126 @@ export interface UIState {
   recentProjects: string[];
 }
 
-// AI form creation -----------------------------------------------------------
+// Workflows (tickets 79-86) ---------------------------------------------------
+// A Workflow is a named, ordered list of Steps plus zero or more Triggers.
+// Steps: form step, decision step, loop step, parallel step; sub-lists nest
+// arbitrarily deep. Workflows start ONLY via explicit triggers. Full schema
+// documented in docs/workflow-schema.md.
 
-export interface CreateFormInput {
+interface WorkflowStepBase {
+  /** Unique within the workflow, slug-safe, user-editable — the reference target. */
+  name: string;
+}
+
+/** Runs one existing form; input values are literals or contain {{…}} references. */
+export interface FormStep extends WorkflowStepBase {
+  type: "form";
+  formSlug: string;
+  inputs: Record<string, string>;
+}
+
+export interface DecisionStep extends WorkflowStepBase {
+  type: "decision";
+  /** Expression (see workflowExpr grammar); truthy → then, else → else. */
+  condition: string;
+  then: WorkflowStep[];
+  else?: WorkflowStep[];
+}
+
+export interface LoopStep extends WorkflowStepBase {
+  type: "loop";
+  /** Expression resolving to a list; sub-steps run once per element, bound as `item`. */
+  over: string;
+  steps: WorkflowStep[];
+}
+
+export interface ParallelStep extends WorkflowStepBase {
+  type: "parallel";
+  /** ≥2 sibling sub-lists, run concurrently, rejoining before the next step. */
+  branches: WorkflowStep[][];
+}
+
+export type WorkflowStep = FormStep | DecisionStep | LoopStep | ParallelStep;
+
+export type WorkflowTrigger =
+  | { type: "manual" }
+  | { type: "schedule"; cron: string }
+  /** Fires when a standalone run of this form completes successfully. */
+  | { type: "form-submitted"; formSlug: string };
+
+export interface Workflow {
+  id: string;
   name: string;
   description: string;
-  project: string;
-  /** Which configured AI service to generate with. */
-  serviceId: string;
-  /** Fine-tuned spec from the creation wizard. When present, generation is spec-driven. */
-  spec?: FormSpecDraft;
+  /** Named text parameters prompted for on manual runs; addressable as trigger.params.<name>. */
+  params?: string[];
+  steps: WorkflowStep[];
+  triggers: WorkflowTrigger[];
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface DraftFormSpecInput {
+export type WorkflowStepStatus = "pending" | "running" | "succeeded" | "failed" | "skipped";
+
+/** One per-step record in a Run's trace. Loop iterations are indexed ("resize[2]"). */
+export interface WorkflowStepRecord {
   name: string;
-  project: string;
-  /** What information does this form collect? */
-  input: string;
-  /** What should the script do with it? */
-  processing: string;
-  /** What does it produce or affect? May be blank (AI infers). */
-  output: string;
-  /** Which configured AI service to draft with. */
-  serviceId: string;
+  type: WorkflowStep["type"];
+  status: WorkflowStepStatus;
+  /** Nesting depth, for trace indentation. */
+  depth: number;
+  /** Form steps: the exact resolved command string that ran. */
+  command?: string;
+  stdout?: string;
+  stderr?: string;
+  exitCode?: number | null;
+  durationMs?: number;
+  resolvedInputs?: Record<string, unknown>;
+  /** Decision: evaluated condition + result; skipped: why. */
+  note?: string;
+  /** Form steps: evaluated named outputs (ticket 77). */
+  outputs?: OutputResult[];
 }
 
-export interface DraftFormSpecResult {
-  ok: boolean;
-  spec?: FormSpecDraft;
-  error?: string;
+export type WorkflowRunStatus = "running" | "succeeded" | "failed" | "cancelled";
+
+export interface WorkflowRunTriggerInfo {
+  type: WorkflowTrigger["type"];
+  /** e.g. the cron expression or triggering form name. */
+  detail?: string;
+  params?: Record<string, string>;
 }
 
-export interface GeneratedForm {
-  meta: FormMeta;
-  form: FormDefinition;
-  script: string;
-  scriptExtension: string;
-  dependencyCheck?: string;
-  installInstructions?: string;
+export interface WorkflowRun {
+  runId: string;
+  workflowId: string;
+  workflowName: string;
+  /** Snapshot of the definition at run time — replay resolves against this, not the current file. */
+  workflow: Workflow;
+  trigger: WorkflowRunTriggerInfo;
+  status: WorkflowRunStatus;
+  startedAt: string;
+  finishedAt: string | null;
+  records: WorkflowStepRecord[];
 }
 
-export interface CreateFormResult {
-  ok: boolean;
-  slug?: string;
-  error?: string;
-  dependencyMissing?: string;
-  installInstructions?: string;
+export interface WorkflowRunSummary {
+  runId: string;
+  workflowId: string;
+  status: WorkflowRunStatus;
+  trigger: WorkflowRunTriggerInfo;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+/** One line of a dry-run plan (ticket 86): compiled command or structural annotation, nothing executed. */
+export interface WorkflowPlanEntry {
+  name: string;
+  type: WorkflowStep["type"];
+  depth: number;
+  summary: string;
+  note?: string;
 }
 
 export interface ScheduleInput {
@@ -484,15 +559,11 @@ export type ClideRPC = {
         params: { serviceId: string };
         response: { ok: boolean; error?: string };
       };
-      createForm: { params: CreateFormInput; response: CreateFormResult };
-      draftFormSpec: { params: DraftFormSpecInput; response: DraftFormSpecResult };
       fillMagicFields: {
         params: {
           formSlug: string;
           /** Field id → magic prompt, for the fields needing fill. */
           fields: Record<string, string>;
-          /** Optional event payload context (event-triggered fills). */
-          payload?: { text: string; json?: unknown; artifacts?: string[] };
         };
         response: { ok: boolean; values?: Record<string, unknown>; error?: string };
       };
@@ -581,10 +652,50 @@ export type ClideRPC = {
           command: CommandSpec;
           fields: FormField[];
           outputType: OutputType;
-          outputs: OutputSpec[];
-          events: FormEvents;
+          outputs: OutputDefinition[];
         };
         response: { ok: boolean; slug?: string; error?: string };
+      };
+      /** Evaluated output-definition results persisted for a run (ticket 77). */
+      getRunOutputs: {
+        params: { runId: string };
+        response: OutputResult[];
+      };
+
+      // Workflows (tickets 79-86) ---------------------------------------------
+      listWorkflows: { params: { project: string }; response: Workflow[] };
+      saveWorkflow: {
+        params: { project: string; workflow: Workflow };
+        response: { ok: boolean; error?: string };
+      };
+      deleteWorkflow: { params: { project: string; id: string }; response: void };
+      startWorkflowRun: {
+        params: { project: string; workflowId: string; params?: Record<string, string> };
+        response: { ok: boolean; runId?: string; error?: string };
+      };
+      cancelWorkflowRun: { params: { project: string; runId: string }; response: void };
+      listWorkflowRuns: {
+        params: { project: string; workflowId?: string };
+        response: WorkflowRunSummary[];
+      };
+      getWorkflowRun: {
+        params: { project: string; runId: string };
+        response: WorkflowRun | null;
+      };
+      /** terraform-plan analogue: compiled commands, nothing executed, nothing persisted (ticket 86). */
+      dryRunWorkflow: {
+        params: { project: string; workflowId: string; params?: Record<string, string> };
+        response: { ok: boolean; plan?: WorkflowPlanEntry[]; problems?: string[]; error?: string };
+      };
+      /** Re-run one form step from a past run's captured inputs; never mutates the run (ticket 86). */
+      replayWorkflowStep: {
+        params: { project: string; runId: string; recordIndex: number };
+        response: { ok: boolean; record?: WorkflowStepRecord; error?: string };
+      };
+      /** AI-drafts a workflow from a goal against the project's existing forms (ticket 83). */
+      draftWorkflow: {
+        params: { project: string; goal: string; name: string; serviceId: string; model: string };
+        response: { ok: boolean; workflow?: Workflow; notes?: string[]; error?: string };
       };
 
       setPinned: {
@@ -646,6 +757,8 @@ export type ClideRPC = {
       onRunStatus: RunStatusUpdate;
       /** Native application-menu item clicked (e.g. View → Forms); action is a `view:*` id. */
       onMenuAction: { action: string };
+      /** Live workflow-run state push (ticket 80/85): full run record on every step transition. */
+      onWorkflowRunUpdate: { run: WorkflowRun };
     };
   }>;
 };

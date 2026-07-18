@@ -9,6 +9,7 @@ import type {
   RepeatInterval,
   RunRecord,
   ThreadView,
+  Workflow,
 } from "../types/forms";
 
 export interface DraftCard {
@@ -17,7 +18,7 @@ export interface DraftCard {
 }
 
 /** Which surface the title tab's body shows. Only meaningful when no view tab is active. */
-export type ProjectSurface = "thread" | "forms" | "views" | "calendar" | "project-settings";
+export type ProjectSurface = "thread" | "forms" | "views" | "calendar" | "project-settings" | "workflows";
 
 interface AppState {
   forms: FormFolder[];
@@ -82,6 +83,16 @@ interface AppState {
   viewSettingsOpen: boolean;
   openViewSettings: () => void;
   closeViewSettings: () => void;
+
+  /** Workflows for the active project (tickets 79-86). */
+  workflows: Workflow[];
+  refreshWorkflows: () => Promise<void>;
+  saveWorkflow: (workflow: Workflow) => Promise<{ ok: boolean; error?: string }>;
+  deleteWorkflowById: (id: string) => Promise<void>;
+  /** Full-window workflow editor/wizard hosting (tickets 82/83). */
+  workflowEditor: { mode: "new" } | { mode: "edit"; workflow: Workflow } | null;
+  openWorkflowEditor: (workflow?: Workflow) => void;
+  closeWorkflowEditor: () => void;
 
   setActiveProject: (p: string | null) => void;
   toggleSidebar: () => void;
@@ -170,10 +181,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const [runPickerOpen, setRunPickerOpen] = useState(false);
   const [viewSettingsOpen, setViewSettingsOpen] = useState(false);
+<<<<<<< HEAD
   const [aiWizardOpen, setAiWizardOpen] = useState(false);
   const [aiWizardChained, setAiWizardChained] = useState(false);
   /** Skipped for this launch — don't re-open until the app restarts. */
   const aiWizardSkippedRef = useRef(false);
+=======
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [workflowEditor, setWorkflowEditor] = useState<{ mode: "new" } | { mode: "edit"; workflow: Workflow } | null>(null);
+>>>>>>> 1dbb9a8 (workflows)
 
   const [views, setViews] = useState<ThreadView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
@@ -428,6 +444,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const closeRunPicker = useCallback(() => setRunPickerOpen(false), []);
   const openViewSettings = useCallback(() => setViewSettingsOpen(true), []);
   const closeViewSettings = useCallback(() => setViewSettingsOpen(false), []);
+
+  const refreshWorkflows = useCallback(async () => {
+    if (!activeProject) {
+      setWorkflows([]);
+      return;
+    }
+    setWorkflows(await api.listWorkflows(activeProject));
+  }, [activeProject]);
+
+  const saveWorkflow = useCallback(
+    async (workflow: Workflow) => {
+      if (!activeProject) return { ok: false, error: "No active project" };
+      const res = await api.saveWorkflow(activeProject, workflow);
+      if (res.ok) await refreshWorkflows();
+      return res;
+    },
+    [activeProject, refreshWorkflows],
+  );
+
+  const deleteWorkflowById = useCallback(
+    async (id: string) => {
+      if (!activeProject) return;
+      await api.deleteWorkflow(activeProject, id);
+      await refreshWorkflows();
+    },
+    [activeProject, refreshWorkflows],
+  );
+
+  const openWorkflowEditor = useCallback((workflow?: Workflow) => {
+    setWorkflowEditor(workflow ? { mode: "edit", workflow } : { mode: "new" });
+  }, []);
+  const closeWorkflowEditor = useCallback(() => setWorkflowEditor(null), []);
+
+  // Workflows load with the project (like views).
+  useEffect(() => {
+    void refreshWorkflows();
+  }, [refreshWorkflows]);
   const openNewProject = useCallback(() => setNewProjectOpen(true), []);
   const closeNewProject = useCallback(() => setNewProjectOpen(false), []);
   const openNewForm = useCallback(() => {
@@ -611,6 +664,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     viewSettingsOpen,
     openViewSettings,
     closeViewSettings,
+    workflows,
+    refreshWorkflows,
+    saveWorkflow,
+    deleteWorkflowById,
+    workflowEditor,
+    openWorkflowEditor,
+    closeWorkflowEditor,
     setActiveProject,
     toggleSidebar,
     openNewProject,

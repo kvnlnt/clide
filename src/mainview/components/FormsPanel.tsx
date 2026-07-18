@@ -174,8 +174,14 @@ function FormsPanelRow({
   updateFormMeta,
 }: FormsPanelRowProps) {
   const { confirm, toast } = useUIFeedback();
+  const { workflows } = useApp();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // "Starts workflows" (ticket 81): visible wherever the form is managed.
+  const startsWorkflows = workflows.filter(
+    (w) => w.enabled && w.triggers.some((t) => t.type === "form-submitted" && t.formSlug === form.meta.slug),
+  );
 
   const remove = async () => {
     const res = await confirm({
@@ -252,6 +258,13 @@ function FormsPanelRow({
 
       {error && (
         <div className="px-3 pb-2 text-[11px] text-red-400">{error}</div>
+      )}
+
+      {startsWorkflows.length > 0 && (
+        <div className="px-3 pb-2 text-[11px] text-white/40">
+          Starts workflow{startsWorkflows.length === 1 ? "" : "s"} when it finishes:{" "}
+          <span className="text-white/60">{startsWorkflows.map((w) => w.name).join(", ")}</span>
+        </div>
       )}
 
       {editing && (

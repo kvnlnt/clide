@@ -4,14 +4,16 @@ import type {
   ArgMapping,
   ArgMappingKind,
   CommandSpec,
+  Extraction,
+  ExtractionSelector,
   FieldType,
   FormDefinition,
-  FormEvents,
   FormField,
   FormFolder,
   FormMeta,
   MagicField,
-  OutputSpec,
+  OutputDefinition,
+  OutputTransform,
   OutputType,
 } from "../../shared/types";
 import { listProjects } from "../config";
@@ -60,12 +62,10 @@ function validateMeta(raw: unknown, slug: string, projectName: string): FormMeta
   };
 }
 
+/** Prompt-only since ticket 76 — legacy `source`/`payloadMapping` keys on disk are ignored. */
 function validateMagic(raw: unknown): MagicField | undefined {
   if (!isObject(raw) || typeof raw.prompt !== "string" || !raw.prompt.trim()) return undefined;
-  return {
-    prompt: raw.prompt,
-    source: raw.source === "event" ? "event" : "prompt",
-  };
+  return { prompt: raw.prompt };
 }
 
 const ARG_MAPPING_KINDS: ArgMappingKind[] = ["flag", "option", "positional", "env", "stdin"];
@@ -110,29 +110,95 @@ function validateCommand(raw: unknown): CommandSpec | undefined {
   };
 }
 
-function validateOutputs(raw: unknown, outputType: OutputType): OutputSpec[] {
-  const outputs: OutputSpec[] = [];
+const MEDIA_KINDS: OutputType[] = ["image", "audio", "video"];
+
+/** The default extraction for a bare kind: whole stdout, or the last-printed-path for media. */
+function defaultExtractionForKind(kind: OutputType): Extraction {
+  return MEDIA_KINDS.includes(kind)
+    ? { source: "file", selector: { type: "lastPathLine" } }
+    : { source: "stdout", selector: { type: "whole" } };
+}
+
+function validateSelector(raw: unknown): ExtractionSelector | null {
+  if (!isObject(raw)) return null;
+  switch (raw.type) {
+    case "whole":
+      return { type: "whole" };
+    case "regex":
+      return typeof raw.pattern === "string"
+        ? { type: "regex", pattern: raw.pattern, group: typeof raw.group === "number" ? raw.group : undefined }
+        : null;
+    case "jsonPath":
+      return typeof raw.path === "string" ? { type: "jsonPath", path: raw.path } : null;
+    case "lines":
+      return {
+        type: "lines",
+        from: typeof raw.from === "number" ? raw.from : undefined,
+        to: typeof raw.to === "number" ? raw.to : undefined,
+      };
+    case "lastPathLine":
+      return { type: "lastPathLine" };
+    default:
+      return null;
+  }
+}
+
+function validateTransforms(raw: unknown): OutputTransform[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: OutputTransform[] = [];
+  for (const t of raw) {
+    if (!isObject(t)) continue;
+    if (t.type === "pickKeys" && isObject(t.mapping)) {
+      const mapping: Record<string, string> = {};
+      for (const [k, v] of Object.entries(t.mapping)) if (typeof v === "string") mapping[k] = v;
+      out.push({ type: "pickKeys", mapping });
+    } else if (t.type === "template" && typeof t.template === "string") {
+      out.push({ type: "template", template: t.template });
+    } else if (t.type === "parseNumber" || t.type === "trim") {
+      out.push({ type: t.type });
+    }
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/**
+ * Validates output definitions (ticket 77), migrating the two legacy shapes
+ * losslessly: bare-kind lists (`[{kind}]`, possibly with retired "effect"
+ * entries — dropped) and the older single `outputType` become one
+ * whole-output definition per kind.
+ */
+function validateOutputs(raw: unknown, outputType: OutputType): OutputDefinition[] {
+  const defs: OutputDefinition[] = [];
   if (Array.isArray(raw)) {
     for (const item of raw) {
       if (!isObject(item)) continue;
-      const kind =
-        item.kind === "effect" || OUTPUT_TYPES.includes(item.kind as OutputType)
-          ? (item.kind as OutputSpec["kind"])
-          : "text";
-      outputs.push({
-        kind,
-        description: typeof item.description === "string" ? item.description : undefined,
-      });
+      // New shape: has id/name/extraction.
+      if (typeof item.id === "string" && typeof item.name === "string" && isObject(item.extraction)) {
+        const ex = item.extraction as Record<string, unknown>;
+        const selector = validateSelector(ex.selector);
+        const kind = OUTPUT_TYPES.includes(item.kind as OutputType) ? (item.kind as OutputType) : "text";
+        if (!selector) continue;
+        defs.push({
+          id: item.id,
+          name: item.name,
+          kind,
+          extraction: {
+            source: ex.source === "stderr" || ex.source === "file" ? ex.source : "stdout",
+            selector,
+          },
+          transforms: validateTransforms(item.transforms),
+        });
+        continue;
+      }
+      // Legacy shape: bare kind (retired "effect" entries are dropped).
+      if (OUTPUT_TYPES.includes(item.kind as OutputType)) {
+        const kind = item.kind as OutputType;
+        defs.push({ id: `legacy-${kind}`, name: kind, kind, extraction: defaultExtractionForKind(kind) });
+      }
     }
   }
-  return outputs.length > 0 ? outputs : [{ kind: outputType }];
-}
-
-function validateEvents(raw: unknown): FormEvents {
-  const obj = isObject(raw) ? raw : {};
-  const names = (v: unknown) =>
-    Array.isArray(v) ? v.filter((n): n is string => typeof n === "string" && n.trim().length > 0) : [];
-  return { emits: names(obj.emits), listensFor: names(obj.listensFor) };
+  if (defs.length > 0) return defs;
+  return [{ id: `legacy-${outputType}`, name: outputType, kind: outputType, extraction: defaultExtractionForKind(outputType) }];
 }
 
 function validateForm(raw: unknown): FormDefinition | null {
@@ -146,7 +212,7 @@ function validateForm(raw: unknown): FormDefinition | null {
     aiPromptField: raw.aiPromptField === true,
     outputType,
     outputs: validateOutputs(raw.outputs, outputType),
-    events: validateEvents(raw.events),
+    // `events` keys on disk are ignored since ticket 76 (bus removed).
     command,
     // Legacy script forms always had a scriptFile; a command form has none.
     scriptFile: typeof raw.scriptFile === "string" ? raw.scriptFile : command ? undefined : "script.sh",

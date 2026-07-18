@@ -90,7 +90,7 @@ export default function FormCard({
     fillRequestedRef.current = true;
     const magicFields: Record<string, string> = {};
     for (const f of form.fields) {
-      if (f.magic?.source === "prompt" && f.magic.prompt) magicFields[f.id] = f.magic.prompt;
+      if (f.magic?.prompt) magicFields[f.id] = f.magic.prompt;
     }
     const ids = Object.keys(magicFields);
     if (ids.length === 0) return;
@@ -207,7 +207,7 @@ export default function FormCard({
               disabled={!editable}
               filling={filling}
               fillFailed={fillFailed}
-              run={run}
+              formSlug={meta.slug}
             />
           )}
 

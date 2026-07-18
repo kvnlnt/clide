@@ -2,9 +2,6 @@ import type { AIService, FormField, FormFolder } from "../../shared/types";
 import { getDefaultAIService, legacyProviderForKind, listAIServices } from "./aiServices";
 import { complete } from "./providers";
 
-/** Max payload text sent to the model as fill context. */
-const PAYLOAD_LIMIT = 8192;
-
 /** The form's creation service kind when a matching service exists, else the default service. */
 async function resolveService(folder: FormFolder): Promise<AIService | null> {
   const services = await listAIServices();
@@ -63,14 +60,12 @@ function validateFill(field: FormField, raw: unknown): unknown {
 
 /**
  * Fill the requested magic fields in one batched AI call. `fields` maps field
- * id → magic prompt; `payload` is the triggering event's output when the fill
- * runs in the auto-submit path. Returns only validated values — fields the AI
- * couldn't fill (or filled invalidly) are simply absent.
+ * id → magic prompt. Returns only validated values — fields the AI couldn't
+ * fill (or filled invalidly) are simply absent.
  */
 export async function fillMagicFields(
   folder: FormFolder,
   fields: Record<string, string>,
-  payload?: { text: string; json?: unknown },
 ): Promise<Record<string, unknown>> {
   const ids = Object.keys(fields);
   if (ids.length === 0) return {};
@@ -86,13 +81,11 @@ export async function fillMagicFields(
       type: f.type,
       options: f.options,
       prompt: fields[f.id],
-      source: f.magic?.source ?? "prompt",
     }));
 
   const system = [
     "You fill form fields for CLIDE, a shell automation app.",
     "Each field below has an associative prompt describing how to fill it.",
-    'Fields with source "event" should derive their value from the event payload context when provided.',
     "Respond ONLY with a single JSON object mapping field id to value, e.g.",
     '{ "target-date": "2026-07-01" }',
     "Rules:",
@@ -107,14 +100,6 @@ export async function fillMagicFields(
     `Today's date: ${new Date().toISOString()}`,
     `Form: ${folder.meta.name} — ${folder.meta.description}`,
     `Fields to fill:\n${JSON.stringify(fieldSpecs, null, 2)}`,
-    ...(payload
-      ? [
-          `Event payload context:\n${payload.text.slice(0, PAYLOAD_LIMIT)}`,
-          ...(payload.json !== undefined
-            ? [`Parsed payload JSON:\n${JSON.stringify(payload.json).slice(0, PAYLOAD_LIMIT)}`]
-            : []),
-        ]
-      : []),
   ].join("\n\n");
 
   const raw = await complete(service, { system, user });

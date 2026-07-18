@@ -1,10 +1,18 @@
 import { ApplicationMenu, BrowserView, BrowserWindow, Updater, Utils } from "electrobun/bun";
 import { rmSync, statSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
-import type { ClideRPC, OutputChunk, Project, RunStatusUpdate, ToolRegistryEntry, ToolSource } from "../shared/types";
+import type {
+  ClideRPC,
+  OutputChunk,
+  Project,
+  RunStatusUpdate,
+  ToolRegistryEntry,
+  ToolSource,
+  Workflow,
+  WorkflowRunTriggerInfo,
+} from "../shared/types";
 import { getAIService, listAIServices, listServiceModels, saveAIServices, testAIService } from "./ai/aiServices";
 import { hasCredential, saveCredential } from "./ai/credentials";
-import { draftFormSpec, generateForm, generateFormFromSpec, runDependencyCheck } from "./ai/formGenerator";
 import { fillMagicFields } from "./ai/magicFill";
 import { draftCommandFields } from "./ai/commandFields";
 import { distillToolSpec, suggestTools } from "./ai/toolSpec";
@@ -18,15 +26,35 @@ import {
   resolveProjectByName,
 } from "./config";
 import { deleteRun as dbDeleteRun, getAllRuns, getRun, getRunHistory, indexRuns, setPinned } from "./db/history";
-import { rebuildListenerIndex, registerHop, resolvePayloadMapping, setAutoSubmitHandler } from "./events/bus";
 import { readLayout, writeLayout } from "./forms/layout";
 import { listForms, loadFormFolder, resolveFormProject } from "./forms/loader";
 import { readViews, writeViews } from "./forms/views";
 import { watchForms } from "./forms/watcher";
-import { writeCommandForm, writeForm } from "./forms/writer";
+import { writeCommandForm } from "./forms/writer";
 import { formDir, projectFormsDir } from "./paths";
-import { cancelRun, startRun, type RunEmitters } from "./runner/execute";
+import { cancelRun, readRunOutputs, setRunCompletionListener, startRun, type RunEmitters } from "./runner/execute";
 import { cancelScheduled, disposeScheduler, initScheduler, rescheduleRun, runScheduledNow, schedule } from "./scheduler";
+import { draftWorkflow } from "./ai/workflowDraft";
+import {
+  cancelWorkflowRun as engineCancelRun,
+  dryRunWorkflow as engineDryRun,
+  replayStep as engineReplayStep,
+  startWorkflowRun as engineStartRun,
+} from "./workflows/engine";
+import { failInterruptedRuns, getRun as getWorkflowRunFile, listRuns as listWorkflowRunFiles } from "./workflows/runStore";
+import {
+  deleteWorkflow as storeDeleteWorkflow,
+  getWorkflow,
+  listWorkflows as storeListWorkflows,
+  saveWorkflow as storeSaveWorkflow,
+  validateForSave,
+} from "./workflows/store";
+import {
+  disposeWorkflowTriggers,
+  initWorkflowTriggers,
+  onFormRunCompleted,
+  refreshWorkflowTriggers,
+} from "./workflows/triggers";
 import { captureFingerprint, captureHelp, resolveTool as resolveToolPath } from "./tools/inspect";
 import {
   findByRealPath,
@@ -94,13 +122,40 @@ const emitters: RunEmitters = {
 
 async function pushFormsChanged(): Promise<void> {
   const forms = await listForms();
-  rebuildListenerIndex(forms);
   sendToView("onFormsChanged", { forms });
 }
 
 async function pushProjectsChanged(): Promise<void> {
   const projects = await listProjects();
   sendToView("onProjectsChanged", { projects });
+  await refreshWorkflowTriggers(projects);
+}
+
+// ---------------------------------------------------------------------------
+// Workflows (tickets 79-86): engine starter + trigger wiring.
+// ---------------------------------------------------------------------------
+
+function startWorkflow(
+  project: Project,
+  workflow: Workflow,
+  trigger: WorkflowRunTriggerInfo,
+  triggerEnv: Record<string, unknown>,
+): string {
+  return engineStartRun(project.path, project.name, workflow, trigger, triggerEnv, (run) =>
+    sendToView("onWorkflowRunUpdate", { run }),
+  );
+}
+
+// Standalone form completions feed form-submitted triggers (never cascades —
+// workflow-internal steps use execFormOnce, which bypasses this listener).
+setRunCompletionListener(onFormRunCompleted);
+initWorkflowTriggers((project, workflow, trigger, env) => {
+  startWorkflow(project, workflow, trigger, env);
+});
+await refreshWorkflowTriggers(await listProjects());
+// Runs left "running" by a previous session can never finish — mark them failed.
+for (const p of await projectPaths()) {
+  await failInterruptedRuns(p);
 }
 
 // ---------------------------------------------------------------------------
@@ -286,59 +341,13 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
 
       testAIService: async ({ serviceId }) => await testAIService(serviceId),
 
-      createForm: async (input) => {
-        try {
-          const service = await getAIService(input.serviceId);
-          if (!service) {
-            return { ok: false, error: "Selected AI service not found." };
-          }
-          if ((service.kind === "anthropic" || service.kind === "openai") && !(await hasCredential(service.id))) {
-            return { ok: false, error: `No API key saved for "${service.name}".` };
-          }
-          // Resolve (or create) the destination project folder.
-          const project = (await resolveProjectByName(input.project)) ?? (await addProject(input.project));
-          const generated = input.spec ? await generateFormFromSpec(input, input.spec) : await generateForm(input);
-          const missing = await runDependencyCheck(generated);
-          if (missing) {
-            return {
-              ok: false,
-              dependencyMissing: missing,
-              installInstructions: generated.installInstructions,
-              error: `Missing dependency: ${missing}`,
-            };
-          }
-          const slug = await writeForm(project.path, generated);
-          await pushProjectsChanged();
-          await pushFormsChanged();
-          return { ok: true, slug };
-        } catch (err) {
-          return { ok: false, error: String(err) };
-        }
-      },
-
-      draftFormSpec: async (input) => {
-        try {
-          const service = await getAIService(input.serviceId);
-          if (!service) {
-            return { ok: false, error: "Selected AI service not found." };
-          }
-          if ((service.kind === "anthropic" || service.kind === "openai") && !(await hasCredential(service.id))) {
-            return { ok: false, error: `No API key saved for "${service.name}".` };
-          }
-          const spec = await draftFormSpec(input);
-          return { ok: true, spec };
-        } catch (err) {
-          return { ok: false, error: String(err) };
-        }
-      },
-
-      fillMagicFields: async ({ formSlug, fields, payload }) => {
+      fillMagicFields: async ({ formSlug, fields }) => {
         try {
           const project = await projectForSlug(formSlug);
           if (!project) return { ok: false, error: `Form not found: ${formSlug}` };
           const folder = await loadFormFolder(project.path, formSlug, project.name);
           if (!folder) return { ok: false, error: `Form not found: ${formSlug}` };
-          const values = await fillMagicFields(folder, fields, payload);
+          const values = await fillMagicFields(folder, fields);
           return { ok: true, values };
         } catch (err) {
           return { ok: false, error: String(err) };
@@ -518,17 +527,117 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
-      createCommandForm: async ({ project, name, description, tags, command, fields, outputType, outputs, events }) => {
+      createCommandForm: async ({ project, name, description, tags, command, fields, outputType, outputs }) => {
         try {
           const resolvedProject = (await resolveProjectByName(project)) ?? (await addProject(project));
           const slug = await writeCommandForm(
             resolvedProject.path,
             { name, description, project: resolvedProject.name, tags },
-            { fields, outputType, outputs, events, command },
+            { fields, outputType, outputs, command },
           );
           await pushProjectsChanged();
           await pushFormsChanged();
           return { ok: true, slug };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      getRunOutputs: async ({ runId }) => {
+        const run = getRun(runId);
+        if (!run) return [];
+        const project = await projectForSlug(run.formSlug);
+        if (!project) return [];
+        return await readRunOutputs(project.path, runId);
+      },
+
+      // Workflows (tickets 79-86) ---------------------------------------------
+
+      listWorkflows: async ({ project }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return [];
+        return await storeListWorkflows(resolved.path);
+      },
+
+      saveWorkflow: async ({ project, workflow }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return { ok: false, error: "Project not found" };
+        const problem = validateForSave(workflow);
+        if (problem) return { ok: false, error: problem };
+        await storeSaveWorkflow(resolved.path, workflow);
+        await refreshWorkflowTriggers(await listProjects());
+        return { ok: true };
+      },
+
+      deleteWorkflow: async ({ project, id }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return;
+        await storeDeleteWorkflow(resolved.path, id);
+        await refreshWorkflowTriggers(await listProjects());
+      },
+
+      startWorkflowRun: async ({ project, workflowId, params }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return { ok: false, error: "Project not found" };
+        const workflow = await getWorkflow(resolved.path, workflowId);
+        if (!workflow) return { ok: false, error: "Workflow not found" };
+        if (!workflow.enabled) return { ok: false, error: "Workflow is disabled — enable it from the Workflows page." };
+        const runId = startWorkflow(
+          resolved,
+          workflow,
+          { type: "manual", params: params ?? {} },
+          { params: params ?? {} },
+        );
+        return { ok: true, runId };
+      },
+
+      cancelWorkflowRun: async ({ runId }) => {
+        engineCancelRun(runId);
+      },
+
+      listWorkflowRuns: async ({ project, workflowId }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return [];
+        return await listWorkflowRunFiles(resolved.path, workflowId);
+      },
+
+      getWorkflowRun: async ({ project, runId }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return null;
+        return await getWorkflowRunFile(resolved.path, runId);
+      },
+
+      dryRunWorkflow: async ({ project, workflowId, params }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return { ok: false, error: "Project not found" };
+        const workflow = await getWorkflow(resolved.path, workflowId);
+        if (!workflow) return { ok: false, error: "Workflow not found" };
+        try {
+          const { plan, problems } = await engineDryRun(resolved.path, resolved.name, workflow, params ?? {});
+          return { ok: true, plan, problems };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      replayWorkflowStep: async ({ project, runId, recordIndex }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return { ok: false, error: "Project not found" };
+        const run = await getWorkflowRunFile(resolved.path, runId);
+        if (!run) return { ok: false, error: "Run not found" };
+        return await engineReplayStep(resolved.path, resolved.name, run, recordIndex);
+      },
+
+      draftWorkflow: async ({ project, goal, name, serviceId, model }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return { ok: false, error: "Project not found" };
+        const service = await getAIService(serviceId);
+        if (!service) return { ok: false, error: "Selected AI service not found." };
+        const forms = (await listForms()).filter((f) => f.meta.project === resolved.name);
+        if (forms.length === 0) return { ok: false, error: "This project has no forms yet — create one first." };
+        try {
+          const { workflow, notes } = await draftWorkflow(goal, name, forms, service, model);
+          return { ok: true, workflow, notes };
         } catch (err) {
           return { ok: false, error: String(err) };
         }
@@ -689,67 +798,6 @@ await initScheduler((projectPath, runId, formSlug, inputs) => {
 });
 
 // ---------------------------------------------------------------------------
-// Event bus — auto-submit forms listening for events emitted by finished runs.
-// ---------------------------------------------------------------------------
-rebuildListenerIndex(await listForms());
-
-setAutoSubmitHandler((event, target) => {
-  void (async () => {
-    try {
-      const folder = await loadFormFolder(target.projectPath, target.slug, target.projectName);
-      const fields = folder?.form.fields ?? [];
-
-      // Deterministic payload → field mapping (ticket 56) fills first, with no
-      // AI call — a mapping that resolves to nothing is left empty/visible
-      // rather than falling back to AI for that field. Fields without a
-      // mapping (or "prompt"-sourced magic) go through AI magic fill (ticket 24)
-      // as before. Failure of either path never blocks submission.
-      const inputs: Record<string, unknown> = {};
-      const aiMagicFields: Record<string, string> = {};
-      for (const field of fields) {
-        const magic = field.magic;
-        if (!magic?.prompt) continue;
-        if (magic.source === "event" && magic.payloadMapping) {
-          const value = resolvePayloadMapping(magic.payloadMapping, event);
-          if (value !== undefined && value !== null && value !== "") inputs[field.id] = value;
-          continue;
-        }
-        aiMagicFields[field.id] = magic.prompt;
-      }
-
-      let fillError: string | null = null;
-      if (folder && Object.keys(aiMagicFields).length > 0) {
-        try {
-          Object.assign(inputs, await fillMagicFields(folder, aiMagicFields, event.payload));
-        } catch (err) {
-          fillError = String(err);
-        }
-      }
-
-      // Pre-generate the run id so the hop depth is recorded before execution.
-      const runId = crypto.randomUUID();
-      registerHop(runId, event.sourceRunId);
-      await startRun(target.projectPath, target.projectName, target.slug, inputs, emitters, runId, {
-        event: event.name,
-        sourceRunId: event.sourceRunId,
-        artifacts: event.payload.artifacts,
-      });
-      if (fillError) {
-        emitters.emitChunk({
-          runId,
-          type: "stderr",
-          data: `Magic fill failed — submitted with empty values: ${fillError}`,
-          timestamp: Date.now(),
-        });
-      }
-      console.log(`[bus] "${event.name}" from ${event.sourceFormSlug} → auto-submitted ${target.slug} (${runId})`);
-    } catch (err) {
-      console.warn(`[bus] Auto-submit of ${target.slug} for "${event.name}" failed:`, err);
-    }
-  })();
-});
-
-// ---------------------------------------------------------------------------
 // Window.
 // ---------------------------------------------------------------------------
 async function getMainViewUrl(): Promise<string> {
@@ -791,6 +839,7 @@ ApplicationMenu.setApplicationMenu([
       { label: "Forms", action: "view:forms", accelerator: "CommandOrControl+P" },
       { label: "Calendar", action: "view:calendar", accelerator: "CommandOrControl+Shift+C" },
       { label: "Views", action: "view:views", accelerator: "CommandOrControl+Shift+V" },
+      { label: "Workflows", action: "view:workflows", accelerator: "CommandOrControl+Shift+U" },
       { label: "Project Settings", action: "view:project-settings", accelerator: "CommandOrControl+," },
       { type: "separator" },
       { label: "Run a Form…", action: "view:run-picker", accelerator: "CommandOrControl+K" },
@@ -838,6 +887,7 @@ const stopWatching = watchForms(await projectPaths(), () => {
 mainWindow.on("close", () => {
   stopWatching();
   disposeScheduler();
+  disposeWorkflowTriggers();
 });
 
 console.log("CLIDE started.");

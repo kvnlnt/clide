@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { copyToClipboard } from "../../clipboard";
 import { api } from "../../rpc";
-import type { OutputChunk, OutputType, RunStatus } from "../../types/forms";
+import type { OutputChunk, OutputResult, OutputType, RunStatus } from "../../types/forms";
 import AudioOutput from "./AudioOutput";
+import AutoSizeOutput from "./AutoSizeOutput";
 import ImageOutput from "./ImageOutput";
 import JsonOutput from "./JsonOutput";
 import OutputToolbar from "./OutputToolbar";
@@ -26,9 +27,34 @@ function decodeBase64ToText(base64: string): string {
   }
 }
 
+/** One labeled block per evaluated output definition (ticket 78): value rendered by kind, failures visible. */
+function NamedOutputBlock({ result }: { result: OutputResult }) {
+  const text = typeof result.value === "string" ? result.value : JSON.stringify(result.value, null, 2);
+  return (
+    <div className="overflow-hidden rounded-[5px] border border-clide-border bg-clide-bg">
+      <OutputToolbar label={`${result.name} · ${result.kind}`} onCopy={result.ok ? () => void copyToClipboard(text) : undefined} />
+      {!result.ok ? (
+        <div className="px-3 py-2 text-[13px] text-amber-300/80">{result.error}</div>
+      ) : result.kind === "table" ? (
+        <TableOutput text={text} />
+      ) : result.kind === "json" ? (
+        <JsonOutput text={text} />
+      ) : result.kind === "image" || result.kind === "audio" || result.kind === "video" ? (
+        // Named media values are file paths — shown as the path (the raw block handles inline media).
+        <div className="break-all px-3 py-2 font-mono text-[12px] text-white/70">{text}</div>
+      ) : (
+        <AutoSizeOutput className="px-3 py-2 font-mono text-[13px]">
+          <pre className="whitespace-pre-wrap break-words text-white/80">{text}</pre>
+        </AutoSizeOutput>
+      )}
+    </div>
+  );
+}
+
 export default function OutputBlock({ runId, outputType, status, chunks }: OutputBlockProps) {
   const [fetchedText, setFetchedText] = useState<string | null>(null);
   const [mediaSrc, setMediaSrc] = useState<string | null>(null);
+  const [namedOutputs, setNamedOutputs] = useState<OutputResult[]>([]);
 
   const liveStdout = useMemo(
     () =>
@@ -72,6 +98,18 @@ export default function OutputBlock({ runId, outputType, status, chunks }: Outpu
     };
   }, [completed, isMedia, liveStdout.length, mediaSrc, runId]);
 
+  // Named output definitions evaluated for this run (ticket 77/78).
+  useEffect(() => {
+    if (!completed) return;
+    let cancelled = false;
+    void api.getRunOutputs(runId).then((results) => {
+      if (!cancelled) setNamedOutputs(results);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [completed, runId]);
+
   const text = liveStdout || fetchedText || "";
   const streaming = status === "running" || status === "pending";
 
@@ -106,10 +144,19 @@ export default function OutputBlock({ runId, outputType, status, chunks }: Outpu
       body = <TextOutput stdout={text} stderr={liveStderr} />;
   }
 
+  // Migrated-legacy definitions (id "legacy-*") mirror the raw block exactly —
+  // rendering them twice would be noise; user-defined outputs all render.
+  const definedOutputs = namedOutputs.filter((o) => !o.id.startsWith("legacy-"));
+
   return (
-    <div className="overflow-hidden rounded-[5px] border border-clide-border bg-clide-bg">
-      <OutputToolbar label={label} onCopy={isMedia ? undefined : copyText} />
-      {body}
+    <div className="flex flex-col gap-2">
+      <div className="overflow-hidden rounded-[5px] border border-clide-border bg-clide-bg">
+        <OutputToolbar label={label} onCopy={isMedia ? undefined : copyText} />
+        {body}
+      </div>
+      {definedOutputs.map((result) => (
+        <NamedOutputBlock key={result.id} result={result} />
+      ))}
     </div>
   );
 }
