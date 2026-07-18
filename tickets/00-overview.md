@@ -141,6 +141,17 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 93  | Workflows Surface & Run Dialog        | Toolbar button + list page; ⌘K searches forms AND workflows; distinct create actions; menu        | ✅ Done       |
 | 94  | Workflow Run Log UI                   | Runs tab + CI-style live trace: per-step command, stdout/stderr, skipped-branch reasons           | ✅ Done       |
 | 95  | Workflow Dry Run & Step Replay        | Plan-style dry run (nothing executes); replay one step from a past run's captured inputs          | ✅ Done       |
+| 96  | Rename "Form" → "Task"                | Product-wide rename: UI copy, menus, docs, code identifiers & filenames; disk format unchanged    | ⬜ Open       |
+| 97  | Unread Result Badges                  | Sidebar badge = unread finished results; decrements on view; per-project tracking toggle          | ⬜ Open       |
+| 98  | AI One-Line Run Summaries             | Accordion header shows an AI status report of what happened, persisted per run, with fallback     | ⬜ Open       |
+| 99  | Native Tools & Browser Automation     | Epic: native tool registry; browser task = fields + recordable/replayable step builder            | ⬜ Open       |
+| 100 | App Profile Interview                 | AI interviews the user → app-level profile (roles, goals, frustrations); self-improving loop      | ⬜ Open       |
+| 101 | Project Profile Interview             | Per-project AI-interviewed profile stored in the project folder; reuses the 100 engine            | ⬜ Open       |
+| 102 | Virtual File System                   | Epic: track any file on any system (local/remote), browse/search/open, run artifacts w/ previews  | ⬜ Open       |
+| 103 | Package-Manager Tool Install          | Detect/register package managers; search their catalogs; consent-gated install → registry         | ⬜ Open       |
+| 104 | Duplicate Workflow                    | One-click deep copy of a workflow (triggers disabled) straight into the editor                    | ⬜ Open       |
+| 105 | Task Adoption & Versioning            | Draft → adopt lifecycle; edits fork new versions; opt-in retroactive workflow upgrades            | ⬜ Open       |
+| 106 | Project Audit Page & RSI Loop         | Epic: audit log + dossier + Datalog theorem prover over run facts + AI-prescribed improvements    | ⬜ Open       |
 
 ¹ Ticket 54: create flow (all 4 steps) is complete; reopening the wizard to
 edit an existing command-backed form (section 5) is not wired — "Edit" on
