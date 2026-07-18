@@ -1,9 +1,9 @@
-import type { FormMeta, RunRecord } from "../types/forms";
+import type { TaskMeta, RunRecord } from "../types/tasks";
 import EllipsisMenu from "./EllipsisMenu";
 import StatusIcon from "./statusIcon";
 
 interface FormCardCollapsedProps {
-  meta: FormMeta;
+  meta: TaskMeta;
   run: RunRecord;
   summary: string;
   onExpand: () => void;

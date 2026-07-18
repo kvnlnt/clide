@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { RepeatInterval } from "../types/forms";
+import type { RepeatInterval } from "../types/tasks";
 
 interface ScheduleSubFormProps {
   onSchedule: (scheduledAt: string, repeat: RepeatInterval) => void;

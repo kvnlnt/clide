@@ -53,6 +53,7 @@ export function indexRuns(projectPaths: string[]): void {
   }
 }
 
+/** DISK FORMAT FIREWALL (ticket 96): DB column `form_slug` maps to RunRecord.taskSlug */
 function rowToRecord(row: RunRow): RunRecord {
   let inputs: Record<string, unknown> = {};
   try {
@@ -71,7 +72,7 @@ function rowToRecord(row: RunRow): RunRecord {
   }
   return {
     id: row.id,
-    formSlug: row.form_slug,
+    taskSlug: row.form_slug, // Disk: form_slug → Memory: taskSlug
     inputs,
     status: row.status as RunStatus,
     exitCode: row.exit_code,
@@ -87,7 +88,7 @@ function rowToRecord(row: RunRow): RunRecord {
 
 export interface CreateRunInput {
   id: string;
-  formSlug: string;
+  taskSlug: string; // Memory: taskSlug → written to disk as form_slug
   inputs: Record<string, unknown>;
   status: RunStatus;
   startedAt: string;
@@ -102,7 +103,7 @@ export function createRun(projectPath: string, input: CreateRunInput): RunRecord
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
     [
       input.id,
-      input.formSlug,
+      input.taskSlug, // Memory: taskSlug → Disk: form_slug column
       JSON.stringify(input.inputs),
       input.status,
       input.startedAt,
@@ -152,10 +153,7 @@ export function setOutputPath(id: string, outputPath: string): void {
 export function setResolvedCommand(id: string, tool: string, argv: string[]): void {
   const projectPath = runIndex.get(id);
   if (!projectPath) return;
-  getDb(projectPath).run(`UPDATE runs SET resolved_command = ? WHERE id = ?`, [
-    JSON.stringify({ tool, argv }),
-    id,
-  ]);
+  getDb(projectPath).run(`UPDATE runs SET resolved_command = ? WHERE id = ?`, [JSON.stringify({ tool, argv }), id]);
 }
 
 export function setPinned(id: string, pinned: boolean): void {

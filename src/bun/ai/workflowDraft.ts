@@ -1,4 +1,4 @@
-import type { AIService, FormFolder, Workflow, WorkflowStep } from "../../shared/types";
+import type { AIService, TaskFolder, Workflow, WorkflowStep } from "../../shared/types";
 import { STEP_NAME_RE, allSteps, templateRefs } from "../../shared/workflowExpr";
 import { validateSteps } from "../workflows/store";
 import { complete } from "./providers";
@@ -13,14 +13,14 @@ function extractJson(text: string): unknown {
 }
 
 /** Compact catalog of the project's forms — all the model may reference. */
-function formCatalog(forms: FormFolder[]): string {
+function formCatalog(forms: TaskFolder[]): string {
   return JSON.stringify(
     forms.map((f) => ({
       slug: f.meta.slug,
       name: f.meta.name,
       description: f.meta.description,
-      fields: f.form.fields.map((field) => ({ id: field.id, label: field.label, type: field.type })),
-      outputs: (f.form.outputs ?? []).map((o) => ({ name: o.name, kind: o.kind })),
+      fields: f.task.fields.map((field) => ({ id: field.id, label: field.label, type: field.type })),
+      outputs: (f.task.outputs ?? []).map((o) => ({ name: o.name, kind: o.kind })),
     })),
     null,
     2,
@@ -62,7 +62,7 @@ export interface WorkflowDraftResult {
 export async function draftWorkflow(
   goal: string,
   name: string,
-  forms: FormFolder[],
+  forms: TaskFolder[],
   service: AIService,
   model: string,
 ): Promise<WorkflowDraftResult> {
@@ -78,16 +78,16 @@ export async function draftWorkflow(
 
   // Drop steps referencing forms that don't exist (and their now-dangling references stay visible in the editor).
   const known = new Set(forms.map((f) => f.meta.slug));
-  const knownFieldIds = new Map(forms.map((f) => [f.meta.slug, new Set(f.form.fields.map((x) => x.id))]));
+  const knownFieldIds = new Map(forms.map((f) => [f.meta.slug, new Set(f.task.fields.map((x) => x.id))]));
 
   const prune = (list: WorkflowStep[]): WorkflowStep[] =>
     list.flatMap((step): WorkflowStep[] => {
       if (step.type === "form") {
-        if (!known.has(step.formSlug)) {
-          notes.push(`No form found for "${step.formSlug}" — add a step manually or create that form first.`);
+        if (!known.has(step.taskSlug)) {
+          notes.push(`No form found for "${step.taskSlug}" — add a step manually or create that form first.`);
           return [];
         }
-        const valid = knownFieldIds.get(step.formSlug)!;
+        const valid = knownFieldIds.get(step.taskSlug)!;
         const inputs: Record<string, string> = {};
         for (const [fieldId, value] of Object.entries(step.inputs)) {
           if (valid.has(fieldId)) inputs[fieldId] = value;

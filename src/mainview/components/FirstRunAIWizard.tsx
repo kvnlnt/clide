@@ -3,7 +3,7 @@ import { useState } from "react";
 import { api } from "../rpc";
 import { AIServiceEditor } from "./SettingsPanel";
 import { useUIFeedback } from "./UIFeedback";
-import type { AIService, AIServiceKind } from "../types/forms";
+import type { AIService, AIServiceKind } from "../types/tasks";
 
 type Step = "choice" | "configure" | "test";
 

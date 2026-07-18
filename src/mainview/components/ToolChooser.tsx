@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../rpc";
 import ToolDropZone, { fileToBase64 } from "./ToolDropZone";
 import type { ServiceModelValue } from "./ServiceModelPicker";
-import type { ToolRegistryEntry } from "../types/forms";
+import type { ToolRegistryEntry } from "../types/tasks";
 
 const inputBase =
   "rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30";

@@ -2,7 +2,7 @@ import { ArrowLeft, ChevronDown, ChevronRight, CircleSlash, RotateCw, Square, Te
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../../context/AppContext";
 import { api, on } from "../../rpc";
-import type { RunStatus, WorkflowPlanEntry, WorkflowRun, WorkflowStepRecord } from "../../types/forms";
+import type { RunStatus, WorkflowPlanEntry, WorkflowRun, WorkflowStepRecord } from "../../types/tasks";
 import AutoSizeOutput from "../output/AutoSizeOutput";
 import StatusIcon from "../statusIcon";
 import { useUIFeedback } from "../UIFeedback";

@@ -1,4 +1,4 @@
-# Electrobun Project
+# CLIDE — Command Line Integration Development Environment
 
 This is an Electrobun desktop application.
 

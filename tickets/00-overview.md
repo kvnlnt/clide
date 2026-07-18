@@ -1,8 +1,10 @@
 # CLIDE — Ticket Overview
 
 CLIDE is a desktop CLI Development Environment built with Electrobun + React + Tailwind.
-The core metaphor: everything is a form. Scripts are wrapped in forms. Results appear inline.
-The user never thinks about shell commands — they think about filling out forms.
+The core metaphor: everything is a task. Scripts are wrapped in tasks. Results appear inline.
+The user never thinks about shell commands — they think about filling out tasks.
+
+**Note**: The on-disk storage layout still uses the name "forms" (`<project>/forms/<slug>/form.json`) for backward compatibility. The product calls these "tasks".
 
 ## Stack
 
@@ -12,9 +14,9 @@ The user never thinks about shell commands — they think about filling out form
 - **AI**: User-selectable provider (Claude / OpenAI / Ollama) — provider and API key chosen by user in the New Form Creator; credentials stored in system keychain
 - **Shell execution**: Bun `Subprocess` in the main process, results streamed to renderer via Electrobun RPC
 
-## Form storage layout
+## Storage layout (on disk)
 
-Each form/script set is a self-contained folder:
+Each task/script set is a self-contained folder:
 
 ```
 ~/.clide/forms/<form-slug>/
@@ -23,7 +25,9 @@ Each form/script set is a self-contained folder:
   meta.json       # name, description, tags, project, created/updated dates
 ```
 
-Each form belongs to exactly one **project**, recorded as a `project` field in `meta.json`. The left sidebar is project navigation — projects are just the distinct `project` values across all form folders. No separate folder hierarchy required.
+Note: The directory and file names still say "form" for backward compatibility, but the product calls these "tasks".
+
+Each task belongs to exactly one **project**, recorded as a `project` field in `meta.json`. The left sidebar is project navigation — projects are just the distinct `project` values across all task folders. No separate folder hierarchy required.
 
 ## Visual language
 

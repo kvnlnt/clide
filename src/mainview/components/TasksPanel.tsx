@@ -1,9 +1,9 @@
 import { FolderOpen, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
-import { useFormSearch } from "../hooks/useFormSearch";
+import { useTaskSearch } from "../hooks/useTaskSearch";
 import { api } from "../rpc";
-import type { FormFolder } from "../types/forms";
+import type { TaskFolder } from "../types/tasks";
 import { useUIFeedback } from "./UIFeedback";
 
 /**
@@ -12,7 +12,7 @@ import { useUIFeedback } from "./UIFeedback";
  * delete — rendered as a full-width page. Opened via ⌘P or the project
  * toolbar's Forms button.
  */
-export default function FormsPanel() {
+export default function TasksPanel() {
   const {
     forms,
     recentSlugs,
@@ -21,7 +21,7 @@ export default function FormsPanel() {
     setProjectSurface,
     activeProject,
     deleteForm,
-    updateFormMeta,
+    updateTaskMeta,
   } = useApp();
   const scopedForms = activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms;
   const [query, setQuery] = useState("");
@@ -29,7 +29,7 @@ export default function FormsPanel() {
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const results = useFormSearch(scopedForms, query, recentSlugs);
+  const results = useTaskSearch(scopedForms, query, recentSlugs);
   const createIndex = results.length; // "Create new form" sits after results.
   const total = results.length + 1;
 
@@ -71,7 +71,7 @@ export default function FormsPanel() {
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex shrink-0 items-baseline gap-2 px-8 pb-4 pt-7 justify-between">
         <div className="flex flex-row gap-1 items-baseline gap-3">
-          <h1 className="text-[20px] font-bold text-white">Forms</h1>
+          <h1 className="text-[20px] font-bold text-white">Tasks</h1>
           <span className="text-[13px] text-white/40">{activeProject ?? "All projects"}</span>
         </div>
         <div>
@@ -83,7 +83,7 @@ export default function FormsPanel() {
             }`}
           >
             <Plus size={15} className="text-white/60" />
-            <span className="italic text-white/70">Create Form</span>
+            <span className="italic text-white/70">Create Task</span>
           </button>
         </div>
       </div>
@@ -94,19 +94,19 @@ export default function FormsPanel() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Search forms…"
+          placeholder="Search tasks…"
           className="w-full rounded-md border border-clide-border bg-clide-surface px-4 py-2.5 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-white/30"
         />
       </div>
 
       <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">
         {results.length === 0 && query.trim() !== "" && (
-          <div className="px-1 py-3 text-[13px] italic text-white/30">No forms match “{query}”</div>
+          <div className="px-1 py-3 text-[13px] italic text-white/30">No tasks match "{query}"</div>
         )}
         {results.length > 0 && (
           <div className="flex flex-col divide-y divide-white/5 border-t border-white/5">
             {results.map((form, i) => (
-              <FormsPanelRow
+              <TasksPanelRow
                 key={form.meta.slug}
                 form={form}
                 active={active === i}
@@ -121,7 +121,7 @@ export default function FormsPanel() {
                   setEditingSlug(null);
                 }}
                 deleteForm={deleteForm}
-                updateFormMeta={updateFormMeta}
+                updateTaskMeta={updateTaskMeta}
               />
             ))}
           </div>
@@ -131,8 +131,8 @@ export default function FormsPanel() {
   );
 }
 
-interface FormsPanelRowProps {
-  form: FormFolder;
+interface TasksPanelRowProps {
+  form: TaskFolder;
   active: boolean;
   showProject: boolean;
   editing: boolean;
@@ -141,14 +141,14 @@ interface FormsPanelRowProps {
   onEdit: () => void;
   onCloseEditors: () => void;
   deleteForm: (projectPath: string, slug: string) => Promise<{ ok: boolean; error?: string }>;
-  updateFormMeta: (
+  updateTaskMeta: (
     projectPath: string,
     slug: string,
     patch: { name?: string; description?: string; tags?: string[] },
   ) => Promise<{ ok: boolean; error?: string }>;
 }
 
-function FormsPanelRow({
+function TasksPanelRow({
   form,
   active,
   showProject,
@@ -158,8 +158,8 @@ function FormsPanelRow({
   onEdit,
   onCloseEditors,
   deleteForm,
-  updateFormMeta,
-}: FormsPanelRowProps) {
+  updateTaskMeta,
+}: TasksPanelRowProps) {
   const { confirm, toast } = useUIFeedback();
   const { workflows } = useApp();
   const [busy, setBusy] = useState(false);
@@ -167,7 +167,7 @@ function FormsPanelRow({
 
   // "Starts workflows" (ticket 90): visible wherever the form is managed.
   const startsWorkflows = workflows.filter(
-    (w) => w.enabled && w.triggers.some((t) => t.type === "form-submitted" && t.formSlug === form.meta.slug),
+    (w) => w.enabled && w.triggers.some((t) => t.type === "task-submitted" && t.taskSlug === form.meta.slug),
   );
 
   const remove = async () => {
@@ -236,13 +236,13 @@ function FormsPanelRow({
       )}
 
       {editing && (
-        <FormMetaEditor
+        <TaskMetaEditor
           form={form}
           busy={busy}
           onSave={async (patch) => {
             setBusy(true);
             setError(null);
-            const res = await updateFormMeta(form.projectPath, form.meta.slug, patch);
+            const res = await updateTaskMeta(form.projectPath, form.meta.slug, patch);
             setBusy(false);
             if (res.ok) {
               onCloseEditors();
@@ -257,14 +257,14 @@ function FormsPanelRow({
   );
 }
 
-interface FormMetaEditorProps {
-  form: FormFolder;
+interface TaskMetaEditorProps {
+  form: TaskFolder;
   busy: boolean;
   onSave: (patch: { name?: string; description?: string; tags?: string[] }) => Promise<void>;
   onCancel: () => void;
 }
 
-function FormMetaEditor({ form, busy, onSave, onCancel }: FormMetaEditorProps) {
+function TaskMetaEditor({ form, busy, onSave, onCancel }: TaskMetaEditorProps) {
   const [name, setName] = useState(form.meta.name);
   const [description, setDescription] = useState(form.meta.description);
   const [tags, setTags] = useState(form.meta.tags.join(", "));

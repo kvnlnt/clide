@@ -1,9 +1,9 @@
 import { FileText, Plus, Search, Workflow as WorkflowIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
-import { useFormSearch } from "../hooks/useFormSearch";
+import { useTaskSearch } from "../hooks/useTaskSearch";
 import { api } from "../rpc";
-import type { Workflow } from "../types/forms";
+import type { Workflow } from "../types/tasks";
 import Modal from "./Modal";
 import { useUIFeedback } from "./UIFeedback";
 
@@ -38,7 +38,7 @@ export default function RunPicker({ onClose }: RunPickerProps) {
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const formResults = useFormSearch(scopedForms, query, recentSlugs);
+  const formResults = useTaskSearch(scopedForms, query, recentSlugs);
   const workflowResults = useMemo(() => {
     const q = query.trim().toLowerCase();
     return workflows.filter(
@@ -134,7 +134,7 @@ export default function RunPicker({ onClose }: RunPickerProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Run a form or workflow…"
+          placeholder="Run a task or workflow…"
           className="min-w-0 flex-1 bg-transparent text-[14px] text-white outline-none placeholder:text-white/30"
         />
       </div>
@@ -147,7 +147,7 @@ export default function RunPicker({ onClose }: RunPickerProps) {
           </div>
         )}
 
-        {formResults.length > 0 && sectionHeader("Forms")}
+        {formResults.length > 0 && sectionHeader("Tasks")}
         {formResults.map((form) => {
           flatIndex++;
           const i = flatIndex;
@@ -201,7 +201,7 @@ export default function RunPicker({ onClose }: RunPickerProps) {
           }}
           className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-white/60 hover:bg-white/5 hover:text-white"
         >
-          <Plus size={13} /> New form…
+          <Plus size={13} /> New task…
         </button>
         <button
           onClick={() => {

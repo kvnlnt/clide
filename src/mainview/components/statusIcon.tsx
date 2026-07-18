@@ -1,5 +1,5 @@
 import { AlarmClock, Check, Circle, Clock, Loader, X, type LucideIcon } from "lucide-react";
-import type { RunStatus } from "../types/forms";
+import type { RunStatus } from "../types/tasks";
 
 interface StatusMeta {
   label: string;

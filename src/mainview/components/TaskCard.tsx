@@ -1,19 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../rpc";
-import type { FormDefinition, FormMeta, OutputChunk, OutputType, RepeatInterval, RunRecord, RunStatus } from "../types/forms";
-import FormCardBody from "./FormCardBody";
-import FormCardFooter from "./FormCardFooter";
-import FormCardHeader from "./FormCardHeader";
+import type {
+  OutputChunk,
+  OutputType,
+  RepeatInterval,
+  RunRecord,
+  RunStatus,
+  TaskDefinition,
+  TaskMeta,
+} from "../types/tasks";
 import ScheduleSubForm from "./ScheduleSubForm";
 import SubmissionAccordion from "./SubmissionAccordion";
 import SubmittedSummary from "./SubmittedSummary";
+import TaskCardBody from "./TaskCardBody";
+import TaskCardFooter from "./TaskCardFooter";
+import TaskCardHeader from "./TaskCardHeader";
 import OutputBlock from "./output/OutputBlock";
 
-export interface FormCardProps {
+export interface TaskCardProps {
   /** All runs for this group, newest first. Single-run groups have length 1. */
   runs: RunRecord[];
-  form: FormDefinition;
-  meta: FormMeta;
+  form: TaskDefinition;
+  meta: TaskMeta;
   outputType?: OutputType;
   /** Keyed by run id — full chunks map passed down so accordion rows can slice. */
   chunks?: Record<string, OutputChunk[]>;
@@ -35,7 +43,7 @@ function isFilled(value: unknown): boolean {
   return value !== undefined && value !== null;
 }
 
-function summarize(form: FormDefinition, inputs: Record<string, unknown>, run: RunRecord): string {
+function summarize(form: TaskDefinition, inputs: Record<string, unknown>, run: RunRecord): string {
   if (run.status === "error") return inputs.__error ? String(inputs.__error) : "Failed";
   if (run.status === "scheduled" && run.scheduledAt) {
     return `Scheduled for ${new Date(run.scheduledAt).toLocaleString()}`;
@@ -48,7 +56,7 @@ function summarize(form: FormDefinition, inputs: Record<string, unknown>, run: R
   return "";
 }
 
-export default function FormCard({
+export default function TaskCard({
   runs,
   form,
   meta,
@@ -63,7 +71,7 @@ export default function FormCard({
   onRerun,
   onDismiss,
   autoFill,
-}: FormCardProps) {
+}: TaskCardProps) {
   // The latest (newest) run drives the card-level state.
   const run = runs[0];
   const isGrouped = runs.length > 1;
@@ -142,7 +150,7 @@ export default function FormCard({
         running ? "animate-pulse border-white/20" : "border-clide-border"
       }`}
     >
-      <FormCardHeader
+      <TaskCardHeader
         meta={meta}
         form={form}
         run={run}
@@ -200,14 +208,14 @@ export default function FormCard({
             </>
           ) : (
             // Single idle run: editable form body.
-            <FormCardBody
+            <TaskCardBody
               form={form}
               values={values}
               onChange={setValue}
               disabled={!editable}
               filling={filling}
               fillFailed={fillFailed}
-              formSlug={meta.slug}
+              taskSlug={meta.slug}
             />
           )}
 
@@ -226,7 +234,7 @@ export default function FormCard({
           {(editable || running) && (
             <>
               <div className="h-px bg-clide-border" />
-              <FormCardFooter
+              <TaskCardFooter
                 status={run.status}
                 canSubmit={canSubmit}
                 onSubmit={() => onSubmit(submitPayload())}

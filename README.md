@@ -6,8 +6,8 @@
 
 **CLIDE** stands for **C**ommand **L**ine **I**ntegration **D**evelopment
 **E**nvironment. It is a desktop app that turns shell scripts into clean,
-fillable forms. Run your tools without touching the terminal — just fill out the
-form and hit **Send**.
+fillable tasks. Run your tools without touching the terminal — just fill out the
+fields and hit **Send**.
 
 macOS · Windows · Linux
 
@@ -22,24 +22,24 @@ macOS · Windows · Linux
 
 ## Features
 
-- **Forms wrap scripts** — Every CLI tool gets a form with labeled fields. No
+- **Tasks wrap scripts** — Every CLI tool gets a task with labeled fields. No
   flags, no syntax to remember.
 - **Inline results** — Output streams directly into the card — text, tables,
   images, audio, video, and JSON all rendered in-place.
-- **Projects & history** — Organize forms into projects. Every run is recorded
+- **Projects & history** — Organize tasks into projects. Every run is recorded
   so you can review, re-run, or compare past results.
 - **Any AI, any combination** — Mix and match models freely — local or remote,
-  in any combination. Generate a form with Claude, draft a script with a private
+  in any combination. Generate a task with Claude, draft a script with a private
   Ollama model, summarize results with OpenAI. Your stack, your call.
 - **Run local or remote** — Execute scripts on your own machine or on any server
-  over SSH — same form, same workflow. Reach for the box that has the right
+  over SSH — same task, same workflow. Reach for the box that has the right
   tools, data, or horsepower.
 - **Call any API** — Wrap HTTP endpoints alongside shell scripts. Local
-  commands, remote hosts, and web APIs all become the same clean, fillable form.
+  commands, remote hosts, and web APIs all become the same clean, fillable task.
 
 ## How it works
 
-1. **Pick a form** — Open the command palette and choose any tool in your
+1. **Pick a task** — Open the command palette and choose any tool in your
    project.
 2. **Fill it in** — Type into clean, labeled fields — CLIDE maps them to script
    arguments.
@@ -49,7 +49,7 @@ macOS · Windows · Linux
 ## The ultimate automation platform
 
 Local scripts, remote machines over SSH, web APIs, and any AI model — local or
-remote, in any combination. CLIDE wraps them all in the same clean form, so your
+remote, in any combination. CLIDE wraps them all in the same clean task, so your
 computer becomes a control panel for everything you can run anywhere. No SaaS
 sprawl, no brittle glue code — automation you can actually read, run, and trust.
 

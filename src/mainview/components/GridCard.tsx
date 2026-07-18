@@ -1,9 +1,9 @@
 import { GripVertical, Maximize2, Play } from "lucide-react";
-import type { FormFolder, GridCardSize, RunRecord } from "../types/forms";
+import type { TaskFolder, GridCardSize, RunRecord } from "../types/tasks";
 import StatusIcon from "./statusIcon";
 
 interface GridCardProps {
-  form: FormFolder;
+  form: TaskFolder;
   size: GridCardSize;
   lastRun: RunRecord | undefined;
   pinned: boolean;

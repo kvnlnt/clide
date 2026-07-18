@@ -15,7 +15,7 @@ export type Interpreter = "bash" | "python3" | "node" | "bun";
 export type RepeatInterval = "none" | "daily" | "weekly";
 
 /** @deprecated Superseded by `AIService`/`AIServiceKind` (ticket 45). Kept for
- *  reading legacy `FormMeta.aiProvider` values written before the migration. */
+ *  reading legacy `TaskMeta.aiProvider` values written before the migration. */
 export type AIProvider = "claude" | "openai" | "ollama";
 
 /** A configurable AI backend, local or remote. Replaces the old fixed 3-provider list. */
@@ -86,9 +86,9 @@ export type OutputTransform =
   | { type: "parseNumber" }
   | { type: "trim" };
 
-/** A named, configured output of a form (ticket 86). */
+/** A named, configured output of a task (ticket 86). */
 export interface OutputDefinition {
-  /** Stable within the form — the future pipeline wiring target. */
+  /** Stable within the task — the future pipeline wiring target. */
   id: string;
   /** User label, e.g. "Upload URL", "Size report". */
   name: string;
@@ -123,7 +123,7 @@ export interface MagicField {
 /** How a command-backed field's value becomes part of the argv (ticket 52). */
 export type ArgMappingKind = "flag" | "option" | "positional" | "env" | "stdin";
 
-/** Maps one form field's value onto the invocation of a command-backed form's tool. */
+/** Maps one task field's value onto the invocation of a command-backed task's tool. */
 export interface ArgMapping {
   kind: ArgMappingKind;
   /** Flag token for "flag"/"option", e.g. "--verbose" or "-o". Defaults to `--<field id>`. */
@@ -138,23 +138,23 @@ export interface ArgMapping {
   envName?: string;
 }
 
-export interface FormField {
+export interface TaskField {
   id: string;
   label: string;
   type: FieldType;
-  /** User-facing help text shown under the label on the form card (ticket 61). */
+  /** User-facing help text shown under the label on the task card (ticket 61). */
   description?: string;
   placeholder?: string;
   required?: boolean;
   options?: string[];
-  /** @deprecated Legacy script-form arg templating (e.g. `--post {{value}}`). Superseded by `argMapping` (ticket 52). */
+  /** @deprecated Legacy script-task arg templating (e.g. `--post {{value}}`). Superseded by `argMapping` (ticket 52). */
   argTemplate?: string;
-  /** How this field's value maps onto the tool invocation. Command-backed forms only (ticket 52). */
+  /** How this field's value maps onto the tool invocation. Command-backed tasks only (ticket 52). */
   argMapping?: ArgMapping;
   magic?: MagicField;
 }
 
-/** A command-backed form's fixed invocation target (ticket 52): one tool, one action. */
+/** A command-backed task's fixed invocation target (ticket 52): one tool, one action. */
 export interface CommandSpec {
   /** Tool registry entry id, or a bare executable name/path resolved on PATH (ticket 53). */
   tool: string;
@@ -162,16 +162,16 @@ export interface CommandSpec {
   baseArgs: string[];
 }
 
-export interface FormDefinition {
-  fields: FormField[];
+export interface TaskDefinition {
+  fields: TaskField[];
   aiPromptField?: boolean;
   /** Primary output kind, kept for backward compatibility with old readers. */
   outputType: OutputType;
   /** Named output definitions (ticket 86). Legacy kind-lists normalize to these on load. */
   outputs?: OutputDefinition[];
-  /** Present on command-backed forms (ticket 52); mutually exclusive with `scriptFile` in practice. */
+  /** Present on command-backed tasks (ticket 52); mutually exclusive with `scriptFile` in practice. */
   command?: CommandSpec;
-  /** @deprecated Legacy script-backed forms only. Absent on command-backed forms. */
+  /** @deprecated Legacy script-backed tasks only. Absent on command-backed tasks. */
   scriptFile?: string;
 }
 
@@ -197,7 +197,7 @@ export interface ToolSpecPositional {
   description: string;
 }
 
-/** AI-distilled structure of a CLI tool's self-documentation, used to draft form fields (ticket 54). */
+/** AI-distilled structure of a CLI tool's self-documentation, used to draft task fields (ticket 54). */
 export interface ToolSpec {
   description: string;
   subcommands: ToolSpecSubcommand[];
@@ -237,7 +237,7 @@ export interface ToolRegistryEntry {
   sourceHash?: string;
 }
 
-export interface FormMeta {
+export interface TaskMeta {
   name: string;
   slug: string;
   description: string;
@@ -251,22 +251,22 @@ export interface FormMeta {
   updatedAt: string;
 }
 
-/** A fully-loaded form folder: metadata + field definition. */
-export interface FormFolder {
-  meta: FormMeta;
-  form: FormDefinition;
-  /** Absolute path of the project folder this form belongs to. */
+/** A fully-loaded task folder: metadata + field definition. */
+export interface TaskFolder {
+  meta: TaskMeta;
+  task: TaskDefinition;
+  /** Absolute path of the project folder this task belongs to. */
   projectPath: string;
 }
 
-/** Editable display metadata for a form. Never includes `slug` — slug is identity. */
-export interface FormMetaPatch {
+/** Editable display metadata for a task. Never includes `slug` — slug is identity. */
+export interface TaskMetaPatch {
   name?: string;
   description?: string;
   tags?: string[];
 }
 
-/** A user-created project: a folder on disk housing its forms, history & outputs. */
+/** A user-created project: a folder on disk housing its tasks, history & outputs. */
 export interface Project {
   /** Absolute path of the project folder. */
   path: string;
@@ -276,7 +276,7 @@ export interface Project {
 
 export interface RunRecord {
   id: string;
-  formSlug: string;
+  taskSlug: string;
   inputs: Record<string, unknown>;
   status: RunStatus;
   exitCode: number | null;
@@ -286,7 +286,7 @@ export interface RunRecord {
   pinned: boolean;
   scheduledAt: string | null;
   repeatInterval: RepeatInterval | null;
-  /** Resolved tool + argv actually executed, for command-backed forms (ticket 52). */
+  /** Resolved tool + argv actually executed, for command-backed tasks (ticket 52). */
   command?: { tool: string; argv: string[] } | null;
 }
 
@@ -309,7 +309,7 @@ export interface RunStatusUpdate {
 export type GridCardSize = "small" | "medium" | "large";
 
 export interface GridCardLayout {
-  formSlug: string;
+  taskSlug: string;
   size: GridCardSize;
   position: number;
 }
@@ -320,7 +320,7 @@ export interface ProjectLayout {
 
 // Thread views (saved filters, shown as browser-style tabs) ------------------
 
-export type FilterEntryType = "form" | "status" | "keyword";
+export type FilterEntryType = "task" | "status" | "keyword";
 
 /**
  * One additive filter chip. Values within an entry combine as OR (e.g. a
@@ -331,7 +331,7 @@ export interface FilterEntry {
   /** Stable identity — used as the edit/remove target for the chip. */
   id: string;
   type: FilterEntryType;
-  /** Form slugs, `RunStatus` values, or free-text keywords, depending on `type`. */
+  /** Task slugs, `RunStatus` values, or free-text keywords, depending on `type`. */
   values: string[];
 }
 
@@ -339,7 +339,7 @@ export interface ThreadViewFilters {
   /** Additive filter chips (ticket 51). Absent/empty = no filtering. */
   entries?: FilterEntry[];
   /** @deprecated Replaced by `entries` (ticket 51). Older `.views.json` files may still have this. */
-  formSlugs?: string[];
+  taskSlugs?: string[];
   /** @deprecated Replaced by `entries` (ticket 51). */
   statuses?: RunStatus[];
   /** @deprecated Replaced by `entries` (ticket 51). */
@@ -383,10 +383,10 @@ interface WorkflowStepBase {
   name: string;
 }
 
-/** Runs one existing form; input values are literals or contain {{…}} references. */
-export interface FormStep extends WorkflowStepBase {
+/** Runs one existing task; input values are literals or contain {{…}} references. */
+export interface TaskStep extends WorkflowStepBase {
   type: "form";
-  formSlug: string;
+  taskSlug: string;
   inputs: Record<string, string>;
 }
 
@@ -411,13 +411,13 @@ export interface ParallelStep extends WorkflowStepBase {
   branches: WorkflowStep[][];
 }
 
-export type WorkflowStep = FormStep | DecisionStep | LoopStep | ParallelStep;
+export type WorkflowStep = TaskStep | DecisionStep | LoopStep | ParallelStep;
 
 export type WorkflowTrigger =
   | { type: "manual" }
   | { type: "schedule"; cron: string }
-  /** Fires when a standalone run of this form completes successfully. */
-  | { type: "form-submitted"; formSlug: string };
+  /** Fires when a standalone run of this task completes successfully. */
+  | { type: "task-submitted"; taskSlug: string };
 
 export interface Workflow {
   id: string;
@@ -458,7 +458,7 @@ export type WorkflowRunStatus = "running" | "succeeded" | "failed" | "cancelled"
 
 export interface WorkflowRunTriggerInfo {
   type: WorkflowTrigger["type"];
-  /** e.g. the cron expression or triggering form name. */
+  /** e.g. the cron expression or triggering task name. */
   detail?: string;
   params?: Record<string, string>;
 }
@@ -495,7 +495,7 @@ export interface WorkflowPlanEntry {
 }
 
 export interface ScheduleInput {
-  formSlug: string;
+  taskSlug: string;
   inputs: Record<string, unknown>;
   scheduledAt: string;
   repeatInterval: RepeatInterval;
@@ -523,15 +523,15 @@ export type ClideRPC = {
         params: { path: string; deleteFiles?: boolean };
         response: void;
       };
-      listForms: { params: Record<string, never>; response: FormFolder[] };
+      listTasks: { params: Record<string, never>; response: TaskFolder[] };
       getRunHistory: {
-        params: { formSlug: string; limit: number };
+        params: { taskSlug: string; limit: number };
         response: RunRecord[];
       };
       getAllRuns: { params: { project: string | null }; response: RunRecord[] };
-      runForm: {
+      runTask: {
         params: {
-          formSlug: string;
+          taskSlug: string;
           inputs: Record<string, unknown>;
         };
         response: { runId: string };
@@ -541,8 +541,8 @@ export type ClideRPC = {
         params: { runId: string };
         response: { mime: string; base64: string } | null;
       };
-      getFormScript: {
-        params: { formSlug: string };
+      getTaskScript: {
+        params: { taskSlug: string };
         response: { script: string; extension: string } | null;
       };
       saveServiceCredential: {
@@ -561,7 +561,7 @@ export type ClideRPC = {
       };
       fillMagicFields: {
         params: {
-          formSlug: string;
+          taskSlug: string;
           /** Field id → magic prompt, for the fields needing fill. */
           fields: Record<string, string>;
         };
@@ -633,7 +633,7 @@ export type ClideRPC = {
       };
       draftCommandFields: {
         params: {
-          /** The user's step-1 statement of what the form should do — scopes which options matter (ticket 61). */
+          /** The user's step-1 statement of what the task should do — scopes which options matter (ticket 61). */
           goal: string;
           toolName: string;
           actionName: string;
@@ -641,16 +641,16 @@ export type ClideRPC = {
           serviceId: string;
           model: string;
         };
-        response: { ok: boolean; fields?: FormField[]; error?: string };
+        response: { ok: boolean; fields?: TaskField[]; error?: string };
       };
-      createCommandForm: {
+      createCommandTask: {
         params: {
           project: string;
           name: string;
           description: string;
           tags: string[];
           command: CommandSpec;
-          fields: FormField[];
+          fields: TaskField[];
           outputType: OutputType;
           outputs: OutputDefinition[];
         };
@@ -687,12 +687,12 @@ export type ClideRPC = {
         params: { project: string; workflowId: string; params?: Record<string, string> };
         response: { ok: boolean; plan?: WorkflowPlanEntry[]; problems?: string[]; error?: string };
       };
-      /** Re-run one form step from a past run's captured inputs; never mutates the run (ticket 95). */
+      /** Re-run one task step from a past run's captured inputs; never mutates the run (ticket 95). */
       replayWorkflowStep: {
         params: { project: string; runId: string; recordIndex: number };
         response: { ok: boolean; record?: WorkflowStepRecord; error?: string };
       };
-      /** AI-drafts a workflow from a goal against the project's existing forms (ticket 92). */
+      /** AI-drafts a workflow from a goal against the project's existing tasks (ticket 92). */
       draftWorkflow: {
         params: { project: string; goal: string; name: string; serviceId: string; model: string };
         response: { ok: boolean; workflow?: Workflow; notes?: string[]; error?: string };
@@ -735,12 +735,12 @@ export type ClideRPC = {
         params: { path: string };
         response: { ok: boolean };
       };
-      deleteForm: {
+      deleteTask: {
         params: { projectPath: string; slug: string };
         response: { ok: boolean; error?: string };
       };
-      updateFormMeta: {
-        params: { projectPath: string; slug: string; patch: FormMetaPatch };
+      updateTaskMeta: {
+        params: { projectPath: string; slug: string; patch: TaskMetaPatch };
         response: { ok: boolean; error?: string };
       };
     };
@@ -752,10 +752,10 @@ export type ClideRPC = {
     requests: Record<string, never>;
     messages: {
       onProjectsChanged: { projects: Project[] };
-      onFormsChanged: { forms: FormFolder[] };
+      onTasksChanged: { tasks: TaskFolder[] };
       onOutputChunk: OutputChunk;
       onRunStatus: RunStatusUpdate;
-      /** Native application-menu item clicked (e.g. View → Forms); action is a `view:*` id. */
+      /** Native application-menu item clicked (e.g. View → Tasks); action is a `view:*` id. */
       onMenuAction: { action: string };
       /** Live workflow-run state push (ticket 89/94): full run record on every step transition. */
       onWorkflowRunUpdate: { run: WorkflowRun };

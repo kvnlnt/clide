@@ -2,7 +2,7 @@ import { Loader, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "../../context/AppContext";
 import { api } from "../../rpc";
-import type { Workflow } from "../../types/forms";
+import type { Workflow } from "../../types/tasks";
 import { useEscapeToClose } from "../Modal";
 import ServiceModelPicker, { type ServiceModelValue } from "../ServiceModelPicker";
 import WorkflowEditor from "./WorkflowEditor";

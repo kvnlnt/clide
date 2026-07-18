@@ -1,7 +1,7 @@
 import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { describeFieldMapping } from "../types/forms";
-import type { ArgMapping, ArgMappingKind, FieldType, FormField, ToolSpec } from "../types/forms";
+import { describeFieldMapping } from "../types/tasks";
+import type { ArgMapping, ArgMappingKind, FieldType, TaskField, ToolSpec } from "../types/tasks";
 
 const FIELD_TYPES: FieldType[] = ["text", "textarea", "select", "multicheck", "number", "file", "date"];
 const TYPE_HINT: Record<FieldType, string> = {
@@ -42,8 +42,8 @@ function inferType(description: string): FieldType | null {
 }
 
 interface Props {
-  fields: FormField[];
-  onChange: (fields: FormField[]) => void;
+  fields: TaskField[];
+  onChange: (fields: TaskField[]) => void;
   /** The chosen tool's distilled spec — powers the pick-a-real-option mapping flow (ticket 65). */
   toolSpec?: ToolSpec;
   /** Lifted open-card state so the live preview can highlight/open cards (ticket 66). */
@@ -58,7 +58,7 @@ interface Props {
  * from its spec, phrased in plain language, with a Custom escape hatch.
  */
 export default function CommandFieldsEditor({ fields, onChange, toolSpec, openId, onOpenChange }: Props) {
-  const update = (index: number, partial: Partial<FormField>) => {
+  const update = (index: number, partial: Partial<TaskField>) => {
     onChange(fields.map((f, i) => (i === index ? { ...f, ...partial } : f)));
   };
 
@@ -77,7 +77,7 @@ export default function CommandFieldsEditor({ fields, onChange, toolSpec, openId
     let id = `field-${n}`;
     while (fields.some((f) => f.id === id)) id = `field-${++n}`;
     // New fields default to optional (ticket 61) — required is opt-in.
-    const field: FormField = { id, label: "", type: "text", argMapping: { kind: "option", flag: `--${id}` } };
+    const field: TaskField = { id, label: "", type: "text", argMapping: { kind: "option", flag: `--${id}` } };
     onChange([...fields, field]);
     onOpenChange(id);
   };
@@ -136,13 +136,13 @@ function FieldCard({
   onMoveUp,
   onMoveDown,
 }: {
-  field: FormField;
+  field: TaskField;
   toolSpec?: ToolSpec;
   open: boolean;
   duplicateFlag: boolean;
   onToggle: () => void;
   onCollapse: () => void;
-  onUpdate: (partial: Partial<FormField>) => void;
+  onUpdate: (partial: Partial<TaskField>) => void;
   onRemove: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -302,10 +302,10 @@ function MappingSection({
   duplicateFlag,
   onUpdate,
 }: {
-  field: FormField;
+  field: TaskField;
   toolSpec?: ToolSpec;
   duplicateFlag: boolean;
-  onUpdate: (partial: Partial<FormField>) => void;
+  onUpdate: (partial: Partial<TaskField>) => void;
 }) {
   const mapping: ArgMapping = field.argMapping ?? { kind: "option" };
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -342,7 +342,7 @@ function MappingSection({
       const opt = options[idx];
       if (!opt) return;
       const longFlag = [...opt.flags].sort((a, b) => b.length - a.length)[0]!;
-      const patch: Partial<FormField> = {
+      const patch: Partial<TaskField> = {
         argMapping: opt.takesValue
           ? { kind: "option", flag: longFlag, style: "space", repeat: opt.repeatable === true }
           : { kind: "flag", flag: longFlag },
@@ -358,7 +358,7 @@ function MappingSection({
     } else {
       const pos = positionals[idx];
       if (!pos) return;
-      const patch: Partial<FormField> = { argMapping: { kind: "positional", order: idx } };
+      const patch: Partial<TaskField> = { argMapping: { kind: "positional", order: idx } };
       if (fresh) {
         patch.label = labelFromFlag(pos.name);
         if (pos.description) patch.description = pos.description;

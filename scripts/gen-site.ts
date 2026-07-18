@@ -55,16 +55,16 @@ const SITE = {
   name: "CLIDE",
   tagline: "Run Free",
   description:
-    "Turn your computer into an <b>automation workhorse</b> — no coding required. CLIDE wraps shell scripts, SSH commands, web APIs, and AI models into clean forms and workflows. Run anything, anywhere — no syntax, no servers, no SaaS lock-in.",
-  // "CLIDE stands for Command Line Integration Development Environment. It is a desktop app that turns shell scripts into clean, fillable forms. " +
-  // "Run your tools without touching the terminal  just fill out the form and hit Send.",
+    "Turn your computer into an <b>automation workhorse</b> — no coding required. CLIDE wraps shell scripts, SSH commands, web APIs, and AI models into clean tasks and workflows. Run anything, anywhere — no syntax, no servers, no SaaS lock-in.",
+  // "CLIDE stands for Command Line Integration Development Environment. It is a desktop app that turns shell scripts into clean, fillable tasks. " +
+  // "Run your tools without touching the terminal  just fill out the fields and hit Send.",
   siteUrl: "https://clide.tools",
   repoUrl: "https://github.com/kvnlnt/clide",
   features: [
     {
       icon: ICONS.terminal,
-      title: "Forms wrap scripts",
-      body: "Every CLI tool gets a form with labeled fields. No flags, no syntax to remember.",
+      title: "Tasks wrap scripts",
+      body: "Every CLI tool gets a task with labeled fields. No flags, no syntax to remember.",
     },
     {
       icon: ICONS.layers,
@@ -74,28 +74,28 @@ const SITE = {
     {
       icon: ICONS.clock,
       title: "Projects & history",
-      body: "Organize forms into projects. Every run is recorded so you can review, re-run, or compare past results.",
+      body: "Organize tasks into projects. Every run is recorded so you can review, re-run, or compare past results.",
     },
     {
       icon: ICONS.sparkle,
       title: "Any AI, any combination",
-      body: "Mix and match models freely — local or remote, in any combination. Generate a form with Claude, draft a script with a private Ollama model, summarize results with OpenAI. Your stack, your call.",
+      body: "Mix and match models freely — local or remote, in any combination. Generate a task with Claude, draft a script with a private Ollama model, summarize results with OpenAI. Your stack, your call.",
     },
     {
       icon: ICONS.network,
       title: "Run local or remote",
-      body: "Execute scripts on your own machine or on any server over SSH — same form, same workflow. Reach for the box that has the right tools, data, or horsepower.",
+      body: "Execute scripts on your own machine or on any server over SSH — same task, same workflow. Reach for the box that has the right tools, data, or horsepower.",
     },
     {
       icon: ICONS.plug,
       title: "Call any API",
-      body: "Wrap HTTP endpoints alongside shell scripts. Local commands, remote hosts, and web APIs all become the same clean, fillable form.",
+      body: "Wrap HTTP endpoints alongside shell scripts. Local commands, remote hosts, and web APIs all become the same clean, fillable task.",
     },
   ],
   steps: [
     {
       n: "1",
-      title: "Pick a form",
+      title: "Pick a task",
       body: "Open the command palette and choose any tool in your project.",
     },
     {
@@ -116,7 +116,7 @@ const SITE = {
   ],
   automation: {
     heading: "The ultimate automation platform",
-    body: "Local scripts, remote machines over SSH, web APIs, and any AI model — local or remote, in any combination. CLIDE wraps them all in the same clean form, so your computer becomes a control panel for everything you can run anywhere. No SaaS sprawl, no brittle glue code — automation you can actually read, run, and trust.",
+    body: "Local scripts, remote machines over SSH, web APIs, and any AI model — local or remote, in any combination. CLIDE wraps them all in the same clean task, so your computer becomes a control panel for everything you can run anywhere. No SaaS sprawl, no brittle glue code — automation you can actually read, run, and trust.",
     pillars: [
       {
         title: "Anything, anywhere",

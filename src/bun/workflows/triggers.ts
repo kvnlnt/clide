@@ -14,7 +14,7 @@ import { listWorkflows } from "./store";
 export type WorkflowStarter = (
   project: Project,
   workflow: Workflow,
-  trigger: { type: "schedule" | "form-submitted"; detail?: string },
+  trigger: { type: "schedule" | "task-submitted"; detail?: string },
   triggerEnv: Record<string, unknown>,
 ) => void;
 
@@ -105,8 +105,8 @@ export async function refreshWorkflowTriggers(projects: Project[]): Promise<void
     for (const workflow of await listWorkflows(project.path)) {
       if (!workflow.enabled) continue;
       for (const trigger of workflow.triggers) {
-        if (trigger.type === "form-submitted") {
-          const key = `${project.path}\0${trigger.formSlug}`;
+        if (trigger.type === "task-submitted") {
+          const key = `${project.path}\0${trigger.taskSlug}`;
           const list = formIndex.get(key) ?? [];
           list.push({ project, workflow });
           formIndex.set(key, list);
@@ -129,14 +129,14 @@ export async function refreshWorkflowTriggers(projects: Project[]): Promise<void
 /** Standalone form-run completion → start every matching enabled workflow (ticket 90). */
 export function onFormRunCompleted(info: RunCompletionInfo): void {
   if (!starter) return;
-  const matches = state.formIndex.get(`${info.projectPath}\0${info.formSlug}`) ?? [];
+  const matches = state.formIndex.get(`${info.projectPath}\0${info.taskSlug}`) ?? [];
   for (const { project, workflow } of matches) {
     const outputs: Record<string, unknown> = {};
     for (const o of info.outputs) if (o.ok) outputs[o.name] = o.value;
     starter(
       project,
       workflow,
-      { type: "form-submitted", detail: info.formSlug },
+      { type: "task-submitted", detail: info.taskSlug },
       { inputs: info.inputs, stdout: info.stdout, stderr: info.stderr, exitCode: info.exitCode, outputs },
     );
   }

@@ -1,12 +1,12 @@
 import { useMemo } from "react";
 import { useApp } from "../context/AppContext";
-import type { FormFolder, RunRecord, ThreadViewFilters } from "../types/forms";
+import type { TaskFolder, RunRecord, ThreadViewFilters } from "../types/tasks";
 
 /** One or more consecutive same-form runs coalesced into a single card unit. */
 export interface RunGroup {
   /** Stable identity — the latest (newest) run's id. */
   key: string;
-  formSlug: string;
+  taskSlug: string;
   /** Newest first; length >= 1. */
   runs: RunRecord[];
 }
@@ -38,26 +38,26 @@ function coalesceRuns(runs: RunRecord[], standalonePinned: boolean): RunGroup[] 
   const groups: RunGroup[] = [];
   for (const run of runs) {
     const last = groups[groups.length - 1];
-    if (!(standalonePinned && run.pinned) && last && last.formSlug === run.formSlug) {
+    if (!(standalonePinned && run.pinned) && last && last.taskSlug === run.taskSlug) {
       last.runs.push(run);
     } else {
-      groups.push({ key: run.id, formSlug: run.formSlug, runs: [run] });
+      groups.push({ key: run.id, taskSlug: run.taskSlug, runs: [run] });
     }
   }
   return groups;
 }
 
 /** AND across filter entries (chips); OR within a single entry's values. */
-function matchesView(run: RunRecord, filters: ThreadViewFilters, formsBySlug: Map<string, FormFolder>): boolean {
+function matchesView(run: RunRecord, filters: ThreadViewFilters, formsBySlug: Map<string, TaskFolder>): boolean {
   const entries = filters.entries ?? [];
   for (const entry of entries) {
     if (entry.values.length === 0) continue;
-    if (entry.type === "form") {
-      if (!entry.values.includes(run.formSlug)) return false;
+    if (entry.type === "task") {
+      if (!entry.values.includes(run.taskSlug)) return false;
     } else if (entry.type === "status") {
       if (!entry.values.includes(run.status)) return false;
     } else {
-      const name = formsBySlug.get(run.formSlug)?.meta.name.toLowerCase() ?? "";
+      const name = formsBySlug.get(run.taskSlug)?.meta.name.toLowerCase() ?? "";
       const inputs = JSON.stringify(run.inputs ?? {}).toLowerCase();
       const isMatch = entry.values.some((k) => {
         const q = k.trim().toLowerCase();
@@ -72,7 +72,7 @@ function matchesView(run: RunRecord, filters: ThreadViewFilters, formsBySlug: Ma
 interface ThreadModel {
   visibleRuns: RunRecord[];
   groups: ThreadGroup[];
-  formFor: (slug: string) => FormFolder | undefined;
+  formFor: (slug: string) => TaskFolder | undefined;
 }
 
 /**
@@ -90,7 +90,7 @@ export function useThread(): ThreadModel {
 
   const visibleRuns = useMemo(() => {
     let filtered = activeProject
-      ? runs.filter((r) => formsBySlug.get(r.formSlug)?.meta.project === activeProject)
+      ? runs.filter((r) => formsBySlug.get(r.taskSlug)?.meta.project === activeProject)
       : runs;
     if (activeView) {
       filtered = filtered.filter((r) => matchesView(r, activeView.filters, formsBySlug));

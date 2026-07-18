@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Seeds a dev "profile" — a persona-shaped snapshot of app-data (projects,
- * forms, run history, AI services, views, schedules) — so `bun run
+ * tasks, run history, AI services, views, schedules) — so `bun run
  * dev:hmr:<profile>` boots CLIDE into a realistic, repeatable scenario
  * instead of whatever has accumulated in the real dev app-data dir (ticket
  * 79). Reuses the same bun-side modules the running app uses (config.ts,
@@ -20,11 +20,11 @@ import { join } from "node:path";
 import { addProject } from "../src/bun/config";
 import { saveAIServices } from "../src/bun/ai/aiServices";
 import { createRun, setPinned, updateRunStatus } from "../src/bun/db/history";
-import { writeViews } from "../src/bun/forms/views";
-import { slugify } from "../src/bun/forms/writer";
+import { writeViews } from "../src/bun/tasks/views";
+import { slugify } from "../src/bun/tasks/writer";
 import { appDataDir, ensureDir, formDir } from "../src/bun/paths";
 import { writeUIState } from "../src/bun/uiState";
-import type { FormDefinition, FormField, FormMeta, RepeatInterval, RunStatus, ThreadView } from "../src/shared/types";
+import type { TaskDefinition, TaskField, TaskMeta, RepeatInterval, RunStatus, ThreadView } from "../src/shared/types";
 
 const profile = process.env.CLIDE_PROFILE?.trim();
 if (!profile) {
@@ -56,8 +56,8 @@ function pick<T>(arr: T[], i: number): T {
 }
 
 // ---------------------------------------------------------------------------
-// Form templates — a small reusable pool, instantiated per project. Mirrors
-// the shape of forms/seed.ts's demo forms (kept there for its own purpose);
+// Task templates — a small reusable pool, instantiated per project. Mirrors
+// the shape of forms/seed.ts's demo tasks (kept there for its own purpose);
 // duplicated here on purpose so profile fixtures don't depend on that file's
 // internals changing out from under this script.
 // ---------------------------------------------------------------------------
@@ -66,11 +66,11 @@ interface FormTemplate {
   name: string;
   description: string;
   tags: string[];
-  fields: FormField[];
-  outputType: FormDefinition["outputType"];
+  fields: TaskField[];
+  outputType: TaskDefinition["outputType"];
   aiPromptField?: boolean;
   script: string;
-  /** Skip writing the script file / chmod — used by the "edge" profile to seed a broken form. */
+  /** Skip writing the script file / chmod — used by the "edge" profile to seed a broken task. */
   brokenScript?: boolean;
 }
 
@@ -150,7 +150,7 @@ async function writeTemplateForm(projectPath: string, projectName: string, templ
   const slug = slugify(template.name);
   const dir = formDir(projectPath, slug);
   ensureDir(dir);
-  const meta: FormMeta = {
+  const meta: TaskMeta = {
     name: template.name,
     slug,
     description: template.description,
@@ -160,7 +160,7 @@ async function writeTemplateForm(projectPath: string, projectName: string, templ
     createdAt: now,
     updatedAt: now,
   };
-  const form: FormDefinition = {
+  const form: TaskDefinition = {
     fields: template.fields,
     aiPromptField: template.aiPromptField,
     outputType: template.outputType,

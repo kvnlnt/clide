@@ -27,11 +27,6 @@ import {
   resolveProjectByName,
 } from "./config";
 import { deleteRun as dbDeleteRun, getAllRuns, getRun, getRunHistory, indexRuns, setPinned } from "./db/history";
-import { readLayout, writeLayout } from "./forms/layout";
-import { listForms, loadFormFolder, resolveFormProject } from "./forms/loader";
-import { readViews, writeViews } from "./forms/views";
-import { watchForms } from "./forms/watcher";
-import { writeCommandForm } from "./forms/writer";
 import { formDir, projectFormsDir } from "./paths";
 import { cancelRun, readRunOutputs, setRunCompletionListener, startRun, type RunEmitters } from "./runner/execute";
 import {
@@ -42,6 +37,11 @@ import {
   runScheduledNow,
   schedule,
 } from "./scheduler";
+import { readLayout, writeLayout } from "./tasks/layout";
+import { listTasks, loadTaskFolder, resolveTaskProject } from "./tasks/loader";
+import { readViews, writeViews } from "./tasks/views";
+import { watchTasks } from "./tasks/watcher";
+import { writeCommandTask } from "./tasks/writer";
 import { captureFingerprint, captureHelp, resolveTool as resolveToolPath } from "./tools/inspect";
 import {
   findByRealPath,
@@ -94,14 +94,14 @@ async function pathForProjectName(name: string): Promise<Project | null> {
   return resolveProjectByName(name);
 }
 
-/** Resolve the project a form slug belongs to (path + display name). */
+/** Resolve the project a task slug belongs to (path + display name). */
 async function projectForSlug(slug: string): Promise<Project | null> {
-  const path = resolveFormProject(slug);
+  const path = resolveTaskProject(slug);
   if (!path) {
     // Index may be stale (e.g. file added externally) — refresh and retry.
-    await listForms();
+    await listTasks();
   }
-  const resolved = resolveFormProject(slug);
+  const resolved = resolveTaskProject(slug);
   if (!resolved) return null;
   const projects = await listProjects();
   return (
@@ -131,9 +131,9 @@ const emitters: RunEmitters = {
   emitStatus: (update: RunStatusUpdate) => sendToView("onRunStatus", update),
 };
 
-async function pushFormsChanged(): Promise<void> {
-  const forms = await listForms();
-  sendToView("onFormsChanged", { forms });
+async function pushTasksChanged(): Promise<void> {
+  const tasks = await listTasks();
+  sendToView("onTasksChanged", { tasks });
 }
 
 async function pushProjectsChanged(): Promise<void> {
@@ -157,8 +157,8 @@ function startWorkflow(
   );
 }
 
-// Standalone form completions feed form-submitted triggers (never cascades —
-// workflow-internal steps use execFormOnce, which bypasses this listener).
+// Standalone task completions feed task-submitted triggers (never cascades —
+// workflow-internal steps use execTaskOnce, which bypasses this listener).
 setRunCompletionListener(onFormRunCompleted);
 initWorkflowTriggers((project, workflow, trigger, env) => {
   startWorkflow(project, workflow, trigger, env);
@@ -191,9 +191,9 @@ const MIME: Record<string, string> = {
 async function readOutputFile(runId: string): Promise<{ mime: string; base64: string } | null> {
   const run = getRun(runId);
   if (!run || !run.outputPath) return null;
-  const project = await projectForSlug(run.formSlug);
-  const folder = project ? await loadFormFolder(project.path, run.formSlug, project.name) : null;
-  const outputType = folder?.form.outputType ?? "text";
+  const project = await projectForSlug(run.taskSlug);
+  const folder = project ? await loadTaskFolder(project.path, run.taskSlug, project.name) : null;
+  const outputType = folder?.task.outputType ?? "text";
 
   try {
     if (outputType === "image" || outputType === "audio" || outputType === "video") {
@@ -219,15 +219,15 @@ async function readOutputFile(runId: string): Promise<{ mime: string; base64: st
   }
 }
 
-async function readFormScript(formSlug: string): Promise<{ script: string; extension: string } | null> {
-  const project = await projectForSlug(formSlug);
+async function readTaskScript(taskSlug: string): Promise<{ script: string; extension: string } | null> {
+  const project = await projectForSlug(taskSlug);
   if (!project) return null;
-  const folder = await loadFormFolder(project.path, formSlug, project.name);
-  if (!folder?.form.scriptFile) return null;
+  const folder = await loadTaskFolder(project.path, taskSlug, project.name);
+  if (!folder?.task.scriptFile) return null;
   try {
-    const scriptPath = join(formDir(project.path, formSlug), folder.form.scriptFile);
+    const scriptPath = join(formDir(project.path, taskSlug), folder.task.scriptFile);
     const script = await Bun.file(scriptPath).text();
-    const extension = extname(folder.form.scriptFile).replace(/^\./, "");
+    const extension = extname(folder.task.scriptFile).replace(/^\./, "");
     return { script, extension };
   } catch {
     return null;
@@ -296,7 +296,7 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         try {
           const project = await renameProject(path, name);
           await pushProjectsChanged();
-          await pushFormsChanged();
+          await pushTasksChanged();
           return { ok: true, project };
         } catch (err) {
           return { ok: false, error: String(err) };
@@ -306,15 +306,15 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
       removeProject: async ({ path, deleteFiles }) => {
         await removeProject(path, deleteFiles === true);
         await pushProjectsChanged();
-        await pushFormsChanged();
+        await pushTasksChanged();
       },
 
-      listForms: async () => await listForms(),
+      listTasks: async () => await listTasks(),
 
-      getRunHistory: async ({ formSlug, limit }) => {
-        const project = await projectForSlug(formSlug);
+      getRunHistory: async ({ taskSlug, limit }) => {
+        const project = await projectForSlug(taskSlug);
         if (!project) return [];
-        return getRunHistory(project.path, formSlug, limit);
+        return getRunHistory(project.path, taskSlug, limit);
       },
 
       getAllRuns: async ({ project }) => {
@@ -324,10 +324,10 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         return getAllRuns([resolved.path]);
       },
 
-      runForm: async ({ formSlug, inputs }) => {
-        const project = await projectForSlug(formSlug);
-        if (!project) throw new Error(`Form not found: ${formSlug}`);
-        return await startRun(project.path, project.name, formSlug, inputs, emitters);
+      runTask: async ({ taskSlug, inputs }) => {
+        const project = await projectForSlug(taskSlug);
+        if (!project) throw new Error(`Task not found: ${taskSlug}`);
+        return await startRun(project.path, project.name, taskSlug, inputs, emitters);
       },
 
       cancelRun: ({ runId }) => {
@@ -336,7 +336,7 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
 
       readOutputFile: async ({ runId }) => await readOutputFile(runId),
 
-      getFormScript: async ({ formSlug }) => await readFormScript(formSlug),
+      getTaskScript: async ({ taskSlug }) => await readTaskScript(taskSlug),
 
       saveServiceCredential: async ({ serviceId, key }) => {
         await saveCredential(serviceId, key);
@@ -352,12 +352,12 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
 
       testAIService: async ({ serviceId }) => await testAIService(serviceId),
 
-      fillMagicFields: async ({ formSlug, fields }) => {
+      fillMagicFields: async ({ taskSlug, fields }) => {
         try {
-          const project = await projectForSlug(formSlug);
-          if (!project) return { ok: false, error: `Form not found: ${formSlug}` };
-          const folder = await loadFormFolder(project.path, formSlug, project.name);
-          if (!folder) return { ok: false, error: `Form not found: ${formSlug}` };
+          const project = await projectForSlug(taskSlug);
+          if (!project) return { ok: false, error: `Task not found: ${taskSlug}` };
+          const folder = await loadTaskFolder(project.path, taskSlug, project.name);
+          if (!folder) return { ok: false, error: `Task not found: ${taskSlug}` };
           const values = await fillMagicFields(folder, fields);
           return { ok: true, values };
         } catch (err) {
@@ -538,16 +538,16 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
-      createCommandForm: async ({ project, name, description, tags, command, fields, outputType, outputs }) => {
+      createCommandTask: async ({ project, name, description, tags, command, fields, outputType, outputs }) => {
         try {
           const resolvedProject = (await resolveProjectByName(project)) ?? (await addProject(project));
-          const slug = await writeCommandForm(
+          const slug = await writeCommandTask(
             resolvedProject.path,
             { name, description, project: resolvedProject.name, tags },
             { fields, outputType, outputs, command },
           );
           await pushProjectsChanged();
-          await pushFormsChanged();
+          await pushTasksChanged();
           return { ok: true, slug };
         } catch (err) {
           return { ok: false, error: String(err) };
@@ -557,7 +557,7 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
       getRunOutputs: async ({ runId }) => {
         const run = getRun(runId);
         if (!run) return [];
-        const project = await projectForSlug(run.formSlug);
+        const project = await projectForSlug(run.taskSlug);
         if (!project) return [];
         return await readRunOutputs(project.path, runId);
       },
@@ -644,10 +644,10 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         if (!resolved) return { ok: false, error: "Project not found" };
         const service = await getAIService(serviceId);
         if (!service) return { ok: false, error: "Selected AI service not found." };
-        const forms = (await listForms()).filter((f) => f.meta.project === resolved.name);
-        if (forms.length === 0) return { ok: false, error: "This project has no forms yet — create one first." };
+        const tasks = (await listTasks()).filter((f) => f.meta.project === resolved.name);
+        if (tasks.length === 0) return { ok: false, error: "This project has no tasks yet — create one first." };
         try {
-          const { workflow, notes } = await draftWorkflow(goal, name, forms, service, model);
+          const { workflow, notes } = await draftWorkflow(goal, name, tasks, service, model);
           return { ok: true, workflow, notes };
         } catch (err) {
           return { ok: false, error: String(err) };
@@ -665,10 +665,10 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         else dbDeleteRun(runId);
       },
 
-      scheduleRun: async ({ formSlug, inputs, scheduledAt, repeatInterval }) => {
-        const project = await projectForSlug(formSlug);
-        if (!project) throw new Error(`Form not found: ${formSlug}`);
-        const runId = schedule(project.path, formSlug, inputs, scheduledAt, repeatInterval);
+      scheduleRun: async ({ taskSlug, inputs, scheduledAt, repeatInterval }) => {
+        const project = await projectForSlug(taskSlug);
+        if (!project) throw new Error(`Task not found: ${taskSlug}`);
+        const runId = schedule(project.path, taskSlug, inputs, scheduledAt, repeatInterval);
         return { runId };
       },
 
@@ -726,27 +726,27 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         return { ok };
       },
 
-      deleteForm: async ({ projectPath, slug }) => {
+      deleteTask: async ({ projectPath, slug }) => {
         try {
           const dir = formDir(projectPath, slug);
           const base = projectFormsDir(projectPath);
           if (!resolve(dir).startsWith(resolve(base) + sep)) {
-            return { ok: false, error: "Invalid form path" };
+            return { ok: false, error: "Invalid task path" };
           }
           rmSync(dir, { recursive: true, force: true });
-          await pushFormsChanged();
+          await pushTasksChanged();
           return { ok: true };
         } catch (err) {
           return { ok: false, error: String(err) };
         }
       },
 
-      updateFormMeta: async ({ projectPath, slug, patch }) => {
+      updateTaskMeta: async ({ projectPath, slug, patch }) => {
         try {
           const dir = formDir(projectPath, slug);
           const base = projectFormsDir(projectPath);
           if (!resolve(dir).startsWith(resolve(base) + sep)) {
-            return { ok: false, error: "Invalid form path" };
+            return { ok: false, error: "Invalid task path" };
           }
           if (patch.name !== undefined && patch.name.trim() === "") {
             return { ok: false, error: "Name required" };
@@ -754,7 +754,7 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           const metaPath = join(dir, "meta.json");
           const file = Bun.file(metaPath);
           if (!(await file.exists())) {
-            return { ok: false, error: "Form not found" };
+            return { ok: false, error: "Task not found" };
           }
           const raw = JSON.parse(await file.text()) as Record<string, unknown>;
           const next = {
@@ -767,7 +767,7 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
             updatedAt: new Date().toISOString(),
           };
           await Bun.write(metaPath, JSON.stringify(next, null, 2));
-          await pushFormsChanged();
+          await pushTasksChanged();
           return { ok: true };
         } catch (err) {
           return { ok: false, error: String(err) };
@@ -798,13 +798,13 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
 });
 
 // ---------------------------------------------------------------------------
-// Scheduler — auto-runs scheduled forms (including overdue ones on launch).
+// Scheduler — auto-runs scheduled tasks (including overdue ones on launch).
 // ---------------------------------------------------------------------------
-await initScheduler((projectPath, runId, formSlug, inputs) => {
+await initScheduler((projectPath, runId, taskSlug, inputs) => {
   void (async () => {
     const projects = await listProjects();
     const name = projects.find((p) => p.path === projectPath)?.name ?? projectPath;
-    void startRun(projectPath, name, formSlug, inputs, emitters, runId);
+    void startRun(projectPath, name, taskSlug, inputs, emitters, runId);
   })();
 });
 
@@ -847,13 +847,13 @@ ApplicationMenu.setApplicationMenu([
   {
     label: "View",
     submenu: [
-      { label: "Forms", action: "view:forms", accelerator: "CommandOrControl+P" },
+      { label: "Tasks", action: "view:forms", accelerator: "CommandOrControl+P" },
       { label: "Calendar", action: "view:calendar", accelerator: "CommandOrControl+Shift+C" },
       { label: "Views", action: "view:views", accelerator: "CommandOrControl+Shift+V" },
       { label: "Workflows", action: "view:workflows", accelerator: "CommandOrControl+Shift+U" },
       { label: "Project Settings", action: "view:project-settings", accelerator: "CommandOrControl+," },
       { type: "separator" },
-      { label: "Run a Form…", action: "view:run-picker", accelerator: "CommandOrControl+K" },
+      { label: "Run a Task…", action: "view:run-picker", accelerator: "CommandOrControl+K" },
       { type: "separator" },
       // Browser-style view tab navigation (tickets 43, 83, 84).
       { label: "New Tab", action: "view:new-tab", accelerator: "CommandOrControl+T" },
@@ -890,9 +890,9 @@ mainWindow = new BrowserWindow({
   rpc,
 });
 
-// Watch each project's forms directory and push changes to the renderer live.
-const stopWatching = watchForms(await projectPaths(), () => {
-  void pushFormsChanged();
+// Watch each project's tasks directory and push changes to the renderer live.
+const stopWatching = watchTasks(await projectPaths(), () => {
+  void pushTasksChanged();
 });
 
 mainWindow.on("close", () => {

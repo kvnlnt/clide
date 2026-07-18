@@ -1,4 +1,4 @@
-import type { ArgMapping, FormDefinition, FormField } from "./types";
+import type { ArgMapping, TaskDefinition, TaskField } from "./types";
 
 export interface BuiltCommand {
   tool: string;
@@ -12,7 +12,7 @@ function isEmptyValue(value: unknown): boolean {
   return value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
 }
 
-function tokensFor(field: FormField, mapping: ArgMapping, value: unknown): string[] {
+function tokensFor(field: TaskField, mapping: ArgMapping, value: unknown): string[] {
   const flag = mapping.flag ?? `--${field.id}`;
   if (mapping.kind === "flag") {
     return value ? [flag] : [];
@@ -30,7 +30,7 @@ function tokensFor(field: FormField, mapping: ArgMapping, value: unknown): strin
 }
 
 /**
- * Builds the exact argv (plus env/stdin) for a command-backed form given its
+ * Builds the exact argv (plus env/stdin) for a command-backed task given its
  * current field values. Pure and side-effect-free — shared by the runner
  * (actual execution) and the UI (live command preview), so what the user
  * sees is always what will run.
@@ -39,23 +39,24 @@ function tokensFor(field: FormField, mapping: ArgMapping, value: unknown): strin
  * positionals sorted by their `order` (most CLI parsers tolerate options
  * anywhere, so this keeps the common case simple and predictable).
  */
-export function buildCommand(form: FormDefinition, inputs: Record<string, unknown>): BuiltCommand {
-  const command = form.command;
-  if (!command) throw new Error("buildCommand called on a form with no command spec");
+export function buildCommand(task: TaskDefinition, inputs: Record<string, unknown>): BuiltCommand {
+  const command = task.command;
+  if (!command) throw new Error("buildCommand called on a task with no command spec");
 
   const optionTokens: string[] = [];
   const positionals: { order: number; tokens: string[] }[] = [];
   const env: Record<string, string> = {};
   let stdin: string | undefined;
 
-  form.fields.forEach((field, index) => {
+  task.fields.forEach((field, index) => {
     const mapping = field.argMapping;
     if (!mapping) return;
     const value = inputs[field.id];
     const empty = isEmptyValue(value);
 
     if (mapping.kind === "env") {
-      if (!empty) env[mapping.envName ?? field.id.toUpperCase()] = Array.isArray(value) ? value.join(",") : String(value);
+      if (!empty)
+        env[mapping.envName ?? field.id.toUpperCase()] = Array.isArray(value) ? value.join(",") : String(value);
       return;
     }
     if (mapping.kind === "stdin") {
@@ -100,7 +101,7 @@ export function formatCommandPreview(tool: string, argv: string[]): string {
  * same mapping semantics as `buildCommand` so the wizard's per-field cell
  * can't drift from what actually runs.
  */
-export function describeFieldMapping(field: FormField): string {
+export function describeFieldMapping(field: TaskField): string {
   const mapping = field.argMapping;
   if (!mapping) return "not passed to the command";
   const placeholder = `<${field.label.trim() || field.id}>`;

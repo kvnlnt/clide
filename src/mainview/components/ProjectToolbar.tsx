@@ -17,7 +17,7 @@ export default function ProjectToolbar() {
 
   return (
     <Toolbar className="bg-white/10">
-      <button onClick={openRunPicker} title="Run a form (⌘K)" className={`${btnBase} ${btnInactive}`}>
+      <button onClick={openRunPicker} title="Run a task (⌘K)" className={`${btnBase} ${btnInactive}`}>
         <Play size={13} />
         Run
       </button>

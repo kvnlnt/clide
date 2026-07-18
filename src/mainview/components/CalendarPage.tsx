@@ -5,7 +5,7 @@ import CalendarComposer from "./CalendarComposer";
 import Modal from "./Modal";
 import MonthYearPicker from "./MonthYearPicker";
 import { useUIFeedback } from "./UIFeedback";
-import type { RepeatInterval, RunRecord } from "../types/forms";
+import type { RepeatInterval, RunRecord } from "../types/tasks";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MAX_CHIPS_PER_DAY = 4;
@@ -81,7 +81,7 @@ export default function CalendarPage() {
   };
 
   const scheduled = useMemo(
-    () => runs.filter((r) => r.status === "scheduled" && formsBySlug.get(r.formSlug)?.meta.project === activeProject),
+    () => runs.filter((r) => r.status === "scheduled" && formsBySlug.get(r.taskSlug)?.meta.project === activeProject),
     [runs, formsBySlug, activeProject],
   );
 
@@ -178,7 +178,7 @@ export default function CalendarPage() {
                       e.stopPropagation();
                       openDetail(chip.run.id);
                     }}
-                    title={`${formsBySlug.get(chip.run.formSlug)?.meta.name ?? chip.run.formSlug} — ${chip.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+                    title={`${formsBySlug.get(chip.run.taskSlug)?.meta.name ?? chip.run.taskSlug} — ${chip.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
                     className={`truncate rounded px-1.5 py-0.5 text-left text-[11px] ${
                       chip.projected
                         ? "border border-dashed border-white/10 text-white/30"
@@ -186,7 +186,7 @@ export default function CalendarPage() {
                     }`}
                   >
                     {chip.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{" "}
-                    {formsBySlug.get(chip.run.formSlug)?.meta.name ?? chip.run.formSlug}
+                    {formsBySlug.get(chip.run.taskSlug)?.meta.name ?? chip.run.taskSlug}
                   </button>
                 ))}
                 {overflow > 0 && <span className="text-[10px] text-white/30">+{overflow} more</span>}
@@ -200,7 +200,7 @@ export default function CalendarPage() {
         {selected && (
           <ScheduleDetail
             run={selected}
-            formName={formsBySlug.get(selected.formSlug)?.meta.name ?? selected.formSlug}
+            formName={formsBySlug.get(selected.taskSlug)?.meta.name ?? selected.taskSlug}
             onClose={() => setSelectedId(null)}
             onSave={async (scheduledAt, repeat) => {
               await updateScheduledRun(selected.id, scheduledAt, repeat);
@@ -213,7 +213,7 @@ export default function CalendarPage() {
               setSelectedId(null);
             }}
             onCancel={async () => {
-              const name = formsBySlug.get(selected.formSlug)?.meta.name ?? selected.formSlug;
+              const name = formsBySlug.get(selected.taskSlug)?.meta.name ?? selected.taskSlug;
               const res = await confirm({
                 title: "Cancel this scheduled run?",
                 message: `"${name}" will no longer run${selected.repeatInterval && selected.repeatInterval !== "none" ? ", including future repeats" : ""}.`,

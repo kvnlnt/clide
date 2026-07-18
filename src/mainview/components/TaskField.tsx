@@ -1,6 +1,6 @@
-import type { FormField as FieldDef } from "../types/forms";
+import type { TaskField as FieldDef } from "../types/tasks";
 
-interface FormFieldProps {
+interface TaskFieldProps {
   field: FieldDef;
   value: unknown;
   onChange: (value: unknown) => void;
@@ -10,7 +10,7 @@ interface FormFieldProps {
 const inputBase =
   "w-full rounded border border-clide-border bg-clide-surface text-white text-[13px] px-2.5 py-1.5 outline-none placeholder:text-white/30 focus:border-white/30 disabled:opacity-60";
 
-export default function FormField({ field, value, onChange, disabled }: FormFieldProps) {
+export default function TaskField({ field, value, onChange, disabled }: TaskFieldProps) {
   switch (field.type) {
     case "textarea":
       return (

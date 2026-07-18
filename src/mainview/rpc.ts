@@ -3,9 +3,6 @@ import type {
   AIService,
   ClideRPC,
   CommandSpec,
-  FormField,
-  FormFolder,
-  FormMetaPatch,
   OutputChunk,
   OutputDefinition,
   OutputResult,
@@ -15,6 +12,9 @@ import type {
   RepeatInterval,
   RunRecord,
   RunStatusUpdate,
+  TaskField,
+  TaskFolder,
+  TaskMetaPatch,
   ThreadView,
   ToolRegistryEntry,
   ToolSource,
@@ -32,7 +32,7 @@ import type {
 // ---------------------------------------------------------------------------
 type EventMap = {
   projects: Project[];
-  forms: FormFolder[];
+  tasks: TaskFolder[];
   chunk: OutputChunk;
   status: RunStatusUpdate;
   /** Native app-menu action id, e.g. "view:forms". */
@@ -45,7 +45,7 @@ type Listener<K extends keyof EventMap> = (payload: EventMap[K]) => void;
 
 const listeners: { [K in keyof EventMap]: Set<Listener<K>> } = {
   projects: new Set(),
-  forms: new Set(),
+  tasks: new Set(),
   chunk: new Set(),
   status: new Set(),
   menuAction: new Set(),
@@ -70,7 +70,7 @@ const rpcDef = Electroview.defineRPC<ClideRPC>({
     requests: {},
     messages: {
       onProjectsChanged: ({ projects }) => emit("projects", projects),
-      onFormsChanged: ({ forms }) => emit("forms", forms),
+      onTasksChanged: ({ tasks }) => emit("tasks", tasks),
       onOutputChunk: (chunk) => emit("chunk", chunk),
       onRunStatus: (update) => emit("status", update),
       onMenuAction: ({ action }) => emit("menuAction", action),
@@ -153,11 +153,11 @@ export const api = {
     await request()?.removeProject({ path, deleteFiles });
   },
 
-  async listForms(): Promise<FormFolder[]> {
+  async listTasks(): Promise<TaskFolder[]> {
     const r = request();
     if (!r) return [];
     try {
-      return await r.listForms({});
+      return await r.listTasks({});
     } catch {
       return [];
     }
@@ -173,21 +173,21 @@ export const api = {
     }
   },
 
-  async getRunHistory(formSlug: string, limit: number): Promise<RunRecord[]> {
+  async getRunHistory(taskSlug: string, limit: number): Promise<RunRecord[]> {
     const r = request();
     if (!r) return [];
     try {
-      return await r.getRunHistory({ formSlug, limit });
+      return await r.getRunHistory({ taskSlug, limit });
     } catch {
       return [];
     }
   },
 
-  async runForm(formSlug: string, inputs: Record<string, unknown>): Promise<string | null> {
+  async runTask(taskSlug: string, inputs: Record<string, unknown>): Promise<string | null> {
     const r = request();
     if (!r) return null;
     try {
-      const { runId } = await r.runForm({ formSlug, inputs });
+      const { runId } = await r.runTask({ taskSlug, inputs });
       return runId;
     } catch {
       return null;
@@ -208,11 +208,11 @@ export const api = {
     }
   },
 
-  async getFormScript(formSlug: string): Promise<{ script: string; extension: string } | null> {
+  async getTaskScript(taskSlug: string): Promise<{ script: string; extension: string } | null> {
     const r = request();
     if (!r) return null;
     try {
-      return await r.getFormScript({ formSlug });
+      return await r.getTaskScript({ taskSlug });
     } catch {
       return null;
     }
@@ -257,13 +257,13 @@ export const api = {
   },
 
   async fillMagicFields(
-    formSlug: string,
+    taskSlug: string,
     fields: Record<string, string>,
   ): Promise<{ ok: boolean; values?: Record<string, unknown>; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
-      return await r.fillMagicFields({ formSlug, fields });
+      return await r.fillMagicFields({ taskSlug, fields });
     } catch (err) {
       return { ok: false, error: String(err) };
     }
@@ -278,7 +278,7 @@ export const api = {
   },
 
   async scheduleRun(
-    formSlug: string,
+    taskSlug: string,
     inputs: Record<string, unknown>,
     scheduledAt: string,
     repeatInterval: RepeatInterval,
@@ -287,7 +287,7 @@ export const api = {
     if (!r) return null;
     try {
       const { runId } = await r.scheduleRun({
-        formSlug,
+        taskSlug,
         inputs,
         scheduledAt,
         repeatInterval,
@@ -385,25 +385,25 @@ export const api = {
     }
   },
 
-  async deleteForm(projectPath: string, slug: string): Promise<{ ok: boolean; error?: string }> {
+  async deleteTask(projectPath: string, slug: string): Promise<{ ok: boolean; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
-      return await r.deleteForm({ projectPath, slug });
+      return await r.deleteTask({ projectPath, slug });
     } catch (err) {
       return { ok: false, error: String(err) };
     }
   },
 
-  async updateFormMeta(
+  async updateTaskMeta(
     projectPath: string,
     slug: string,
-    patch: FormMetaPatch,
+    patch: TaskMetaPatch,
   ): Promise<{ ok: boolean; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
-      return await r.updateFormMeta({ projectPath, slug, patch });
+      return await r.updateTaskMeta({ projectPath, slug, patch });
     } catch (err) {
       return { ok: false, error: String(err) };
     }
@@ -555,7 +555,7 @@ export const api = {
     spec: ToolSpec,
     serviceId: string,
     model: string,
-  ): Promise<{ ok: boolean; fields?: FormField[]; error?: string }> {
+  ): Promise<{ ok: boolean; fields?: TaskField[]; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
@@ -578,20 +578,20 @@ export const api = {
     }
   },
 
-  async createCommandForm(input: {
+  async createCommandTask(input: {
     project: string;
     name: string;
     description: string;
     tags: string[];
     command: CommandSpec;
-    fields: FormField[];
+    fields: TaskField[];
     outputType: OutputType;
     outputs: OutputDefinition[];
   }): Promise<{ ok: boolean; slug?: string; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
-      return await r.createCommandForm(input);
+      return await r.createCommandTask(input);
     } catch (err) {
       return { ok: false, error: String(err) };
     }

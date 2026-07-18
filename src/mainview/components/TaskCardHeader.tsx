@@ -1,6 +1,6 @@
 import { Braces, Eye } from "lucide-react";
 import { useApp } from "../context/AppContext";
-import type { FormDefinition, FormMeta, RunRecord, RunStatus } from "../types/forms";
+import type { TaskDefinition, TaskMeta, RunRecord, RunStatus } from "../types/tasks";
 import EllipsisMenu from "./EllipsisMenu";
 import { STATUS_META, STATUS_ORDER } from "./statusIcon";
 
@@ -10,8 +10,8 @@ const TABS = [
 ] as const;
 
 interface FormCardHeaderProps {
-  meta: FormMeta;
-  form: FormDefinition;
+  meta: TaskMeta;
+  form: TaskDefinition;
   run: RunRecord;
   /** Count of runs in the group by status — renders one badge per nonzero status. */
   statusCounts: Partial<Record<RunStatus, number>>;

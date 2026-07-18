@@ -2,7 +2,7 @@ import { FlaskConical, ListChecks, Pencil, Play, Plus, Trash2 } from "lucide-rea
 import { useEffect, useState } from "react";
 import { useApp } from "../../context/AppContext";
 import { api, on } from "../../rpc";
-import type { RunStatus, Workflow, WorkflowPlanEntry, WorkflowRunSummary } from "../../types/forms";
+import type { RunStatus, Workflow, WorkflowPlanEntry, WorkflowRunSummary } from "../../types/tasks";
 import Modal from "../Modal";
 import StatusIcon from "../statusIcon";
 import { useUIFeedback } from "../UIFeedback";
@@ -14,7 +14,7 @@ const inputBase =
 function triggerSummary(w: Workflow): string {
   if (w.triggers.length === 0) return "no triggers";
   return w.triggers
-    .map((t) => (t.type === "manual" ? "manual" : t.type === "schedule" ? `cron ${t.cron}` : `on ${t.formSlug}`))
+    .map((t) => (t.type === "manual" ? "manual" : t.type === "schedule" ? `cron ${t.cron}` : `on ${t.taskSlug}`))
     .join(" · ");
 }
 

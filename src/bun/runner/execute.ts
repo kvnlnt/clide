@@ -3,16 +3,16 @@ import { join } from "node:path";
 import { buildCommand, formatCommandPreview } from "../../shared/command";
 import { evaluateOutputs } from "../../shared/outputs";
 import type {
-  FormFolder,
   Interpreter,
   OutputChunk,
   OutputResult,
   RunRecord,
   RunStatusUpdate,
+  TaskFolder,
 } from "../../shared/types";
 import { createRun, getRun, setOutputPath, setResolvedCommand, updateRunStatus } from "../db/history";
-import { loadFormFolder } from "../forms/loader";
 import { formDir, runDir } from "../paths";
+import { loadTaskFolder } from "../tasks/loader";
 import { buildArgs } from "./argBuilder";
 import { OutputCapture } from "./outputCapture";
 import * as registry from "./registry";
@@ -40,7 +40,7 @@ const MAX_CAPTURE_CHARS = 256 * 1024;
 export interface RunCompletionInfo {
   projectPath: string;
   projectName: string;
-  formSlug: string;
+  taskSlug: string;
   runId: string;
   exitCode: number | null;
   inputs: Record<string, unknown>;
@@ -62,14 +62,14 @@ export function setRunCompletionListener(fn: (info: RunCompletionInfo) => void):
 export async function startRun(
   projectPath: string,
   projectName: string,
-  formSlug: string,
+  taskSlug: string,
   inputs: Record<string, unknown>,
   emitters: RunEmitters,
   existingRunId?: string,
 ): Promise<{ runId: string }> {
-  const folder = await loadFormFolder(projectPath, formSlug, projectName);
+  const folder = await loadTaskFolder(projectPath, taskSlug, projectName);
   if (!folder) {
-    throw new Error(`Form not found: ${formSlug}`);
+    throw new Error(`Form not found: ${taskSlug}`);
   }
 
   const runId = existingRunId ?? crypto.randomUUID();
@@ -80,7 +80,7 @@ export async function startRun(
   } else {
     createRun(projectPath, {
       id: runId,
-      formSlug,
+      taskSlug,
       inputs,
       status: "running",
       startedAt,
@@ -107,15 +107,15 @@ export async function startRun(
 
 /** Spawns a form's process — direct tool invocation for command forms, interpreter+script for legacy. */
 function spawnForm(
-  folder: FormFolder,
+  folder: TaskFolder,
   inputs: Record<string, unknown>,
 ): {
   proc: ReturnType<typeof Bun.spawn>;
   commandDisplay: string;
   argv?: { tool: string; argv: string[] };
 } {
-  if (folder.form.command) {
-    const built = buildCommand(folder.form, inputs);
+  if (folder.task.command) {
+    const built = buildCommand(folder.task, inputs);
     const resolvedPath = Bun.which(built.tool);
     if (!resolvedPath) {
       throw new Error(`Tool not installed: "${built.tool}" is not on PATH.`);
@@ -133,9 +133,9 @@ function spawnForm(
     };
   }
 
-  const scriptFile = folder.form.scriptFile ?? "script.sh";
+  const scriptFile = folder.task.scriptFile ?? "script.sh";
   const scriptPath = join(formDir(folder.projectPath, folder.meta.slug), scriptFile);
-  const args = buildArgs(folder.form, inputs);
+  const args = buildArgs(folder.task, inputs);
   const cmd = INTERPRETER_CMD[folder.meta.interpreter ?? "bash"] ?? "bash";
   const proc = Bun.spawn([cmd, scriptPath, ...args], {
     stdout: "pipe",
@@ -149,7 +149,7 @@ async function execute(
   projectPath: string,
   projectName: string,
   runId: string,
-  folder: FormFolder,
+  folder: TaskFolder,
   inputs: Record<string, unknown>,
   emitters: RunEmitters,
 ): Promise<void> {
@@ -197,7 +197,7 @@ async function execute(
   // or fails the run itself.
   let outputs: OutputResult[] = [];
   try {
-    outputs = evaluateOutputs(folder.form.outputs ?? [], { stdout: capture.text, stderr: stderrText }, existsSync);
+    outputs = evaluateOutputs(folder.task.outputs ?? [], { stdout: capture.text, stderr: stderrText }, existsSync);
     await Bun.write(join(runDir(projectPath, runId), "outputs.json"), JSON.stringify(outputs, null, 2));
   } catch (err) {
     console.warn(`[outputs] evaluation failed for ${runId}:`, err);
@@ -219,7 +219,7 @@ async function execute(
     completionListener({
       projectPath,
       projectName,
-      formSlug: folder.meta.slug,
+      taskSlug: folder.meta.slug,
       runId,
       exitCode,
       inputs,
@@ -258,7 +258,7 @@ export interface ExecOnceResult {
 }
 
 export async function execFormOnce(
-  folder: FormFolder,
+  folder: TaskFolder,
   inputs: Record<string, unknown>,
   /** Registry key for cancellation (the workflow run id); optional. */
   procKey?: string,
@@ -291,7 +291,7 @@ export async function execFormOnce(
   await Promise.all([p1, p2]);
   if (procKey) registry.unregister(procKey);
 
-  const outputs = evaluateOutputs(folder.form.outputs ?? [], { stdout, stderr }, existsSync);
+  const outputs = evaluateOutputs(folder.task.outputs ?? [], { stdout, stderr }, existsSync);
   return {
     commandDisplay: spawned.commandDisplay,
     stdout,

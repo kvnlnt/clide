@@ -2,10 +2,10 @@ import { ArrowLeft, Loader, RefreshCw, Sparkles, Terminal, X } from "lucide-reac
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
-import type { FormField, OutputDefinition, OutputType, ToolRegistryEntry } from "../types/forms";
-import { buildCommand, formatCommandPreview } from "../types/forms";
+import type { TaskField, OutputDefinition, OutputType, ToolRegistryEntry } from "../types/tasks";
+import { buildCommand, formatCommandPreview } from "../types/tasks";
 import CommandFieldsEditor from "./CommandFieldsEditor";
-import FormPreview from "./FormPreview";
+import FormPreview from "./TaskPreview";
 import { useEscapeToClose } from "./Modal";
 import OutputDefinitionsEditor from "./OutputDefinitionsEditor";
 import ServiceModelPicker, { type ServiceModelValue } from "./ServiceModelPicker";
@@ -32,7 +32,7 @@ function isSampleFilled(value: unknown): boolean {
  * otherwise — so the argv shape is always visible and real samples
  * materialize in place.
  */
-function previewInputs(fields: FormField[], samples: Record<string, unknown>): Record<string, unknown> {
+function previewInputs(fields: TaskField[], samples: Record<string, unknown>): Record<string, unknown> {
   const inputs: Record<string, unknown> = {};
   for (const f of fields) {
     if (!f.argMapping) continue;
@@ -74,7 +74,7 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
   const [baseArgsText, setBaseArgsText] = useState("");
 
   // Step 3
-  const [fields, setFields] = useState<FormField[]>([]);
+  const [fields, setFields] = useState<TaskField[]>([]);
   const [draftBusy, setDraftBusy] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
   /** Which tool+action the current fields were drafted for — drives the "drafted for another tool" hint. */
@@ -164,7 +164,7 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
     setCreating(true);
     setCreateError(null);
     const outputType: OutputType = outputs[0]?.kind ?? "text";
-    const res = await api.createCommandForm({
+    const res = await api.createCommandTask({
       project: project.trim(),
       name: name.trim(),
       description: goal.trim(),
@@ -222,7 +222,7 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
     // it the wizard body grows past the window instead of scrolling.
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-4 px-8 pb-4 pt-7">
-        <h1 className="shrink-0 text-[20px] font-bold text-white">{name.trim() || "Create new form"}</h1>
+        <h1 className="shrink-0 text-[20px] font-bold text-white">{name.trim() || "Create new task"}</h1>
         <WizardSteps steps={stepDefs} current={step} onSelect={(n) => setStep(n as Step)} />
         <div className="flex-1" />
         <button
@@ -239,10 +239,9 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
           {step === 1 && (
             <>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[14px] font-bold text-white/70">What should this form do?</label>
+                <label className="text-[14px] font-bold text-white/70">What should this task do?</label>
                 <span className="text-[12px] text-white/40">
-                  Describe the goal in a sentence or two — CLIDE will suggest command-line tools and draft the form's
-                  fields from this.
+                  Describe the goal in a sentence or two — CLIDE will suggest command-line tools and draft the fields from this.
                 </span>
                 <textarea
                   autoFocus

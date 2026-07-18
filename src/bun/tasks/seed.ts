@@ -1,11 +1,11 @@
 import { join } from "node:path";
-import type { FormDefinition, FormMeta } from "../../shared/types";
+import type { TaskDefinition, TaskMeta } from "../../shared/types";
 import { addProject, loadProjects } from "../config";
 import { ensureDir, ensureProjectDirs, formDir } from "../paths";
 
 interface Seed {
-  meta: Omit<FormMeta, "createdAt" | "updatedAt">;
-  form: FormDefinition;
+  meta: Omit<TaskMeta, "createdAt" | "updatedAt">;
+  task: TaskDefinition;
   script: string;
 }
 
@@ -19,7 +19,7 @@ const SEEDS: Seed[] = [
       tags: ["social", "publish"],
       interpreter: "bash",
     },
-    form: {
+    task: {
       fields: [
         {
           id: "post",
@@ -67,7 +67,7 @@ echo "Done."
       tags: ["files"],
       interpreter: "bash",
     },
-    form: {
+    task: {
       fields: [
         {
           id: "dir",
@@ -109,7 +109,7 @@ done
       tags: ["system"],
       interpreter: "bash",
     },
-    form: {
+    task: {
       fields: [],
       outputType: "json",
       scriptFile: "script.sh",
@@ -131,7 +131,7 @@ EOF
 
 /**
  * On very first launch (no projects registered yet), create the example
- * projects and seed each with its demo forms. Each project becomes a real
+ * projects and seed each with its demo tasks. Each project becomes a real
  * folder on disk under the app's default projects directory.
  */
 export async function seedExampleProjects(): Promise<void> {
@@ -150,12 +150,12 @@ export async function seedExampleProjects(): Promise<void> {
     const project = await addProject(projectName);
     ensureProjectDirs(project.path);
     for (const seed of seeds) {
-      const dir = formDir(project.path, seed.meta.slug);
+      const dir = formDir(project.path, seed.meta.slug); // Disk directory still under "forms/"
       ensureDir(dir);
-      const meta: FormMeta = { ...seed.meta, project: project.name, createdAt: now, updatedAt: now };
-      const scriptFile = seed.form.scriptFile ?? "script.sh";
+      const meta: TaskMeta = { ...seed.meta, project: project.name, createdAt: now, updatedAt: now };
+      const scriptFile = seed.task.scriptFile ?? "script.sh";
       await Bun.write(join(dir, "meta.json"), JSON.stringify(meta, null, 2));
-      await Bun.write(join(dir, "form.json"), JSON.stringify(seed.form, null, 2));
+      await Bun.write(join(dir, "form.json"), JSON.stringify(seed.task, null, 2)); // Disk file still "form.json"
       await Bun.write(join(dir, scriptFile), seed.script);
       try {
         await Bun.spawn(["chmod", "+x", join(dir, scriptFile)]).exited;
@@ -164,5 +164,5 @@ export async function seedExampleProjects(): Promise<void> {
       }
     }
   }
-  console.log(`[forms] Seeded ${byProject.size} example projects.`);
+  console.log(`[tasks] Seeded ${byProject.size} example projects.`);
 }

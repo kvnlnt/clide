@@ -1,15 +1,15 @@
 import { useState } from "react";
 import type {
-  FormDefinition,
+  TaskDefinition,
   OutputChunk,
   OutputType,
   RunRecord,
-} from "../types/forms";
+} from "../types/tasks";
 import SubmissionAccordionRow from "./SubmissionAccordionRow";
 
 interface SubmissionAccordionProps {
   runs: RunRecord[];
-  form: FormDefinition;
+  form: TaskDefinition;
   outputType?: OutputType;
   chunks: Record<string, OutputChunk[]>;
   activeTab: "results" | "submitted";

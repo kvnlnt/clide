@@ -1,11 +1,11 @@
 import { Sparkles, Terminal, Workflow } from "lucide-react";
 import { useApp } from "../context/AppContext";
-import type { FormDefinition } from "../types/forms";
-import { buildCommand, formatCommandPreview } from "../types/forms";
-import FormField from "./FormField";
+import type { TaskDefinition } from "../types/tasks";
+import { buildCommand, formatCommandPreview } from "../types/tasks";
+import TaskField from "./TaskField";
 
 interface FormCardBodyProps {
-  form: FormDefinition;
+  form: TaskDefinition;
   values: Record<string, unknown>;
   onChange: (id: string, value: unknown) => void;
   disabled?: boolean;
@@ -14,11 +14,11 @@ interface FormCardBodyProps {
   /** The magic fill attempt failed — show a small hint. */
   fillFailed?: boolean;
   /** Slug for the "Starts workflows" lookup (ticket 90); omit to hide it. */
-  formSlug?: string;
+  taskSlug?: string;
 }
 
 /** Live "what will run" line for command-backed forms (ticket 52) — recomputed from current values. */
-function CommandPreview({ form, values }: { form: FormDefinition; values: Record<string, unknown> }) {
+function CommandPreview({ form, values }: { form: TaskDefinition; values: Record<string, unknown> }) {
   if (!form.command) return null;
   const built = buildCommand(form, values);
   return (
@@ -34,11 +34,11 @@ function CommandPreview({ form, values }: { form: FormDefinition; values: Record
  * trigger, so "what happens if I hit submit?" is always answered on the
  * form itself. Renders nothing when no workflow is attached.
  */
-function StartsWorkflows({ formSlug }: { formSlug?: string }) {
+function StartsWorkflows({ taskSlug }: { taskSlug?: string }) {
   const { workflows } = useApp();
-  if (!formSlug) return null;
+  if (!taskSlug) return null;
   const starting = workflows.filter(
-    (w) => w.enabled && w.triggers.some((t) => t.type === "form-submitted" && t.formSlug === formSlug),
+    (w) => w.enabled && w.triggers.some((t) => t.type === "task-submitted" && t.taskSlug === taskSlug),
   );
   if (starting.length === 0) return null;
   return (
@@ -59,14 +59,14 @@ export default function FormCardBody({
   disabled,
   filling,
   fillFailed,
-  formSlug,
+  taskSlug,
 }: FormCardBodyProps) {
   if (form.fields.length === 0) {
     return (
       <div className="flex flex-col gap-3 px-5 py-3.5">
         <div className="text-[13px] text-white/40">No inputs — press SEND to run.</div>
         <CommandPreview form={form} values={values} />
-        <StartsWorkflows formSlug={formSlug} />
+        <StartsWorkflows taskSlug={taskSlug} />
       </div>
     );
   }
@@ -94,7 +94,7 @@ export default function FormCardBody({
               )}
             </label>
             {field.description && <span className="text-[12px] text-white/40">{field.description}</span>}
-            <FormField
+            <TaskField
               field={field}
               value={values[field.id]}
               onChange={(v) => onChange(field.id, v)}
@@ -104,7 +104,7 @@ export default function FormCardBody({
         );
       })}
       <CommandPreview form={form} values={values} />
-      <StartsWorkflows formSlug={formSlug} />
+      <StartsWorkflows taskSlug={taskSlug} />
     </div>
   );
 }

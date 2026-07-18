@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { copyToClipboard } from "../../clipboard";
 import { api } from "../../rpc";
-import type { OutputChunk, OutputResult, OutputType, RunStatus } from "../../types/forms";
+import type { OutputChunk, OutputResult, OutputType, RunStatus } from "../../types/tasks";
 import AudioOutput from "./AudioOutput";
 import AutoSizeOutput from "./AutoSizeOutput";
 import ImageOutput from "./ImageOutput";

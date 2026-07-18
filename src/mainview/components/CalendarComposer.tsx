@@ -1,12 +1,12 @@
 import { AlarmClock, Search, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
-import { useFormSearch } from "../hooks/useFormSearch";
+import { useTaskSearch } from "../hooks/useTaskSearch";
 import { api } from "../rpc";
-import FormCardBody from "./FormCardBody";
+import TaskCardBody from "./TaskCardBody";
 import Modal from "./Modal";
 import { useUIFeedback } from "./UIFeedback";
-import type { FormFolder, RepeatInterval } from "../types/forms";
+import type { TaskFolder, RepeatInterval } from "../types/tasks";
 
 function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -51,7 +51,7 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
   const scopedForms = activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms;
 
   const [query, setQuery] = useState("");
-  const [picked, setPicked] = useState<FormFolder | null>(null);
+  const [picked, setPicked] = useState<TaskFolder | null>(null);
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [filling, setFilling] = useState<Set<string>>(new Set());
   const [fillFailed, setFillFailed] = useState(false);
@@ -62,9 +62,9 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
   const [repeat, setRepeat] = useState<RepeatInterval>("none");
   const [saving, setSaving] = useState(false);
 
-  const results = useFormSearch(scopedForms, query, recentSlugs);
+  const results = useTaskSearch(scopedForms, query, recentSlugs);
 
-  const pick = (folder: FormFolder) => {
+  const pick = (folder: TaskFolder) => {
     // Switching forms resets everything — stale values must not leak (ticket 69).
     setPicked(folder);
     setValues({});
@@ -72,7 +72,7 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
     touchedRef.current = new Set();
 
     const magicFields: Record<string, string> = {};
-    for (const f of folder.form.fields) {
+    for (const f of folder.task.fields) {
       if (f.magic?.prompt) magicFields[f.id] = f.magic.prompt;
     }
     const ids = Object.keys(magicFields);
@@ -108,7 +108,7 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
   }, [dateStr, time]);
 
   const inPast = scheduledDate.getTime() <= Date.now();
-  const requiredFilled = picked ? picked.form.fields.every((f) => !f.required || isFilled(values[f.id])) : false;
+  const requiredFilled = picked ? picked.task.fields.every((f) => !f.required || isFilled(values[f.id])) : false;
   const canSchedule = picked !== null && requiredFilled && !inPast && !saving;
 
   const schedule = async () => {
@@ -148,7 +148,7 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
         <div className="clide-scroll flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
           {scopedForms.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-6 text-center">
-          <span className="text-[13px] text-white/50">This project has no forms yet.</span>
+          <span className="text-[13px] text-white/50">This project has no tasks yet.</span>
           <button
             onClick={() => {
               onClose();
@@ -161,7 +161,7 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
         </div>
       ) : (
         <>
-          {/* Form picker */}
+          {/* Task picker */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2 rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5">
               <Search size={13} className="shrink-0 text-white/30" />
@@ -169,14 +169,14 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
                 autoFocus={picked === null}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={picked ? picked.meta.name : "Pick a form to schedule…"}
+                placeholder={picked ? picked.meta.name : "Pick a task to schedule…"}
                 className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/40"
               />
             </div>
             {(picked === null || query.trim() !== "") && (
               <div className="clide-scroll flex max-h-40 flex-col gap-0.5 overflow-y-auto">
                 {results.length === 0 && (
-                  <div className="px-2 py-1.5 text-[12px] italic text-white/30">No forms match.</div>
+                  <div className="px-2 py-1.5 text-[12px] italic text-white/30">No tasks match.</div>
                 )}
                 {results.map((folder) => (
                   <button
@@ -206,8 +206,8 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
           {/* The picked form's real fields — same rendering as the card. */}
           {picked && (
             <div className="rounded-md border border-clide-border bg-clide-surface">
-              <FormCardBody
-                form={picked.form}
+              <TaskCardBody
+                form={picked.task}
                 values={values}
                 onChange={setValue}
                 filling={filling}

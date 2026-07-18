@@ -16,8 +16,8 @@ import {
 import { useMemo, useState } from "react";
 import { STEP_NAME_RE, allSteps, computeScopes, expressionRefs, templateRefs } from "../../../shared/workflowExpr";
 import { useApp } from "../../context/AppContext";
-import type { DecisionStep, FormFolder, FormStep, Workflow, WorkflowStep, WorkflowTrigger } from "../../types/forms";
-import { buildCommand, formatCommandPreview } from "../../types/forms";
+import type { DecisionStep, TaskFolder, TaskStep, Workflow, WorkflowStep, WorkflowTrigger } from "../../types/tasks";
+import { buildCommand, formatCommandPreview } from "../../types/tasks";
 import { useEscapeToClose } from "../Modal";
 import { useUIFeedback } from "../UIFeedback";
 
@@ -34,7 +34,7 @@ const STEP_ICON = { form: Play, decision: GitBranch, loop: Repeat, parallel: Spl
 // flags per step + a summary that gates Save.
 // ---------------------------------------------------------------------------
 
-function validate(workflow: Workflow, formsBySlug: Map<string, FormFolder>): Map<string, string[]> {
+function validate(workflow: Workflow, formsBySlug: Map<string, TaskFolder>): Map<string, string[]> {
   const problems = new Map<string, string[]>();
   const add = (name: string, msg: string) => problems.set(name, [...(problems.get(name) ?? []), msg]);
 
@@ -59,10 +59,10 @@ function validate(workflow: Workflow, formsBySlug: Map<string, FormFolder>): Map
 
   for (const s of steps) {
     if (s.type === "form") {
-      const folder = formsBySlug.get(s.formSlug);
-      if (!folder) add(s.name, `form "${s.formSlug}" not found`);
+      const folder = formsBySlug.get(s.taskSlug);
+      if (!folder) add(s.name, `form "${s.taskSlug}" not found`);
       else {
-        for (const f of folder.form.fields) {
+        for (const f of folder.task.fields) {
           if (f.required && !(f.id in s.inputs)) add(s.name, `required field "${f.label || f.id}" is unset`);
         }
       }
@@ -85,7 +85,7 @@ function validate(workflow: Workflow, formsBySlug: Map<string, FormFolder>): Map
 }
 
 /** Reference suggestions for a step's scope: named outputs + stdout of in-scope form steps, trigger, item. */
-function buildSuggestions(workflow: Workflow, stepName: string, formsBySlug: Map<string, FormFolder>): string[] {
+function buildSuggestions(workflow: Workflow, stepName: string, formsBySlug: Map<string, TaskFolder>): string[] {
   const scopes = computeScopes(workflow);
   const scope = scopes.get(stepName) ?? [];
   const stepBySlugName = new Map(allSteps(workflow.steps).map((s) => [s.name, s]));
@@ -102,8 +102,8 @@ function buildSuggestions(workflow: Workflow, stepName: string, formsBySlug: Map
     }
     const step = stepBySlugName.get(root);
     if (step?.type === "form") {
-      const folder = formsBySlug.get(step.formSlug);
-      for (const def of folder?.form.outputs ?? []) out.push(`${root}.outputs.${def.name}`);
+      const folder = formsBySlug.get(step.taskSlug);
+      for (const def of folder?.task.outputs ?? []) out.push(`${root}.outputs.${def.name}`);
       out.push(`${root}.stdout`, `${root}.exitCode`);
     }
   }
@@ -173,15 +173,15 @@ function ReferenceInput({
 
 interface StepCtx {
   workflow: Workflow;
-  formsBySlug: Map<string, FormFolder>;
-  projectForms: FormFolder[];
+  formsBySlug: Map<string, TaskFolder>;
+  projectForms: TaskFolder[];
   problems: Map<string, string[]>;
 }
 
-function stepSummary(step: WorkflowStep, formsBySlug: Map<string, FormFolder>): string {
+function stepSummary(step: WorkflowStep, formsBySlug: Map<string, TaskFolder>): string {
   switch (step.type) {
     case "form":
-      return formsBySlug.get(step.formSlug)?.meta.name ?? step.formSlug;
+      return formsBySlug.get(step.taskSlug)?.meta.name ?? step.taskSlug;
     case "decision":
       return `if ${step.condition || "…"}`;
     case "loop":
@@ -196,18 +196,18 @@ function placeholderResolve(value: string): string {
   return value.replace(/\{\{([^}]*)\}\}/g, (_, e: string) => `⟨${e.trim()}⟩`);
 }
 
-function FormStepBody({ step, onChange, ctx }: { step: FormStep; onChange: (s: FormStep) => void; ctx: StepCtx }) {
-  const folder = ctx.formsBySlug.get(step.formSlug);
+function TaskStepBody({ step, onChange, ctx }: { step: TaskStep; onChange: (s: TaskStep) => void; ctx: StepCtx }) {
+  const folder = ctx.formsBySlug.get(step.taskSlug);
   const suggestions = useMemo(
     () => buildSuggestions(ctx.workflow, step.name, ctx.formsBySlug),
     [ctx.workflow, step.name, ctx.formsBySlug],
   );
 
   const compiled = useMemo(() => {
-    if (!folder?.form.command) return null;
+    if (!folder?.task.command) return null;
     const inputs: Record<string, unknown> = {};
     for (const [fieldId, value] of Object.entries(step.inputs)) inputs[fieldId] = placeholderResolve(value);
-    const built = buildCommand(folder.form, inputs);
+    const built = buildCommand(folder.task, inputs);
     return formatCommandPreview(built.tool, built.argv);
   }, [folder, step.inputs]);
 
@@ -217,12 +217,12 @@ function FormStepBody({ step, onChange, ctx }: { step: FormStep; onChange: (s: F
         <label className={fieldLabel}>Form</label>
         <select
           className={`${inputBase} appearance-none`}
-          value={step.formSlug}
-          onChange={(e) => onChange({ ...step, formSlug: e.target.value, inputs: {} })}
+          value={step.taskSlug}
+          onChange={(e) => onChange({ ...step, taskSlug: e.target.value, inputs: {} })}
         >
-          {!ctx.formsBySlug.has(step.formSlug) && (
-            <option value={step.formSlug} className="bg-clide-panel">
-              (missing) {step.formSlug}
+          {!ctx.formsBySlug.has(step.taskSlug) && (
+            <option value={step.taskSlug} className="bg-clide-panel">
+              (missing) {step.taskSlug}
             </option>
           )}
           {ctx.projectForms.map((f) => (
@@ -234,7 +234,7 @@ function FormStepBody({ step, onChange, ctx }: { step: FormStep; onChange: (s: F
       </div>
 
       {folder &&
-        folder.form.fields.map((field) => (
+        folder.task.fields.map((field) => (
           <div key={field.id} className="flex flex-col gap-1">
             <label className={fieldLabel}>
               {field.label || field.id}
@@ -282,7 +282,7 @@ function StepCard({
   ctx: StepCtx;
   depth: number;
 }) {
-  const [open, setOpen] = useState(step.type === "form" && step.formSlug === "");
+  const [open, setOpen] = useState(step.type === "form" && step.taskSlug === "");
   const Icon = STEP_ICON[step.type];
   const issues = ctx.problems.get(step.name) ?? [];
   const suggestions = useMemo(
@@ -353,7 +353,7 @@ function StepCard({
             </div>
           )}
 
-          {step.type === "form" && <FormStepBody step={step} onChange={onChange} ctx={ctx} />}
+          {step.type === "form" && <TaskStepBody step={step} onChange={onChange} ctx={ctx} />}
 
           {step.type === "decision" && (
             <>
@@ -492,7 +492,7 @@ function StepList({
     const name = freshName(ctx.workflow, type === "form" ? "step" : type);
     const step: WorkflowStep =
       type === "form"
-        ? { type, name, formSlug: ctx.projectForms[0]?.meta.slug ?? "", inputs: {} }
+        ? { type, name, taskSlug: ctx.projectForms[0]?.meta.slug ?? "", inputs: {} }
         : type === "decision"
           ? { type, name, condition: "", then: [] }
           : type === "loop"
@@ -546,7 +546,7 @@ function TriggersEditor({
 }: {
   workflow: Workflow;
   onChange: (w: Workflow) => void;
-  projectForms: FormFolder[];
+  projectForms: TaskFolder[];
 }) {
   const triggers = workflow.triggers;
   const set = (next: WorkflowTrigger[]) => onChange({ ...workflow, triggers: next });
@@ -570,7 +570,7 @@ function TriggersEditor({
                   ? { type }
                   : type === "schedule"
                     ? { type, cron: "0 9 * * *" }
-                    : { type, formSlug: projectForms[0]?.meta.slug ?? "" };
+                    : { type, taskSlug: projectForms[0]?.meta.slug ?? "" };
               set(triggers.map((x, xi) => (xi === i ? next : x)));
             }}
           >
@@ -580,7 +580,7 @@ function TriggersEditor({
             <option value="schedule" className="bg-clide-panel">
               Schedule (cron)
             </option>
-            <option value="form-submitted" className="bg-clide-panel">
+            <option value="task-submitted" className="bg-clide-panel">
               When a form finishes
             </option>
           </select>
@@ -592,11 +592,11 @@ function TriggersEditor({
               onChange={(e) => set(triggers.map((x, xi) => (xi === i ? { ...t, cron: e.target.value } : x)))}
             />
           )}
-          {t.type === "form-submitted" && (
+          {t.type === "task-submitted" && (
             <select
               className={`${inputBase} w-56 appearance-none`}
-              value={t.formSlug}
-              onChange={(e) => set(triggers.map((x, xi) => (xi === i ? { ...t, formSlug: e.target.value } : x)))}
+              value={t.taskSlug}
+              onChange={(e) => set(triggers.map((x, xi) => (xi === i ? { ...t, taskSlug: e.target.value } : x)))}
             >
               {projectForms.map((f) => (
                 <option key={f.meta.slug} value={f.meta.slug} className="bg-clide-panel">

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../rpc";
-import { DEFAULT_MODEL_FOR_KIND } from "../types/forms";
-import type { AIService } from "../types/forms";
+import { DEFAULT_MODEL_FOR_KIND } from "../types/tasks";
+import type { AIService } from "../types/tasks";
 
 export interface ServiceModelValue {
   serviceId: string;

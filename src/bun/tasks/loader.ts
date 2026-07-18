@@ -1,3 +1,12 @@
+/**
+ * Task loader: translates on-disk "form" vocabulary to in-memory "task" types.
+ *
+ * DISK FORMAT FIREWALL (ticket 96):
+ * - Disk layout: `<project>/forms/<slug>/form.json` and `meta.json` — stays unchanged.
+ * - Memory: TaskFolder, TaskMeta, TaskDefinition, TaskField.
+ * - This loader and its sibling writer are the translation boundary.
+ */
+
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type {
@@ -7,23 +16,23 @@ import type {
   Extraction,
   ExtractionSelector,
   FieldType,
-  FormDefinition,
-  FormField,
-  FormFolder,
-  FormMeta,
   MagicField,
   OutputDefinition,
   OutputTransform,
   OutputType,
+  TaskDefinition,
+  TaskField,
+  TaskFolder,
+  TaskMeta,
 } from "../../shared/types";
 import { listProjects } from "../config";
 import { ensureProjectDirs, projectFormsDir } from "../paths";
 
-/** slug -> absolute project path, rebuilt on each listForms(). */
+/** slug -> absolute project path, rebuilt on each listTasks(). */
 const slugIndex = new Map<string, string>();
 
-/** Resolve which project folder a given form slug lives in. */
-export function resolveFormProject(slug: string): string | null {
+/** Resolve which project folder a given task slug lives in. */
+export function resolveTaskProject(slug: string): string | null {
   return slugIndex.get(slug) ?? null;
 }
 
@@ -34,7 +43,7 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function validateMeta(raw: unknown, slug: string, projectName: string): FormMeta | null {
+function validateMeta(raw: unknown, slug: string, projectName: string): TaskMeta | null {
   if (!isObject(raw)) return null;
   if (typeof raw.name !== "string") {
     return null;
@@ -83,7 +92,7 @@ function validateArgMapping(raw: unknown): ArgMapping | undefined {
   };
 }
 
-function validateField(raw: unknown): FormField | null {
+function validateField(raw: unknown): TaskField | null {
   if (!isObject(raw)) return null;
   if (typeof raw.id !== "string" || typeof raw.label !== "string") return null;
   const type = FIELD_TYPES.includes(raw.type as FieldType) ? (raw.type as FieldType) : "text";
@@ -208,10 +217,10 @@ function validateOutputs(raw: unknown, outputType: OutputType): OutputDefinition
   ];
 }
 
-function validateForm(raw: unknown): FormDefinition | null {
+function validateForm(raw: unknown): TaskDefinition | null {
   if (!isObject(raw)) return null;
   if (!Array.isArray(raw.fields)) return null;
-  const fields = raw.fields.map(validateField).filter((f): f is FormField => f !== null);
+  const fields = raw.fields.map(validateField).filter((f): f is TaskField => f !== null);
   const outputType = OUTPUT_TYPES.includes(raw.outputType as OutputType) ? (raw.outputType as OutputType) : "text";
   const command = validateCommand(raw.command);
   return {
@@ -236,32 +245,32 @@ async function readJson(path: string): Promise<unknown | null> {
   }
 }
 
-export async function loadFormFolder(
+export async function loadTaskFolder(
   projectPath: string,
   slug: string,
   projectName: string,
-): Promise<FormFolder | null> {
+): Promise<TaskFolder | null> {
   const dir = join(projectFormsDir(projectPath), slug);
   const metaRaw = await readJson(join(dir, "meta.json"));
-  const formRaw = await readJson(join(dir, "form.json"));
+  const formRaw = await readJson(join(dir, "form.json")); // Disk still says "form.json"
   const meta = validateMeta(metaRaw, slug, projectName);
-  const form = validateForm(formRaw);
-  if (!meta || !form) {
-    console.warn(`[forms] Skipping malformed form folder: ${slug}`);
+  const task = validateForm(formRaw);
+  if (!meta || !task) {
+    console.warn(`[tasks] Skipping malformed task folder: ${slug}`);
     return null;
   }
-  return { meta, form, projectPath };
+  return { meta, task, projectPath };
 }
 
-/** Scan every registered project's forms directory and return all valid forms. */
-export async function listForms(): Promise<FormFolder[]> {
+/** Scan every registered project's tasks directory and return all valid tasks. */
+export async function listTasks(): Promise<TaskFolder[]> {
   const projects = await listProjects();
   slugIndex.clear();
-  const folders: FormFolder[] = [];
+  const folders: TaskFolder[] = [];
 
   for (const project of projects) {
     ensureProjectDirs(project.path);
-    const formsDir = projectFormsDir(project.path);
+    const formsDir = projectFormsDir(project.path); // Disk directory still named "forms"
     let entries: string[];
     try {
       entries = readdirSync(formsDir);
@@ -277,7 +286,7 @@ export async function listForms(): Promise<FormFolder[]> {
         isDir = false;
       }
       if (!isDir) continue;
-      const folder = await loadFormFolder(project.path, entry, project.name);
+      const folder = await loadTaskFolder(project.path, entry, project.name);
       if (folder) {
         slugIndex.set(folder.meta.slug, project.path);
         folders.push(folder);
@@ -289,8 +298,8 @@ export async function listForms(): Promise<FormFolder[]> {
   return folders;
 }
 
-/** Distinct project names across all forms, alphabetically sorted. */
-export function projectsFromForms(forms: FormFolder[]): string[] {
-  const set = new Set(forms.map((f) => f.meta.project).filter(Boolean));
+/** Distinct project names across all tasks, alphabetically sorted. */
+export function projectsFromTasks(tasks: TaskFolder[]): string[] {
+  const set = new Set(tasks.map((f) => f.meta.project).filter(Boolean));
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }

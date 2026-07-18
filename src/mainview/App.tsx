@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import CalendarPage from "./components/CalendarPage";
 import FirstRunAIWizard from "./components/FirstRunAIWizard";
 import FirstRunWelcome from "./components/FirstRunWelcome";
-import FormsPanel from "./components/FormsPanel";
-import NewFormPage from "./components/NewFormPage";
 import NewProjectModal from "./components/NewProjectModal";
+import NewTaskPage from "./components/NewTaskPage";
 import ProjectSettingsPage from "./components/ProjectSettingsPage";
 import ProjectToolbar from "./components/ProjectToolbar";
 import RunPicker from "./components/RunPicker";
 import SettingsPanel from "./components/SettingsPanel";
 import Sidebar from "./components/Sidebar";
+import TasksPanel from "./components/TasksPanel";
 import Thread from "./components/Thread";
 import TrafficLights from "./components/TrafficLights";
 import { UIFeedbackLayer, UIFeedbackProvider } from "./components/UIFeedback";
@@ -197,7 +197,7 @@ function Workspace() {
           ) : (
             <>
               <ProjectToolbar />
-              {projectSurface === "forms" && <FormsPanel />}
+              {projectSurface === "forms" && <TasksPanel />}
               {projectSurface === "views" && <ViewsPage />}
               {projectSurface === "workflows" && <WorkflowsPage />}
               {projectSurface === "calendar" && <CalendarPage />}
@@ -248,7 +248,7 @@ function Workspace() {
           <div className="flex electrobun-webkit-app-region-drag">
             <TrafficLights />
           </div>
-          <NewFormPage onClose={closeNewForm} />
+          <NewTaskPage onClose={closeNewForm} />
         </div>
       )}
 

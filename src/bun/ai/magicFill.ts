@@ -1,9 +1,9 @@
-import type { AIService, FormField, FormFolder } from "../../shared/types";
+import type { AIService, TaskField, TaskFolder } from "../../shared/types";
 import { getDefaultAIService, legacyProviderForKind, listAIServices } from "./aiServices";
 import { complete } from "./providers";
 
 /** The form's creation service kind when a matching service exists, else the default service. */
-async function resolveService(folder: FormFolder): Promise<AIService | null> {
+async function resolveService(folder: TaskFolder): Promise<AIService | null> {
   const services = await listAIServices();
   if (services.length === 0) return null;
   const preferredKind = folder.meta.aiProvider
@@ -24,7 +24,7 @@ function extractJson(text: string): unknown {
 }
 
 /** Coerce/validate a raw AI fill against the field's type. Returns undefined to drop. */
-function validateFill(field: FormField, raw: unknown): unknown {
+function validateFill(field: TaskField, raw: unknown): unknown {
   switch (field.type) {
     case "select": {
       const value = typeof raw === "string" ? raw.trim() : "";
@@ -64,7 +64,7 @@ function validateFill(field: FormField, raw: unknown): unknown {
  * fill (or filled invalidly) are simply absent.
  */
 export async function fillMagicFields(
-  folder: FormFolder,
+  folder: TaskFolder,
   fields: Record<string, string>,
 ): Promise<Record<string, unknown>> {
   const ids = Object.keys(fields);
@@ -73,9 +73,9 @@ export async function fillMagicFields(
   const service = await resolveService(folder);
   if (!service) throw new Error("No AI service configured — add one in Settings");
 
-  const fieldSpecs = folder.form.fields
-    .filter((f) => ids.includes(f.id))
-    .map((f) => ({
+  const fieldSpecs = folder.task.fields
+    .filter((f: TaskField) => ids.includes(f.id))
+    .map((f: TaskField) => ({
       id: f.id,
       label: f.label,
       type: f.type,
@@ -107,7 +107,7 @@ export async function fillMagicFields(
   if (typeof parsed !== "object" || parsed === null) return {};
 
   const values: Record<string, unknown> = {};
-  for (const field of folder.form.fields) {
+  for (const field of folder.task.fields) {
     if (!ids.includes(field.id)) continue;
     const fill = (parsed as Record<string, unknown>)[field.id];
     if (fill === undefined || fill === null) continue;

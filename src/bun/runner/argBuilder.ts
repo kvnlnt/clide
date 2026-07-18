@@ -1,4 +1,4 @@
-import type { FormDefinition } from "../../shared/types";
+import type { TaskDefinition } from "../../shared/types";
 
 /**
  * Build the argv array (excluding the interpreter + script path) for a form run
@@ -9,7 +9,7 @@ import type { FormDefinition } from "../../shared/types";
  * discrete argv entries — no shell string is constructed — so there is no shell
  * injection surface.
  */
-export function buildArgs(form: FormDefinition, inputs: Record<string, unknown>): string[] {
+export function buildArgs(form: TaskDefinition, inputs: Record<string, unknown>): string[] {
   const args: string[] = [];
 
   for (const field of form.fields) {

@@ -1,17 +1,23 @@
 # CLIDE Workflow Schema & Expression Language
 
-Workflows orchestrate existing CLIDE forms into ordered, multi-step
+Workflows orchestrate existing CLIDE tasks into ordered, multi-step
 automations. This document is the reviewed source of truth for the on-disk
 format (tickets 88-95).
+
+**IMPORTANT**: The on-disk format uses `form`/`formSlug`/`form-submitted` for
+backward compatibility (`<project>/forms/<slug>/form.json`). In memory and in
+the product UI, these are called tasks. Translation happens at load/save
+boundaries. See ticket 96.
 
 ## Vocabulary
 
 - **Workflow** — a named, ordered list of steps plus zero or more triggers.
-- **Step** — one item in a workflow: _form step_, _decision step_, _loop
-  step_, or _parallel step_.
+- **Step** — one item in a workflow: _task step_, _decision step_, _loop
+  step_, or _parallel step_. (Persisted as `type: "form"` for compatibility.)
 - **Trigger** — what starts a run: _manual_, _schedule_ (cron), or
-  _form-submitted_. Workflows start **only** via triggers; submitting a form
-  on its own never propagates into a workflow.
+  _task-submitted_. (Persisted as `form-submitted` for compatibility.) Workflows
+  start **only** via triggers; submitting a task on its own never propagates
+  into a workflow.
 - **Run** — one execution, persisted as a full trace.
 
 ## Files
@@ -134,9 +140,10 @@ earlier siblings and ancestors' earlier siblings. Consequences:
 - `schedule` — cron subset `m h dom mon dow` supporting numbers, `*`, `,`,
   `-`, `/`. Evaluated **only while the app is running**; missed fires do
   not back-fill. No daemon in v1.
-- `form-submitted` — fires when a **standalone** run of the referenced form
-  completes successfully (outputs must exist to be a useful payload). Form
-  steps inside a workflow never trigger other workflows (no cascades, v1).
+- `form-submitted` (persisted name; product calls it `task-submitted`) — fires
+  when a **standalone** run of the referenced task completes successfully
+  (outputs must exist to be a useful payload). Task steps inside a workflow
+  never trigger other workflows (no cascades, v1).
 
 ## Runs
 

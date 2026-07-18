@@ -1,6 +1,6 @@
 import { Ellipsis } from "lucide-react";
 import { useRef, useState } from "react";
-import FormCardMenu from "./FormCardMenu";
+import TaskCardMenu from "./TaskCardMenu";
 import PortalPopover from "./PortalPopover";
 
 interface EllipsisMenuProps {
@@ -43,7 +43,7 @@ export default function EllipsisMenu({
         onClose={() => setOpen(false)}
         className="w-40 overflow-hidden rounded-md border border-clide-border bg-clide-panel py-1 shadow-xl"
       >
-        <FormCardMenu
+        <TaskCardMenu
           pinned={pinned}
           showPin={showPin}
           onPin={onPin}

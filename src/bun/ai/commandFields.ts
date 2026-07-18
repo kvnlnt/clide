@@ -1,4 +1,4 @@
-import type { AIService, ArgMapping, ArgMappingKind, FieldType, FormField, ToolSpec } from "../../shared/types";
+import type { AIService, ArgMapping, ArgMappingKind, FieldType, TaskField, ToolSpec } from "../../shared/types";
 import { complete } from "./providers";
 
 function extractJson(text: string): unknown {
@@ -28,7 +28,7 @@ function validateArgMapping(raw: unknown): ArgMapping | undefined {
   };
 }
 
-function validateField(raw: unknown, index: number): FormField | null {
+function validateField(raw: unknown, index: number): TaskField | null {
   if (!isObject(raw)) return null;
   const label = typeof raw.label === "string" && raw.label.trim() ? raw.label.trim() : null;
   if (!label) return null;
@@ -48,7 +48,7 @@ function validateField(raw: unknown, index: number): FormField | null {
 const SYSTEM_PROMPT = [
   "You design a GUI form for CLIDE, which wraps ONE action of an installed CLI tool as a form.",
   "The user has stated a goal for the form. Follow the Unix philosophy: the form does one thing well. Only include fields for the options/positionals the stated goal actually needs — do not include every flag the tool has.",
-  "Respond ONLY with a single JSON object: { \"fields\": FormField[] } where each FormField is:",
+  'Respond ONLY with a single JSON object: { "fields": FormField[] } where each FormField is:',
   `{
   "id": string (kebab-case, unique),
   "label": string (human-friendly),
@@ -80,7 +80,7 @@ export async function draftCommandFields(
   spec: ToolSpec,
   service: AIService,
   model: string,
-): Promise<FormField[]> {
+): Promise<TaskField[]> {
   const user = [
     `The form's goal, as stated by the user: ${goal}`,
     `Tool: ${toolName}`,
@@ -90,5 +90,5 @@ export async function draftCommandFields(
   const raw = await complete({ ...service, model }, { system: SYSTEM_PROMPT, user });
   const parsed = extractJson(raw);
   const list = isObject(parsed) && Array.isArray(parsed.fields) ? parsed.fields : [];
-  return list.map(validateField).filter((f): f is FormField => f !== null);
+  return list.map(validateField).filter((f): f is TaskField => f !== null);
 }

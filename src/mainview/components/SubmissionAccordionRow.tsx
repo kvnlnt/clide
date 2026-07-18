@@ -1,17 +1,17 @@
 import { ChevronDown } from "lucide-react";
 import type {
-  FormDefinition,
+  TaskDefinition,
   OutputChunk,
   OutputType,
   RunRecord,
-} from "../types/forms";
+} from "../types/tasks";
 import SubmittedSummary from "./SubmittedSummary";
 import OutputBlock from "./output/OutputBlock";
 import StatusIcon from "./statusIcon";
 
 interface SubmissionAccordionRowProps {
   run: RunRecord;
-  form: FormDefinition;
+  form: TaskDefinition;
   outputType?: OutputType;
   chunks: OutputChunk[];
   open: boolean;
@@ -28,7 +28,7 @@ function formatTime(iso: string | null): string {
 }
 
 function summarize(
-  form: FormDefinition,
+  form: TaskDefinition,
   inputs: Record<string, unknown>,
   run: RunRecord,
 ): string {

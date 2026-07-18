@@ -1,7 +1,7 @@
 import { AlertTriangle, ChevronDown, ChevronRight, FlaskConical, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { Extraction, ExtractionSelector, OutputDefinition, OutputTransform, OutputType } from "../types/forms";
-import { evaluateOutputs } from "../types/forms";
+import type { Extraction, ExtractionSelector, OutputDefinition, OutputTransform, OutputType } from "../types/tasks";
+import { evaluateOutputs } from "../types/tasks";
 
 const OUTPUT_KINDS: OutputType[] = ["text", "table", "json", "image", "audio", "video"];
 

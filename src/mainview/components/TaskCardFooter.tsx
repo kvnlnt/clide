@@ -1,5 +1,5 @@
 import { ChevronRight, Loader, Wifi } from "lucide-react";
-import type { RunStatus } from "../types/forms";
+import type { RunStatus } from "../types/tasks";
 
 interface FormCardFooterProps {
   status: RunStatus;

@@ -2,27 +2,27 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { api, on } from "../rpc";
 import type {
   FilterEntry,
-  FormFolder,
-  FormMetaPatch,
+  TaskFolder,
+  TaskMetaPatch,
   OutputChunk,
   Project,
   RepeatInterval,
   RunRecord,
   ThreadView,
   Workflow,
-} from "../types/forms";
+} from "../types/tasks";
 
 export interface DraftCard {
   id: string;
-  formSlug: string;
+  taskSlug: string;
 }
 
 /** Which surface the title tab's body shows. Only meaningful when no view tab is active. */
 export type ProjectSurface = "thread" | "forms" | "views" | "calendar" | "project-settings" | "workflows";
 
 interface AppState {
-  forms: FormFolder[];
-  formsBySlug: Map<string, FormFolder>;
+  forms: TaskFolder[];
+  formsBySlug: Map<string, TaskFolder>;
   projects: string[];
   projectMeta: Project[];
   runs: RunRecord[];
@@ -101,18 +101,18 @@ interface AppState {
   openNewForm: () => void;
   closeNewForm: () => void;
 
-  addFormDraft: (formSlug: string) => void;
+  addFormDraft: (taskSlug: string) => void;
   removeDraft: (id: string) => void;
 
   createProject: (name: string, path?: string) => Promise<{ ok: boolean; error?: string }>;
   renameProject: (path: string, name: string) => Promise<{ ok: boolean; error?: string }>;
   deleteProject: (path: string, deleteFiles?: boolean) => Promise<void>;
   deleteForm: (projectPath: string, slug: string) => Promise<{ ok: boolean; error?: string }>;
-  updateFormMeta: (projectPath: string, slug: string, patch: FormMetaPatch) => Promise<{ ok: boolean; error?: string }>;
+  updateTaskMeta: (projectPath: string, slug: string, patch: TaskMetaPatch) => Promise<{ ok: boolean; error?: string }>;
 
-  submitRun: (formSlug: string, inputs: Record<string, unknown>) => Promise<void>;
+  submitRun: (taskSlug: string, inputs: Record<string, unknown>) => Promise<void>;
   scheduleRun: (
-    formSlug: string,
+    taskSlug: string,
     inputs: Record<string, unknown>,
     scheduledAt: string,
     repeat: RepeatInterval,
@@ -141,7 +141,7 @@ function normalizeView(view: ThreadView): ThreadView {
   if (f.entries) return view;
 
   const entries: FilterEntry[] = [];
-  if (f.formSlugs?.length) entries.push({ id: crypto.randomUUID(), type: "form", values: f.formSlugs });
+  if (f.taskSlugs?.length) entries.push({ id: crypto.randomUUID(), type: "task", values: f.taskSlugs });
   if (f.statuses?.length) entries.push({ id: crypto.randomUUID(), type: "status", values: f.statuses });
   if (f.keywords?.length) {
     if (f.keywordMode === "and") {
@@ -165,7 +165,7 @@ export function useApp(): AppState {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [forms, setForms] = useState<FormFolder[]>([]);
+  const [forms, setForms] = useState<TaskFolder[]>([]);
   const [projectList, setProjectList] = useState<Project[]>([]);
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [chunks, setChunks] = useState<Record<string, OutputChunk[]>>({});
@@ -336,7 +336,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [activeViewId, views, updateView, setActiveView, previousVisibleTab]);
 
   const refreshForms = useCallback(async () => {
-    const f = await api.listForms();
+    const f = await api.listTasks();
     setForms(f);
   }, []);
 
@@ -378,7 +378,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Push subscriptions.
   useEffect(() => {
     const offProjects = on("projects", (p) => setProjectList(p));
-    const offForms = on("forms", (f) => setForms(f));
+    const offForms = on("tasks", (f) => setForms(f));
     const offChunk = on("chunk", (chunk: OutputChunk) => {
       setChunks((prev) => ({
         ...prev,
@@ -408,7 +408,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const formsBySlug = useMemo(() => {
-    const m = new Map<string, FormFolder>();
+    const m = new Map<string, TaskFolder>();
     for (const f of forms) m.set(f.meta.slug, f);
     return m;
   }, [forms]);
@@ -492,10 +492,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDrafts((prev) => prev.filter((d) => d.id !== id));
   }, []);
 
-  const addFormDraft = useCallback((formSlug: string) => {
+  const addFormDraft = useCallback((taskSlug: string) => {
     const id = `draft-${draftSeq.current++}`;
-    setDrafts((prev) => [{ id, formSlug }, ...prev]);
-    setRecentSlugs((prev) => [formSlug, ...prev.filter((s) => s !== formSlug)].slice(0, 5));
+    setDrafts((prev) => [{ id, taskSlug }, ...prev]);
+    setRecentSlugs((prev) => [taskSlug, ...prev.filter((s) => s !== taskSlug)].slice(0, 5));
     setProjectSurfaceState("thread");
   }, []);
 
@@ -543,28 +543,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteForm = useCallback(
     async (projectPath: string, slug: string) => {
-      const res = await api.deleteForm(projectPath, slug);
+      const res = await api.deleteTask(projectPath, slug);
       if (res.ok) await refreshForms();
       return res;
     },
     [refreshForms],
   );
 
-  const updateFormMeta = useCallback(
-    async (projectPath: string, slug: string, patch: FormMetaPatch) => {
-      const res = await api.updateFormMeta(projectPath, slug, patch);
+  const updateTaskMeta = useCallback(
+    async (projectPath: string, slug: string, patch: TaskMetaPatch) => {
+      const res = await api.updateTaskMeta(projectPath, slug, patch);
       if (res.ok) await refreshForms();
       return res;
     },
     [refreshForms],
   );
 
-  const submitRun = useCallback(async (formSlug: string, inputs: Record<string, unknown>) => {
-    const runId = await api.runForm(formSlug, inputs);
+  const submitRun = useCallback(async (taskSlug: string, inputs: Record<string, unknown>) => {
+    const runId = await api.runTask(taskSlug, inputs);
     if (!runId) return;
     const optimistic: RunRecord = {
       id: runId,
-      formSlug,
+      taskSlug,
       inputs,
       status: "running",
       exitCode: null,
@@ -576,12 +576,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       repeatInterval: null,
     };
     setRuns((prev) => [optimistic, ...prev.filter((r) => r.id !== runId)]);
-    setRecentSlugs((prev) => [formSlug, ...prev.filter((s) => s !== formSlug)].slice(0, 5));
+    setRecentSlugs((prev) => [taskSlug, ...prev.filter((s) => s !== taskSlug)].slice(0, 5));
   }, []);
 
   const scheduleRun = useCallback(
-    async (formSlug: string, inputs: Record<string, unknown>, scheduledAt: string, repeat: RepeatInterval) => {
-      await api.scheduleRun(formSlug, inputs, scheduledAt, repeat);
+    async (taskSlug: string, inputs: Record<string, unknown>, scheduledAt: string, repeat: RepeatInterval) => {
+      await api.scheduleRun(taskSlug, inputs, scheduledAt, repeat);
       await refreshRuns();
     },
     [refreshRuns],
@@ -609,7 +609,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const rerun = useCallback(
     async (run: RunRecord) => {
-      await submitRun(run.formSlug, run.inputs);
+      await submitRun(run.taskSlug, run.inputs);
     },
     [submitRun],
   );
@@ -682,7 +682,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     renameProject,
     deleteProject,
     deleteForm,
-    updateFormMeta,
+    updateTaskMeta,
     submitRun,
     scheduleRun,
     updateScheduledRun,

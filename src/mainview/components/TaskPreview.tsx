@@ -1,6 +1,6 @@
 import { AlertTriangle } from "lucide-react";
-import FormField from "./FormField";
-import type { FormField as FieldDef } from "../types/forms";
+import TaskField from "./TaskField";
+import type { TaskField as FieldDef } from "../types/tasks";
 
 interface FormPreviewProps {
   fields: FieldDef[];
@@ -14,7 +14,7 @@ interface FormPreviewProps {
 
 /**
  * Step 3's "How it will look" pane (ticket 66): the fields rendered exactly
- * as the form card will show them — same `FormField` controls, same
+ * as the form card will show them — same `TaskField` controls, same
  * label/help-text markup as FormCardBody — and interactive, so sample
  * values feed the featured command preview. Two views of one list: the
  * open editor card is ringed here, and clicking a field jumps to its card.
@@ -51,7 +51,7 @@ export default function FormPreview({ fields, sampleValues, onSampleChange, open
                     {field.required && <span className="text-red-400"> *</span>}
                   </label>
                   {field.description && <span className="text-[12px] text-white/40">{field.description}</span>}
-                  <FormField
+                  <TaskField
                     field={field}
                     value={sampleValues[field.id]}
                     onChange={(v) => onSampleChange(field.id, v)}

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import Modal from "./Modal";
 import { useUIFeedback } from "./UIFeedback";
-import type { ThreadView } from "../types/forms";
+import type { ThreadView } from "../types/tasks";
 
 interface Props {
   view: ThreadView;

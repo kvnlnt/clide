@@ -1,14 +1,14 @@
 import { EllipsisVertical, Play, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
-import type { FilterEntry, FilterEntryType, RunStatus, ThreadView } from "../types/forms";
+import type { FilterEntry, FilterEntryType, RunStatus, ThreadView } from "../types/tasks";
 import PortalPopover from "./PortalPopover";
 import { STATUS_META } from "./statusIcon";
 import Toolbar from "./Toolbar";
 
 const STATUS_OPTIONS: RunStatus[] = ["idle", "running", "success", "error", "scheduled"];
 
-const TYPE_LABEL: Record<FilterEntryType, string> = { form: "Form", status: "Status", keyword: "Keyword" };
+const TYPE_LABEL: Record<FilterEntryType, string> = { task: "Task", status: "Status", keyword: "Keyword" };
 
 /** Either picking which filter type to add, or editing one entry's criteria (new or existing). */
 type PopoverState = { mode: "pick-type" } | { mode: "criteria"; type: FilterEntryType; entryId: string };
@@ -97,8 +97,8 @@ export default function ViewToolbar({ view }: Props) {
   };
 
   const chipLabel = (entry: FilterEntry): string => {
-    if (entry.type === "form") {
-      return entry.values.length === 1 ? nameFor(entry.values[0]!) : `${entry.values.length} forms`;
+    if (entry.type === "task") {
+      return entry.values.length === 1 ? nameFor(entry.values[0]!) : `${entry.values.length} tasks`;
     }
     if (entry.type === "status") {
       return entry.values.length === 1
@@ -116,7 +116,7 @@ export default function ViewToolbar({ view }: Props) {
     <Toolbar className="bg-white/10">
       <button
         onClick={openRunPicker}
-        title="Run a form (⌘K)"
+        title="Run a task (⌘K)"
         className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] text-white/50 transition-colors hover:bg-white/5 hover:text-white"
       >
         <Play size={13} />
@@ -165,7 +165,7 @@ export default function ViewToolbar({ view }: Props) {
             <span className="px-1.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/30">
               Filter by
             </span>
-            {(["form", "status", "keyword"] as FilterEntryType[]).map((type) => (
+            {(["task", "status", "keyword"] as FilterEntryType[]).map((type) => (
               <button
                 key={type}
                 onClick={() => pickType(type)}
@@ -177,7 +177,7 @@ export default function ViewToolbar({ view }: Props) {
           </div>
         )}
 
-        {popover?.mode === "criteria" && popover.type === "form" && (
+        {popover?.mode === "criteria" && popover.type === "task" && (
           <>
             {currentValues.length > 0 && (
               <div className="mb-1.5 flex flex-wrap gap-1">
@@ -185,7 +185,7 @@ export default function ViewToolbar({ view }: Props) {
                   <span key={slug} className={rowChip}>
                     <span className="max-w-[140px] truncate">{nameFor(slug)}</span>
                     <button
-                      onClick={() => applyValues("form", popover.entryId, currentValues.filter((s) => s !== slug))}
+                      onClick={() => applyValues("task", popover.entryId, currentValues.filter((s) => s !== slug))}
                       title="Remove"
                       className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full hover:bg-white/10"
                     >
@@ -201,7 +201,7 @@ export default function ViewToolbar({ view }: Props) {
               onChange={(e) => setFormQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && formSuggestions[0]) {
-                  applyValues("form", popover.entryId, [...currentValues, formSuggestions[0].meta.slug]);
+                  applyValues("task", popover.entryId, [...currentValues, formSuggestions[0].meta.slug]);
                   setFormQuery("");
                 }
               }}
@@ -216,7 +216,7 @@ export default function ViewToolbar({ view }: Props) {
                 <button
                   key={f.meta.slug}
                   onClick={() => {
-                    applyValues("form", popover.entryId, [...currentValues, f.meta.slug]);
+                    applyValues("task", popover.entryId, [...currentValues, f.meta.slug]);
                     setFormQuery("");
                   }}
                   className="block w-full truncate rounded px-1.5 py-0.5 text-left text-[13px] text-white/60 hover:bg-white/5 hover:text-white"

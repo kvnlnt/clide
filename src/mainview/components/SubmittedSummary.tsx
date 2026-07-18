@@ -1,9 +1,9 @@
 import { Terminal } from "lucide-react";
-import { buildCommand, formatCommandPreview } from "../types/forms";
-import type { FormDefinition, RunRecord } from "../types/forms";
+import { buildCommand, formatCommandPreview } from "../types/tasks";
+import type { TaskDefinition, RunRecord } from "../types/tasks";
 
 interface SubmittedSummaryProps {
-  form: FormDefinition;
+  form: TaskDefinition;
   run: RunRecord;
 }
 

@@ -1,3 +1,10 @@
+/**
+ * DISK FORMAT FIREWALL (ticket 96):
+ * - Disk workflow JSON: type:"form", formSlug, "form-submitted"
+ * - Memory: TaskStep.taskSlug, "task-submitted"
+ * - Translation happens here on read/write.
+ */
+
 import { readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { Workflow, WorkflowStep, WorkflowTrigger } from "../../shared/types";
@@ -8,6 +15,7 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+/** Translate disk JSON (formSlug) → memory (taskSlug) */
 export function validateSteps(raw: unknown): WorkflowStep[] {
   if (!Array.isArray(raw)) return [];
   const steps: WorkflowStep[] = [];
@@ -16,11 +24,11 @@ export function validateSteps(raw: unknown): WorkflowStep[] {
     const name = item.name;
     switch (item.type) {
       case "form":
-        if (typeof item.formSlug !== "string") continue;
+        if (typeof item.formSlug !== "string") continue; // Disk uses formSlug
         steps.push({
           type: "form",
           name,
-          formSlug: item.formSlug,
+          taskSlug: item.formSlug, // Memory uses taskSlug
           inputs: isObject(item.inputs)
             ? (Object.fromEntries(Object.entries(item.inputs).filter(([, v]) => typeof v === "string")) as Record<
                 string,
@@ -54,6 +62,7 @@ export function validateSteps(raw: unknown): WorkflowStep[] {
   return steps;
 }
 
+/** Translate disk JSON (form-submitted/formSlug) → memory (task-submitted/taskSlug) */
 function validateTriggers(raw: unknown): WorkflowTrigger[] {
   if (!Array.isArray(raw)) return [];
   const triggers: WorkflowTrigger[] = [];
@@ -63,7 +72,8 @@ function validateTriggers(raw: unknown): WorkflowTrigger[] {
     else if (item.type === "schedule" && typeof item.cron === "string")
       triggers.push({ type: "schedule", cron: item.cron });
     else if (item.type === "form-submitted" && typeof item.formSlug === "string") {
-      triggers.push({ type: "form-submitted", formSlug: item.formSlug });
+      // Disk: "form-submitted"/formSlug → Memory: "task-submitted"/taskSlug
+      triggers.push({ type: "task-submitted", taskSlug: item.formSlug });
     }
   }
   return triggers;
@@ -144,6 +154,37 @@ export function validateForSave(workflow: Workflow): string | null {
   return null;
 }
 
+/** Translate memory (taskSlug) → disk JSON (formSlug) for persistence */
+function stepsToDisk(steps: WorkflowStep[]): unknown[] {
+  return steps.map((step) => {
+    if (step.type === "form") {
+      return { type: "form", name: step.name, formSlug: step.taskSlug, inputs: step.inputs };
+    } else if (step.type === "decision") {
+      return {
+        type: "decision",
+        name: step.name,
+        condition: step.condition,
+        then: stepsToDisk(step.then),
+        else: step.else ? stepsToDisk(step.else) : undefined,
+      };
+    } else if (step.type === "loop") {
+      return { type: "loop", name: step.name, over: step.over, steps: stepsToDisk(step.steps) };
+    } else {
+      return { type: "parallel", name: step.name, branches: step.branches.map(stepsToDisk) };
+    }
+  });
+}
+
+/** Translate memory (task-submitted/taskSlug) → disk JSON (form-submitted/formSlug) */
+function triggersToDisk(triggers: WorkflowTrigger[]): unknown[] {
+  return triggers.map((t) => {
+    if (t.type === "task-submitted") {
+      return { type: "form-submitted", formSlug: t.taskSlug };
+    }
+    return t;
+  });
+}
+
 /** Writes a workflow to `<project>/workflows/<slug>.json`, maintaining timestamps. */
 export async function saveWorkflow(projectPath: string, workflow: Workflow): Promise<void> {
   ensureDir(projectWorkflowsDir(projectPath));
@@ -163,7 +204,14 @@ export async function saveWorkflow(projectPath: string, workflow: Workflow): Pro
   // Avoid slug collisions between two differently-id'd workflows.
   let slug = slugify(next.name);
   if (existing.some((w) => w.id !== next.id && slugify(w.name) === slug)) slug = `${slug}-${next.id.slice(0, 8)}`;
-  await Bun.write(workflowPath(projectPath, slug), JSON.stringify(next, null, 2));
+
+  // Translate memory representation → disk JSON format
+  const diskWorkflow = {
+    ...next,
+    steps: stepsToDisk(next.steps),
+    triggers: triggersToDisk(next.triggers),
+  };
+  await Bun.write(workflowPath(projectPath, slug), JSON.stringify(diskWorkflow, null, 2));
 }
 
 export async function deleteWorkflow(projectPath: string, id: string): Promise<void> {

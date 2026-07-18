@@ -1,8 +1,8 @@
 import { useApp } from "../context/AppContext";
 import type { RunGroup } from "../hooks/useThread";
 import { useThread } from "../hooks/useThread";
-import type { RunRecord } from "../types/forms";
-import FormCard from "./FormCard";
+import type { RunRecord } from "../types/tasks";
+import TaskCard from "./TaskCard";
 import ThreadDateGroup from "./ThreadDateGroup";
 import ThreadEmpty from "./ThreadEmpty";
 import { useUIFeedback } from "./UIFeedback";
@@ -39,20 +39,20 @@ export default function Thread() {
   };
 
   const renderGroup = (group: RunGroup) => {
-    const folder = formsBySlug.get(group.formSlug);
+    const folder = formsBySlug.get(group.taskSlug);
     if (!folder) return null;
     const latestRun = group.runs[0];
     return (
-      <FormCard
+      <TaskCard
         key={group.key}
         runs={group.runs}
-        form={folder.form}
+        form={folder.task}
         meta={folder.meta}
-        outputType={folder.form.outputType}
+        outputType={folder.task.outputType}
         chunks={chunks}
-        onSubmit={(values) => void submitRun(group.formSlug, values)}
+        onSubmit={(values) => void submitRun(group.taskSlug, values)}
         onCancel={() => void cancelRun(latestRun.id)}
-        onSchedule={(values, at, repeat) => void scheduleRun(group.formSlug, values, at, repeat)}
+        onSchedule={(values, at, repeat) => void scheduleRun(group.taskSlug, values, at, repeat)}
         onPin={() => void setPinned(latestRun.id, !latestRun.pinned)}
         onDelete={(runId) => void removeRun(runId)}
         onRerun={() => void rerun(latestRun)}
@@ -70,12 +70,12 @@ export default function Thread() {
         ) : (
           <>
             {drafts.map((draft) => {
-              const folder = formsBySlug.get(draft.formSlug);
+              const folder = formsBySlug.get(draft.taskSlug);
               if (!folder) return null;
-              const slug = draft.formSlug;
+              const slug = draft.taskSlug;
               const synthetic: RunRecord = {
                 id: draft.id,
-                formSlug: slug,
+                taskSlug: slug,
                 inputs: {},
                 status: "idle",
                 exitCode: null,
@@ -87,10 +87,10 @@ export default function Thread() {
                 repeatInterval: null,
               };
               return (
-                <FormCard
+                <TaskCard
                   key={draft.id}
                   runs={[synthetic]}
-                  form={folder.form}
+                  form={folder.task}
                   meta={folder.meta}
                   defaultExpanded
                   autoFill

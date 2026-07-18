@@ -4,7 +4,7 @@ import { api } from "../rpc";
 import ServiceModelPicker, { type ServiceModelValue } from "./ServiceModelPicker";
 import ToolDropZone, { fileToBase64 } from "./ToolDropZone";
 import { useUIFeedback } from "./UIFeedback";
-import type { ToolRegistryEntry } from "../types/forms";
+import type { ToolRegistryEntry } from "../types/tasks";
 
 const inputBase =
   "rounded-md border border-clide-border bg-clide-bg px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30";

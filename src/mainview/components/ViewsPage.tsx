@@ -2,14 +2,14 @@ import { Eye, EyeOff, Layers, Trash2 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { useUIFeedback } from "./UIFeedback";
 import { STATUS_META } from "./statusIcon";
-import type { RunStatus, ThreadView, ThreadViewFilters } from "../types/forms";
+import type { RunStatus, ThreadView, ThreadViewFilters } from "../types/tasks";
 
 function filterSummary(filters: ThreadViewFilters): string {
   const entries = filters.entries ?? [];
   if (entries.length === 0) return "No filters — shows every run";
   return entries
     .map((entry) => {
-      if (entry.type === "form") return `${entry.values.length} form${entry.values.length === 1 ? "" : "s"}`;
+      if (entry.type === "task") return `${entry.values.length} task${entry.values.length === 1 ? "" : "s"}`;
       if (entry.type === "status") return entry.values.map((s) => STATUS_META[s as RunStatus].label).join("/");
       return `${entry.values.length} keyword${entry.values.length === 1 ? "" : "s"}`;
     })

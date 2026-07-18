@@ -1,11 +1,18 @@
 import type { RepeatInterval, RunRecord } from "../shared/types";
 import { projectPaths } from "./config";
-import { createRun, deleteRun, getPendingScheduledRuns, getRun, resolveRunProject, updateRunSchedule } from "./db/history";
+import {
+  createRun,
+  deleteRun,
+  getPendingScheduledRuns,
+  getRun,
+  resolveRunProject,
+  updateRunSchedule,
+} from "./db/history";
 
 export type TriggerRun = (
   projectPath: string,
   runId: string,
-  formSlug: string,
+  taskSlug: string,
   inputs: Record<string, unknown>,
 ) => void;
 
@@ -52,9 +59,9 @@ function arm(projectPath: string, run: RunRecord): void {
 function fire(projectPath: string, run: RunRecord, late: boolean): void {
   timers.delete(run.id);
   if (late) {
-    console.log(`[scheduler] Running late scheduled form: ${run.formSlug}`);
+    console.log(`[scheduler] Running late scheduled form: ${run.taskSlug}`);
   }
-  trigger?.(projectPath, run.id, run.formSlug, run.inputs);
+  trigger?.(projectPath, run.id, run.taskSlug, run.inputs);
 
   // Schedule the next occurrence for recurring runs.
   if (run.repeatInterval && run.repeatInterval !== "none") {
@@ -67,7 +74,7 @@ function fire(projectPath: string, run: RunRecord, late: boolean): void {
     const nextId = crypto.randomUUID();
     const created = createRun(projectPath, {
       id: nextId,
-      formSlug: run.formSlug,
+      taskSlug: run.taskSlug,
       inputs: run.inputs,
       status: "scheduled",
       startedAt: new Date().toISOString(),
@@ -81,7 +88,7 @@ function fire(projectPath: string, run: RunRecord, late: boolean): void {
 /** Persist a new scheduled run and arm its timer. */
 export function schedule(
   projectPath: string,
-  formSlug: string,
+  taskSlug: string,
   inputs: Record<string, unknown>,
   scheduledAt: string,
   repeatInterval: RepeatInterval,
@@ -89,7 +96,7 @@ export function schedule(
   const id = crypto.randomUUID();
   const run = createRun(projectPath, {
     id,
-    formSlug,
+    taskSlug,
     inputs,
     status: "scheduled",
     startedAt: new Date().toISOString(),

@@ -2,7 +2,7 @@ import { LayoutGrid, List } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
-import type { GridCardSize, ProjectLayout, RunRecord } from "../types/forms";
+import type { GridCardSize, ProjectLayout, RunRecord } from "../types/tasks";
 import GridCard from "./GridCard";
 
 const SIZE_CYCLE: GridCardSize[] = ["small", "medium", "large"];
@@ -35,12 +35,12 @@ export default function GridView() {
       const slugs = projectForms.map((f) => f.meta.slug);
       const ordered = layout.cards
         .sort((a, b) => a.position - b.position)
-        .map((c) => c.formSlug)
+        .map((c) => c.taskSlug)
         .filter((s) => slugs.includes(s));
       const missing = slugs.filter((s) => !ordered.includes(s));
       setOrder([...ordered, ...missing]);
       const sizeMap: Record<string, GridCardSize> = {};
-      for (const c of layout.cards) sizeMap[c.formSlug] = c.size;
+      for (const c of layout.cards) sizeMap[c.taskSlug] = c.size;
       setSizes(sizeMap);
     });
     return () => {
@@ -51,14 +51,14 @@ export default function GridView() {
   const lastRunBySlug = useMemo(() => {
     const m = new Map<string, RunRecord>();
     for (const run of runs) {
-      if (!m.has(run.formSlug)) m.set(run.formSlug, run);
+      if (!m.has(run.taskSlug)) m.set(run.taskSlug, run);
     }
     return m;
   }, [runs]);
 
   const pinnedSlugs = useMemo(() => {
     const set = new Set<string>();
-    for (const run of runs) if (run.pinned) set.add(run.formSlug);
+    for (const run of runs) if (run.pinned) set.add(run.taskSlug);
     return set;
   }, [runs]);
 
@@ -66,7 +66,7 @@ export default function GridView() {
     (nextOrder: string[], nextSizes: Record<string, GridCardSize>) => {
       const layout: ProjectLayout = {
         cards: nextOrder.map((slug, i) => ({
-          formSlug: slug,
+          taskSlug: slug,
           size: nextSizes[slug] ?? "small",
           position: i,
         })),
@@ -114,7 +114,7 @@ export default function GridView() {
 
   const quickRun = (slug: string) => {
     const folder = projectForms.find((f) => f.meta.slug === slug);
-    const hasRequired = folder?.form.fields.some((f) => f.required);
+    const hasRequired = folder?.task.fields.some((f) => f.required);
     if (hasRequired) {
       openForm(slug);
     } else {

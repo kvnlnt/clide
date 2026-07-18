@@ -17,7 +17,7 @@ export default function Sidebar() {
   const counts = useMemo(() => {
     const map = new Map<string, { active: number; error: number }>();
     for (const run of runs) {
-      const project = slugToProject.get(run.formSlug);
+      const project = slugToProject.get(run.taskSlug);
       if (!project) continue;
       const entry = map.get(project) ?? { active: 0, error: 0 };
       if (run.status === "running" || run.status === "pending" || run.status === "scheduled") {

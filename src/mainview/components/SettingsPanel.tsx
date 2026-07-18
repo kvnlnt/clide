@@ -4,8 +4,8 @@ import { api } from "../rpc";
 import { useEscapeToClose } from "./Modal";
 import ToolsSection from "./ToolsSection";
 import { useUIFeedback } from "./UIFeedback";
-import { AI_SERVICE_KIND_LABEL, AI_SERVICE_KIND_NEEDS_BASE_URL } from "../types/forms";
-import type { AIService, AIServiceKind } from "../types/forms";
+import { AI_SERVICE_KIND_LABEL, AI_SERVICE_KIND_NEEDS_BASE_URL } from "../types/tasks";
+import type { AIService, AIServiceKind } from "../types/tasks";
 
 interface SettingsPanelProps {
   onClose: () => void;
