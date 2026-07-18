@@ -3,10 +3,10 @@ import { useMemo, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useTaskSearch } from "../hooks/useTaskSearch";
 import { api } from "../rpc";
-import TaskCardBody from "./TaskCardBody";
+import type { RepeatInterval, TaskFolder } from "../types/tasks";
 import Modal from "./Modal";
+import TaskCardBody from "./TaskCardBody";
 import { useUIFeedback } from "./UIFeedback";
-import type { TaskFolder, RepeatInterval } from "../types/tasks";
 
 function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -132,131 +132,138 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
       backdropClassName="pt-10"
       panelClassName="flex max-h-[85%] flex-col overflow-hidden"
     >
-        <div className="flex shrink-0 items-center justify-between border-b border-clide-border px-5 py-4">
-          <span className="flex items-center gap-2 text-[14px] font-bold text-white">
-            <AlarmClock size={15} className="text-orange-400" />
-            Schedule for {date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
-          </span>
-          <button
-            onClick={onClose}
-            className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
-          >
-            <X size={14} />
-          </button>
-        </div>
+      <div className="flex shrink-0 items-center justify-between border-b border-clide-border px-5 py-4">
+        <span className="flex items-center gap-2 text-[14px] font-bold text-white">
+          <AlarmClock size={15} className="text-orange-400" />
+          Schedule for {date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
+        </span>
+        <button
+          onClick={onClose}
+          className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
+        >
+          <X size={14} />
+        </button>
+      </div>
 
-        <div className="clide-scroll flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
-          {scopedForms.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-6 text-center">
-          <span className="text-[13px] text-white/50">This project has no tasks yet.</span>
-          <button
-            onClick={() => {
-              onClose();
-              openNewForm();
-            }}
-            className="rounded-md bg-white/10 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-white/20"
-          >
-            Create one
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* Task picker */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-2 rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5">
-              <Search size={13} className="shrink-0 text-white/30" />
-              <input
-                autoFocus={picked === null}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={picked ? picked.meta.name : "Pick a task to schedule…"}
-                className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/40"
-              />
-            </div>
-            {(picked === null || query.trim() !== "") && (
-              <div className="clide-scroll flex max-h-40 flex-col gap-0.5 overflow-y-auto">
-                {results.length === 0 && (
-                  <div className="px-2 py-1.5 text-[12px] italic text-white/30">No tasks match.</div>
-                )}
-                {results.map((folder) => (
-                  <button
-                    key={folder.meta.slug}
-                    onClick={() => {
-                      pick(folder);
-                      setQuery("");
-                    }}
-                    className={`flex items-center justify-between gap-3 rounded px-2 py-1.5 text-left text-[13px] ${
-                      picked?.meta.slug === folder.meta.slug
-                        ? "bg-white/10 text-white"
-                        : "text-white/70 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <span className="min-w-0 truncate">{folder.meta.name}</span>
-                    {folder.meta.description && (
-                      <span className="min-w-0 shrink truncate text-[12px] text-white/40">
-                        {folder.meta.description}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* The picked form's real fields — same rendering as the card. */}
-          {picked && (
-            <div className="rounded-md border border-clide-border bg-clide-surface">
-              <TaskCardBody
-                form={picked.task}
-                values={values}
-                onChange={setValue}
-                filling={filling}
-                fillFailed={fillFailed}
-              />
-            </div>
-          )}
-
-          {/* When */}
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-[13px] text-white/70">
-              Date
-              <input type="date" className={inputClass} value={dateStr} onChange={(e) => setDateStr(e.target.value)} />
-            </label>
-            <label className="flex items-center gap-2 text-[13px] text-white/70">
-              Time
-              <input type="time" className={inputClass} value={time} onChange={(e) => setTime(e.target.value)} />
-            </label>
-            <label className="flex items-center gap-2 text-[13px] text-white/70">
-              Repeat
-              <select
-                className={inputClass}
-                value={repeat}
-                onChange={(e) => setRepeat(e.target.value as RepeatInterval)}
-              >
-                <option value="none" className="bg-clide-panel">
-                  None
-                </option>
-                <option value="daily" className="bg-clide-panel">
-                  Daily
-                </option>
-                <option value="weekly" className="bg-clide-panel">
-                  Weekly
-                </option>
-              </select>
-            </label>
-            <div className="flex-1" />
-            {inPast && <span className="text-[12px] text-amber-300/80">That's in the past — pick a future time.</span>}
+      <div className="clide-scroll flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
+        {scopedForms.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <span className="text-[13px] text-white/50">This project has no tasks yet.</span>
             <button
-              disabled={!canSchedule}
-              onClick={() => void schedule()}
-              className="rounded-md bg-white/10 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-white/20 disabled:opacity-40"
+              onClick={() => {
+                onClose();
+                openNewForm();
+              }}
+              className="rounded-md bg-white/10 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-white/20"
             >
-              {saving ? "Scheduling…" : "Schedule"}
+              Create one
             </button>
           </div>
-        </>
-          )}
-        </div>
+        ) : (
+          <>
+            {/* Task picker */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2 rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5">
+                <Search size={13} className="shrink-0 text-white/30" />
+                <input
+                  autoFocus={picked === null}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={picked ? picked.meta.name : "Pick a task to schedule…"}
+                  className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/40"
+                />
+              </div>
+              {(picked === null || query.trim() !== "") && (
+                <div className="clide-scroll flex max-h-40 flex-col gap-0.5 overflow-y-auto">
+                  {results.length === 0 && (
+                    <div className="px-2 py-1.5 text-[12px] italic text-white/30">No tasks match.</div>
+                  )}
+                  {results.map((folder) => (
+                    <button
+                      key={folder.meta.slug}
+                      onClick={() => {
+                        pick(folder);
+                        setQuery("");
+                      }}
+                      className={`flex items-center justify-between gap-3 rounded px-2 py-1.5 text-left text-[13px] ${
+                        picked?.meta.slug === folder.meta.slug
+                          ? "bg-white/10 text-white"
+                          : "text-white/70 hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      <span className="min-w-0 truncate">{folder.meta.name}</span>
+                      {folder.meta.description && (
+                        <span className="min-w-0 shrink truncate text-[12px] text-white/40">
+                          {folder.meta.description}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* The picked form's real fields — same rendering as the card. */}
+            {picked && (
+              <div className="rounded-md border border-clide-border bg-clide-surface">
+                <TaskCardBody
+                  form={picked.task}
+                  values={values}
+                  onChange={setValue}
+                  filling={filling}
+                  fillFailed={fillFailed}
+                />
+              </div>
+            )}
+
+            {/* When */}
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-[13px] text-white/70">
+                Date
+                <input
+                  type="date"
+                  className={inputClass}
+                  value={dateStr}
+                  onChange={(e) => setDateStr(e.target.value)}
+                />
+              </label>
+              <label className="flex items-center gap-2 text-[13px] text-white/70">
+                Time
+                <input type="time" className={inputClass} value={time} onChange={(e) => setTime(e.target.value)} />
+              </label>
+              <label className="flex items-center gap-2 text-[13px] text-white/70">
+                Repeat
+                <select
+                  className={inputClass}
+                  value={repeat}
+                  onChange={(e) => setRepeat(e.target.value as RepeatInterval)}
+                >
+                  <option value="none" className="bg-clide-panel">
+                    None
+                  </option>
+                  <option value="daily" className="bg-clide-panel">
+                    Daily
+                  </option>
+                  <option value="weekly" className="bg-clide-panel">
+                    Weekly
+                  </option>
+                </select>
+              </label>
+              <div className="flex-1" />
+              {inPast && (
+                <span className="text-[12px] text-amber-300/80">That's in the past — pick a future time.</span>
+              )}
+              <button
+                disabled={!canSchedule}
+                onClick={() => void schedule()}
+                className="rounded-md bg-white/10 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-white/20 disabled:opacity-40"
+              >
+                {saving ? "Scheduling…" : "Schedule"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </Modal>
   );
 }

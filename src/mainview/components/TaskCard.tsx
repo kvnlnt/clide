@@ -44,16 +44,49 @@ function isFilled(value: unknown): boolean {
 }
 
 function summarize(form: TaskDefinition, inputs: Record<string, unknown>, run: RunRecord): string {
-  if (run.status === "error") return inputs.__error ? String(inputs.__error) : "Failed";
+  // Ticket 98: use AI summary when present
+  if (run.summary) return run.summary;
+
+  // Scheduled runs show the fire time
   if (run.status === "scheduled" && run.scheduledAt) {
     return `Scheduled for ${new Date(run.scheduledAt).toLocaleString()}`;
   }
+
+  // Fallback heuristic (ticket 98 §3)
+  if (run.status === "error") {
+    return inputs.__error ? String(inputs.__error) : "Failed";
+  }
+
+  // Success: first filled field with label
   const first = form.fields.find((f) => isFilled(inputs[f.id]));
   if (first) {
     const v = inputs[first.id];
-    return Array.isArray(v) ? v.join(", ") : String(v);
+    const displayValue = Array.isArray(v) ? v.join(", ") : String(v);
+    return `${first.label}: ${displayValue}`;
   }
   return "";
+}
+
+/** Summary for grouped runs (ticket 98 §2): latest run's summary with terse rollup for mixed outcomes. */
+function summarizeGroup(runs: RunRecord[], form: TaskDefinition): string {
+  if (runs.length === 0) return "";
+
+  const latest = runs[0];
+  const latestSummary = summarize(form, latest.inputs, latest);
+
+  // Single run — just use its summary
+  if (runs.length === 1) return latestSummary;
+
+  // Mixed outcomes: prefix with rollup
+  const hasError = runs.some((r) => r.status === "error");
+  const hasSuccess = runs.some((r) => r.status === "success");
+  if (hasError && hasSuccess) {
+    const errorCount = runs.filter((r) => r.status === "error").length;
+    return `${runs.length} runs, ${errorCount} failed — ${latestSummary}`;
+  }
+
+  // Homogeneous outcomes: just show latest
+  return latestSummary;
 }
 
 export default function TaskCard({
@@ -155,7 +188,7 @@ export default function TaskCard({
         form={form}
         run={run}
         statusCounts={statusCounts}
-        summary={summarize(form, run.inputs, run)}
+        summary={summarizeGroup(runs, form)}
         expanded={shouldExpand}
         onToggle={toggleable ? () => setExpanded((e) => !e) : undefined}
         aiPrompt={aiPrompt}

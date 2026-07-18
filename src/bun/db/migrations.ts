@@ -32,6 +32,8 @@ export function migrate(db: Database): void {
     resolved_command: "ALTER TABLE runs ADD COLUMN resolved_command TEXT",
     // Ticket 97: when the run was marked read (ISO timestamp).
     read_at: "ALTER TABLE runs ADD COLUMN read_at TEXT",
+    // Ticket 98: AI-generated one-line status report.
+    summary: "ALTER TABLE runs ADD COLUMN summary TEXT",
   };
 
   for (const [column, sql] of Object.entries(additions)) {

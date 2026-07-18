@@ -14,7 +14,14 @@ const BADGE_BG: Record<string, string> = {
 };
 
 /** A plain project row: name + activity badge. Project actions live on the title tab. */
-export default function SidebarProject({ name, active, badgeCount, badgeColor, hasRunning, onClick }: SidebarProjectProps) {
+export default function SidebarProject({
+  name,
+  active,
+  badgeCount,
+  badgeColor,
+  hasRunning,
+  onClick,
+}: SidebarProjectProps) {
   return (
     <div
       className={`group flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 ${

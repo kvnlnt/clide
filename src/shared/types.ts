@@ -152,6 +152,8 @@ export interface TaskField {
   /** How this field's value maps onto the tool invocation. Command-backed tasks only (ticket 52). */
   argMapping?: ArgMapping;
   magic?: MagicField;
+  /** When true, the field's value is masked (•••) before reaching any AI prompt (ticket 98). */
+  secret?: boolean;
 }
 
 /** A command-backed task's fixed invocation target (ticket 52): one tool, one action. */
@@ -292,6 +294,8 @@ export interface RunRecord {
   readAt: string | null;
   /** Provenance of auto-submitted runs (ticket 23). */
   triggeredBy?: unknown;
+  /** AI-generated one-line status report (ticket 98). */
+  summary?: string | null;
 }
 
 export interface OutputChunk {
@@ -306,6 +310,8 @@ export interface RunStatusUpdate {
   status: RunStatus;
   exitCode: number | null;
   finishedAt: string | null;
+  /** AI-generated summary (ticket 98), streamed when available. */
+  summary?: string | null;
 }
 
 // Grid layout persistence ----------------------------------------------------
@@ -478,6 +484,8 @@ export interface WorkflowRun {
   startedAt: string;
   finishedAt: string | null;
   records: WorkflowStepRecord[];
+  /** AI-generated one-line status report (ticket 98). */
+  summary?: string | null;
   /** When the workflow run was marked read (ticket 97). */
   readAt?: string | null;
 }

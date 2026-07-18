@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useApp } from "../context/AppContext";
-import type { TaskFolder, RunRecord, ThreadViewFilters } from "../types/tasks";
+import type { RunRecord, TaskFolder, ThreadViewFilters } from "../types/tasks";
 
 /** One or more consecutive same-form runs coalesced into a single card unit. */
 export interface RunGroup {

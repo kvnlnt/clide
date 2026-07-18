@@ -1,11 +1,6 @@
 import { ChevronDown } from "lucide-react";
-import type {
-  TaskDefinition,
-  OutputChunk,
-  OutputType,
-  RunRecord,
-} from "../types/tasks";
 import { useApp } from "../context/AppContext";
+import type { OutputChunk, OutputType, RunRecord, TaskDefinition } from "../types/tasks";
 import SubmittedSummary from "./SubmittedSummary";
 import OutputBlock from "./output/OutputBlock";
 import StatusIcon from "./statusIcon";
@@ -28,13 +23,11 @@ function formatTime(iso: string | null): string {
   });
 }
 
-function summarize(
-  form: TaskDefinition,
-  inputs: Record<string, unknown>,
-  run: RunRecord,
-): string {
-  if (run.status === "error")
-    return inputs.__error ? String(inputs.__error) : "Failed";
+function summarize(form: TaskDefinition, inputs: Record<string, unknown>, run: RunRecord): string {
+  // Ticket 98: use AI summary when present
+  if (run.summary) return run.summary;
+
+  // Scheduled runs show the fire time
   if (run.status === "scheduled" && run.scheduledAt) {
     return new Date(run.scheduledAt).toLocaleString([], {
       month: "short",
@@ -43,6 +36,13 @@ function summarize(
       minute: "2-digit",
     });
   }
+
+  // Fallback heuristic (ticket 98 §3)
+  if (run.status === "error") {
+    return inputs.__error ? String(inputs.__error) : "Failed";
+  }
+
+  // Success: first filled field with label
   const first = form.fields.find((f) => {
     const v = inputs[f.id];
     if (Array.isArray(v)) return v.length > 0;
@@ -51,7 +51,8 @@ function summarize(
   });
   if (first) {
     const v = inputs[first.id];
-    return Array.isArray(v) ? v.join(", ") : String(v);
+    const displayValue = Array.isArray(v) ? v.join(", ") : String(v);
+    return `${first.label}: ${displayValue}`;
   }
   return "";
 }
@@ -69,10 +70,11 @@ export default function SubmissionAccordionRow({
   const time = formatTime(run.finishedAt ?? run.startedAt);
   const summary = summarize(form, run.inputs, run);
   const hasOutput =
-    run.status === "running" ||
-    run.status === "pending" ||
-    run.status === "success" ||
-    run.status === "error";
+    run.status === "running" || run.status === "pending" || run.status === "success" || run.status === "error";
+
+  // Subtle shimmer while summary is pending (ticket 98)
+  const summaryPending =
+    (run.status === "success" || run.status === "error") && run.finishedAt && !run.summary && !run.triggeredBy;
 
   const handleToggle = () => {
     onToggle();
@@ -93,7 +95,11 @@ export default function SubmissionAccordionRow({
         </span>
         <span className="shrink-0 text-[12px] text-white/40">{time}</span>
         {summary && (
-          <span className="min-w-0 flex-1 truncate text-[12px] text-clide-muted">
+          <span
+            className={`min-w-0 flex-1 truncate text-[12px] text-clide-muted ${
+              summaryPending ? "animate-pulse opacity-60" : ""
+            }`}
+          >
             {summary}
           </span>
         )}
@@ -107,16 +113,9 @@ export default function SubmissionAccordionRow({
           {hasOutput ? (
             activeTab === "results" ? (
               outputType ? (
-                <OutputBlock
-                  runId={run.id}
-                  outputType={outputType}
-                  status={run.status}
-                  chunks={chunks}
-                />
+                <OutputBlock runId={run.id} outputType={outputType} status={run.status} chunks={chunks} />
               ) : (
-                <div className="py-2 text-[13px] text-white/40">
-                  No results.
-                </div>
+                <div className="py-2 text-[13px] text-white/40">No results.</div>
               )
             ) : (
               <SubmittedSummary form={form} run={run} />

@@ -2,12 +2,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { api, on } from "../rpc";
 import type {
   FilterEntry,
-  TaskFolder,
-  TaskMetaPatch,
   OutputChunk,
   Project,
   RepeatInterval,
   RunRecord,
+  TaskFolder,
+  TaskMetaPatch,
   ThreadView,
   Workflow,
 } from "../types/tasks";
@@ -396,6 +396,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 status: update.status,
                 exitCode: update.exitCode,
                 finishedAt: update.finishedAt,
+                ...(update.summary !== undefined ? { summary: update.summary } : {}),
               }
             : r,
         ),

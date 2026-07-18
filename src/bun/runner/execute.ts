@@ -10,7 +10,8 @@ import type {
   RunStatusUpdate,
   TaskFolder,
 } from "../../shared/types";
-import { createRun, getRun, setOutputPath, setResolvedCommand, updateRunStatus } from "../db/history";
+import { fallbackSummary, generateRunSummary } from "../ai/runSummary";
+import { createRun, getRun, setOutputPath, setResolvedCommand, setSummary, updateRunStatus } from "../db/history";
 import { formDir, runDir } from "../paths";
 import { loadTaskFolder } from "../tasks/loader";
 import { buildArgs } from "./argBuilder";
@@ -31,6 +32,41 @@ const INTERPRETER_CMD: Record<Interpreter, string> = {
 
 /** Cap in-memory stderr accumulation (streaming to the UI is unaffected). */
 const MAX_CAPTURE_CHARS = 256 * 1024;
+
+/**
+ * Fire-and-forget AI summary generation (ticket 98).
+ * Never blocks or fails the run — errors degrade to fallback.
+ */
+async function generateAndSetSummary(
+  runId: string,
+  folder: TaskFolder,
+  inputs: Record<string, unknown>,
+  exitCode: number | null,
+  stdout: string,
+  stderr: string,
+  outputs: OutputResult[],
+  emitters: RunEmitters,
+): Promise<void> {
+  try {
+    const aiSummary = await generateRunSummary(folder, inputs, exitCode, stdout, stderr, outputs);
+    const summary = aiSummary ?? fallbackSummary(folder, inputs, exitCode, stderr);
+    setSummary(runId, summary);
+
+    // Push summary update to renderer via the run-status stream
+    const current = getRun(runId);
+    if (current) {
+      emitters.emitStatus({
+        runId,
+        status: current.status,
+        exitCode: current.exitCode,
+        finishedAt: current.finishedAt,
+        summary,
+      });
+    }
+  } catch (err) {
+    console.warn(`[runSummary] failed to generate/set summary for ${runId}:`, err);
+  }
+}
 
 /**
  * Fired when a standalone (user/scheduler-initiated) form run completes
@@ -212,6 +248,21 @@ async function execute(
   const status = exitCode === 0 ? "success" : "error";
   updateRunStatus(runId, status, exitCode, finishedAt);
   emitters.emitStatus({ runId, status, exitCode, finishedAt });
+
+  // Fire-and-forget AI summary generation (ticket 98) — skip workflow child runs.
+  const runRecord = getRun(runId);
+  if (runRecord && !runRecord.triggeredBy) {
+    void generateAndSetSummary(
+      runId,
+      folder,
+      inputs,
+      exitCode,
+      capture.text,
+      stderrText,
+      outputs,
+      emitters,
+    );
+  }
 
   // Workflow form-submitted triggers (ticket 90) fire on successful
   // standalone completion — outputs exist by now, which is the point.

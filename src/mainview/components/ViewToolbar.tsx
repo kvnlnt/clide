@@ -162,9 +162,7 @@ export default function ViewToolbar({ view }: Props) {
       >
         {popover?.mode === "pick-type" && (
           <div className="flex flex-col gap-0.5">
-            <span className="px-1.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/30">
-              Filter by
-            </span>
+            <span className="px-1.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/30">Filter by</span>
             {(["task", "status", "keyword"] as FilterEntryType[]).map((type) => (
               <button
                 key={type}
@@ -185,7 +183,13 @@ export default function ViewToolbar({ view }: Props) {
                   <span key={slug} className={rowChip}>
                     <span className="max-w-[140px] truncate">{nameFor(slug)}</span>
                     <button
-                      onClick={() => applyValues("task", popover.entryId, currentValues.filter((s) => s !== slug))}
+                      onClick={() =>
+                        applyValues(
+                          "task",
+                          popover.entryId,
+                          currentValues.filter((s) => s !== slug),
+                        )
+                      }
                       title="Remove"
                       className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full hover:bg-white/10"
                     >
@@ -266,7 +270,13 @@ export default function ViewToolbar({ view }: Props) {
                   <span key={k} className={rowChip}>
                     <span className="max-w-[140px] truncate">{k}</span>
                     <button
-                      onClick={() => applyValues("keyword", popover.entryId, currentValues.filter((x) => x !== k))}
+                      onClick={() =>
+                        applyValues(
+                          "keyword",
+                          popover.entryId,
+                          currentValues.filter((x) => x !== k),
+                        )
+                      }
                       title="Remove"
                       className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full hover:bg-white/10"
                     >

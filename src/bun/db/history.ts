@@ -18,6 +18,7 @@ interface RunRow {
   resolved_command: string | null;
   triggered_by: string | null;
   read_at: string | null;
+  summary: string | null;
 }
 
 /** projectPath -> open Database. */
@@ -95,6 +96,7 @@ function rowToRecord(row: RunRow): RunRecord {
     command,
     readAt: row.read_at,
     triggeredBy,
+    summary: row.summary,
   };
 }
 
@@ -201,6 +203,13 @@ export function markRunsRead(runIds: string[]): void {
 export function markAllRunsRead(projectPath: string): void {
   const now = new Date().toISOString();
   getDb(projectPath).run(`UPDATE runs SET read_at = ? WHERE read_at IS NULL`, [now]);
+}
+
+/** Set AI-generated summary for a run (ticket 98). */
+export function setSummary(id: string, summary: string): void {
+  const projectPath = runIndex.get(id);
+  if (!projectPath) return;
+  getDb(projectPath).run(`UPDATE runs SET summary = ? WHERE id = ?`, [summary, id]);
 }
 
 export function deleteRun(id: string): void {

@@ -1,8 +1,8 @@
 import { Eye, EyeOff, Layers, Trash2 } from "lucide-react";
 import { useApp } from "../context/AppContext";
+import type { RunStatus, ThreadView, ThreadViewFilters } from "../types/tasks";
 import { useUIFeedback } from "./UIFeedback";
 import { STATUS_META } from "./statusIcon";
-import type { RunStatus, ThreadView, ThreadViewFilters } from "../types/tasks";
 
 function filterSummary(filters: ThreadViewFilters): string {
   const entries = filters.entries ?? [];

@@ -262,6 +262,15 @@ function FieldCard({
                 Required
               </label>
               <span className={fieldHint}>The form can't be submitted without it</span>
+              <label className="flex cursor-pointer items-center gap-2 text-[13px] text-white/70">
+                <input
+                  type="checkbox"
+                  checked={field.secret === true}
+                  onChange={(e) => onUpdate({ secret: e.target.checked || undefined })}
+                />
+                Secret
+              </label>
+              <span className={fieldHint}>Value is masked before it reaches any AI</span>
             </div>
           </div>
 

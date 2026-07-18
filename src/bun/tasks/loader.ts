@@ -103,6 +103,7 @@ function validateField(raw: unknown): TaskField | null {
     description: typeof raw.description === "string" && raw.description.trim() ? raw.description : undefined,
     placeholder: typeof raw.placeholder === "string" ? raw.placeholder : undefined,
     required: raw.required === true,
+    secret: raw.secret === true ? true : undefined,
     options: Array.isArray(raw.options) ? raw.options.filter((o): o is string => typeof o === "string") : undefined,
     argTemplate: typeof raw.argTemplate === "string" ? raw.argTemplate : undefined,
     argMapping: validateArgMapping(raw.argMapping),

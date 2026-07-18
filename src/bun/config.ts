@@ -171,9 +171,7 @@ export async function addProject(name: string, path?: string): Promise<Project> 
   }
 
   // Determine a display name, unique across other projects.
-  const others = (await resolveProjects())
-    .filter((p) => p.path !== resolvedPath)
-    .map((p) => p.name);
+  const others = (await resolveProjects()).filter((p) => p.path !== resolvedPath).map((p) => p.name);
   if (existing) {
     const current = await readProjectConfig(resolvedPath);
     return { path: resolvedPath, name: current.name };
@@ -202,9 +200,7 @@ export async function renameProject(path: string, newName: string): Promise<Proj
   const trimmed = newName.trim();
   if (!trimmed) throw new Error("Project name cannot be empty.");
   if (!projectPathsList.includes(path)) throw new Error("Project not found.");
-  const others = (await resolveProjects())
-    .filter((p) => p.path !== path)
-    .map((p) => p.name);
+  const others = (await resolveProjects()).filter((p) => p.path !== path).map((p) => p.name);
   const name = uniqueName(trimmed, others);
   const config = await readProjectConfig(path);
   await writeProjectConfig(path, { ...config, name });

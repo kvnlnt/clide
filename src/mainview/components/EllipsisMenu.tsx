@@ -1,7 +1,7 @@
 import { Ellipsis } from "lucide-react";
 import { useRef, useState } from "react";
-import TaskCardMenu from "./TaskCardMenu";
 import PortalPopover from "./PortalPopover";
+import TaskCardMenu from "./TaskCardMenu";
 
 interface EllipsisMenuProps {
   pinned: boolean;

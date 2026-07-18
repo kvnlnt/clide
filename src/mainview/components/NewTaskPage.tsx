@@ -2,13 +2,13 @@ import { ArrowLeft, Loader, RefreshCw, Sparkles, Terminal, X } from "lucide-reac
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
-import type { TaskField, OutputDefinition, OutputType, ToolRegistryEntry } from "../types/tasks";
+import type { OutputDefinition, OutputType, TaskField, ToolRegistryEntry } from "../types/tasks";
 import { buildCommand, formatCommandPreview } from "../types/tasks";
 import CommandFieldsEditor from "./CommandFieldsEditor";
-import FormPreview from "./TaskPreview";
 import { useEscapeToClose } from "./Modal";
 import OutputDefinitionsEditor from "./OutputDefinitionsEditor";
 import ServiceModelPicker, { type ServiceModelValue } from "./ServiceModelPicker";
+import FormPreview from "./TaskPreview";
 import ToolChooser from "./ToolChooser";
 import WizardSteps from "./WizardSteps";
 
@@ -241,7 +241,8 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
               <div className="flex flex-col gap-1.5">
                 <label className="text-[14px] font-bold text-white/70">What should this task do?</label>
                 <span className="text-[12px] text-white/40">
-                  Describe the goal in a sentence or two — CLIDE will suggest command-line tools and draft the fields from this.
+                  Describe the goal in a sentence or two — CLIDE will suggest command-line tools and draft the fields
+                  from this.
                 </span>
                 <textarea
                   autoFocus

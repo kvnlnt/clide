@@ -17,14 +17,14 @@
  */
 import { rmSync } from "node:fs";
 import { join } from "node:path";
-import { addProject } from "../src/bun/config";
 import { saveAIServices } from "../src/bun/ai/aiServices";
+import { addProject } from "../src/bun/config";
 import { createRun, setPinned, updateRunStatus } from "../src/bun/db/history";
+import { appDataDir, ensureDir, formDir } from "../src/bun/paths";
 import { writeViews } from "../src/bun/tasks/views";
 import { slugify } from "../src/bun/tasks/writer";
-import { appDataDir, ensureDir, formDir } from "../src/bun/paths";
 import { writeUIState } from "../src/bun/uiState";
-import type { TaskDefinition, TaskField, TaskMeta, RepeatInterval, RunStatus, ThreadView } from "../src/shared/types";
+import type { RepeatInterval, RunStatus, TaskDefinition, TaskField, TaskMeta, ThreadView } from "../src/shared/types";
 
 const profile = process.env.CLIDE_PROFILE?.trim();
 if (!profile) {
@@ -123,9 +123,7 @@ echo "Done."
     name: "Backup Folder",
     description: "Archives a folder to a timestamped zip",
     tags: ["backup"],
-    fields: [
-      { id: "source", label: "Source folder", type: "text", required: true },
-    ],
+    fields: [{ id: "source", label: "Source folder", type: "text", required: true }],
     outputType: "text",
     script: `#!/bin/bash
 echo "Backing up \${1:-.}..."
@@ -136,9 +134,7 @@ echo "Done."
     name: "Send Notification",
     description: "Sends a Slack/email notification",
     tags: ["notify"],
-    fields: [
-      { id: "message", label: "Message", type: "textarea", required: true },
-    ],
+    fields: [{ id: "message", label: "Message", type: "textarea", required: true }],
     outputType: "text",
     script: `#!/bin/bash
 echo "Notification sent: \${1:-(no message)}"
@@ -146,7 +142,12 @@ echo "Notification sent: \${1:-(no message)}"
   },
 ];
 
-async function writeTemplateForm(projectPath: string, projectName: string, template: FormTemplate, now: string): Promise<string> {
+async function writeTemplateForm(
+  projectPath: string,
+  projectName: string,
+  template: FormTemplate,
+  now: string,
+): Promise<string> {
   const slug = slugify(template.name);
   const dir = formDir(projectPath, slug);
   ensureDir(dir);
@@ -261,7 +262,13 @@ async function seedBeginner(): Promise<void> {
     }
   }
   await saveAIServices([
-    { id: crypto.randomUUID(), name: "Local Ollama", kind: "ollama", baseUrl: "http://localhost:11434", isDefault: true },
+    {
+      id: crypto.randomUUID(),
+      name: "Local Ollama",
+      kind: "ollama",
+      baseUrl: "http://localhost:11434",
+      isDefault: true,
+    },
   ]);
   await writeUIState({ activeProject: null, activeViewByProject: {}, recentProjects: [projectNames[0]!] });
 }
@@ -291,14 +298,16 @@ async function seedRegular(): Promise<void> {
     seedRun(project.path, pick(slugs, 0), { status: "scheduled", scheduledInHours: 6 + p * 4 });
     seedRun(project.path, pick(slugs, 1), { status: "scheduled", scheduledInHours: 30, repeatInterval: "daily" });
 
-    await writeViews(project.path, [
-      makeView("Failures"),
-      makeView("Pinned"),
-      makeView("This week"),
-    ]);
+    await writeViews(project.path, [makeView("Failures"), makeView("Pinned"), makeView("This week")]);
   }
   await saveAIServices([
-    { id: crypto.randomUUID(), name: "Local Ollama", kind: "ollama", baseUrl: "http://localhost:11434", isDefault: true },
+    {
+      id: crypto.randomUUID(),
+      name: "Local Ollama",
+      kind: "ollama",
+      baseUrl: "http://localhost:11434",
+      isDefault: true,
+    },
     { id: crypto.randomUUID(), name: "Work Claude", kind: "anthropic" },
   ]);
   await writeUIState({ activeProject: null, activeViewByProject: {}, recentProjects: recents });
@@ -353,7 +362,13 @@ async function seedPower(): Promise<void> {
     await writeViews(project.path, views);
   }
   await saveAIServices([
-    { id: crypto.randomUUID(), name: "Local Ollama", kind: "ollama", baseUrl: "http://localhost:11434", isDefault: true },
+    {
+      id: crypto.randomUUID(),
+      name: "Local Ollama",
+      kind: "ollama",
+      baseUrl: "http://localhost:11434",
+      isDefault: true,
+    },
     { id: crypto.randomUUID(), name: "Work Claude", kind: "anthropic" },
   ]);
   await writeUIState({ activeProject: null, activeViewByProject: {}, recentProjects: recents.slice(0, 10) });
@@ -395,7 +410,15 @@ async function seedEdge(): Promise<void> {
       seedRun(project.path, pick(slugs, i), { status: "scheduled", scheduledInHours: 48 + i * 0.1 });
     }
   }
-  await saveAIServices([{ id: crypto.randomUUID(), name: "Local Ollama", kind: "ollama", baseUrl: "http://localhost:11434", isDefault: true }]);
+  await saveAIServices([
+    {
+      id: crypto.randomUUID(),
+      name: "Local Ollama",
+      kind: "ollama",
+      baseUrl: "http://localhost:11434",
+      isDefault: true,
+    },
+  ]);
   await writeUIState({ activeProject: null, activeViewByProject: {}, recentProjects: recents });
 }
 

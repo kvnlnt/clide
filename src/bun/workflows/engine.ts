@@ -9,6 +9,7 @@ import type {
   WorkflowStepRecord,
 } from "../../shared/types";
 import { ITEM_NAME, TRIGGER_NAME, evalExpressionString, isTruthy, resolveTemplate } from "../../shared/workflowExpr";
+import { generateWorkflowSummary, fallbackWorkflowSummary } from "../ai/runSummary";
 import { execFormOnce } from "../runner/execute";
 import * as procRegistry from "../runner/registry";
 import { loadTaskFolder } from "../tasks/loader";
@@ -299,6 +300,16 @@ export function startWorkflowRun(
     const ok = await runSteps(ctx, workflow.steps, env, 0, "");
     run.status = handle.cancelled ? "cancelled" : ok ? "succeeded" : "failed";
     run.finishedAt = new Date().toISOString();
+    
+    // Generate workflow run summary (ticket 98) — fire-and-forget.
+    try {
+      const aiSummary = await generateWorkflowSummary(workflow, run);
+      run.summary = aiSummary ?? fallbackWorkflowSummary(run);
+    } catch (err) {
+      console.warn(`[workflowSummary] failed for ${run.runId}:`, err);
+      run.summary = fallbackWorkflowSummary(run);
+    }
+    
     activeRuns.delete(run.runId);
     await publish(ctx);
   })();
