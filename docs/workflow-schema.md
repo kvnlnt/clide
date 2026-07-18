@@ -2,15 +2,15 @@
 
 Workflows orchestrate existing CLIDE forms into ordered, multi-step
 automations. This document is the reviewed source of truth for the on-disk
-format (tickets 79-86).
+format (tickets 88-95).
 
 ## Vocabulary
 
 - **Workflow** — a named, ordered list of steps plus zero or more triggers.
-- **Step** — one item in a workflow: *form step*, *decision step*, *loop
-  step*, or *parallel step*.
-- **Trigger** — what starts a run: *manual*, *schedule* (cron), or
-  *form-submitted*. Workflows start **only** via triggers; submitting a form
+- **Step** — one item in a workflow: _form step_, _decision step_, _loop
+  step_, or _parallel step_.
+- **Trigger** — what starts a run: _manual_, _schedule_ (cron), or
+  _form-submitted_. Workflows start **only** via triggers; submitting a form
   on its own never propagates into a workflow.
 - **Run** — one execution, persisted as a full trace.
 
@@ -75,12 +75,12 @@ format (tickets 79-86).
 
 Step types:
 
-| type | fields |
-| --- | --- |
-| `form` | `formSlug`, `inputs` (field id → literal or `{{…}}` string) |
-| `decision` | `condition` (expression), `then` (steps), `else?` (steps) |
-| `loop` | `over` (expression → list), `steps`; current element bound as `item` |
-| `parallel` | `branches` (≥2 step lists, concurrent, rejoining) |
+| type       | fields                                                               |
+| ---------- | -------------------------------------------------------------------- |
+| `form`     | `formSlug`, `inputs` (field id → literal or `{{…}}` string)          |
+| `decision` | `condition` (expression), `then` (steps), `else?` (steps)            |
+| `loop`     | `over` (expression → list), `steps`; current element bound as `item` |
+| `parallel` | `branches` (≥2 step lists, concurrent, rejoining)                    |
 
 Sub-lists nest arbitrarily deep. Every step has a unique, slug-safe `name`
 (`^[a-z][a-z0-9_-]*$`) — the reference target.
@@ -94,7 +94,7 @@ allowed); otherwise values interpolate (objects as JSON).
 Addressable roots:
 
 - Prior form-step names → `{ stdout, stderr, exitCode, outputs.<name> }`
-  where `<name>` is the form's output-definition name (ticket 77).
+  where `<name>` is the form's output-definition name (ticket 86).
 - `trigger` → `{ params.<name> }` (manual), or for form-submitted:
   `{ inputs.<fieldId>, stdout, stderr, exitCode, outputs.<name> }`.
 - `item` — the current element, inside loops only.
@@ -122,7 +122,7 @@ references at edit time instead).
 A step may reference any step **guaranteed to have completed before it**:
 earlier siblings and ancestors' earlier siblings. Consequences:
 
-- Steps in a *parallel sibling branch* are out of scope for each other.
+- Steps in a _parallel sibling branch_ are out of scope for each other.
 - After a parallel step joins, all its branches' form steps are in scope.
 - Steps inside a decision branch are out of scope after the decision (which
   branch ran is a runtime fact), and inside a loop after the loop (zero

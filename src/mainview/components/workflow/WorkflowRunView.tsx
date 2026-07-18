@@ -30,7 +30,7 @@ function triggerLabel(run: WorkflowRun): string {
 }
 
 // ---------------------------------------------------------------------------
-// One CI-style trace row (ticket 85), with the replay slot (ticket 86).
+// One CI-style trace row (ticket 94), with the replay slot (ticket 95).
 // ---------------------------------------------------------------------------
 
 function StepTraceRow({
@@ -92,7 +92,10 @@ function StepTraceRow({
             </div>
           )}
           {(record.stdout || record.stderr) && (
-            <AutoSizeOutput className="rounded-md border border-clide-border bg-clide-bg px-3 py-2 font-mono text-[12px]" capHeight={240}>
+            <AutoSizeOutput
+              className="rounded-md border border-clide-border bg-clide-bg px-3 py-2 font-mono text-[12px]"
+              capHeight={240}
+            >
               {record.stdout && <pre className="whitespace-pre-wrap break-words text-white/70">{record.stdout}</pre>}
               {record.stderr && (
                 <pre className="whitespace-pre-wrap break-words text-[rgba(255,100,100,0.85)]">{record.stderr}</pre>
@@ -129,7 +132,7 @@ function StepTraceRow({
 }
 
 // ---------------------------------------------------------------------------
-// Run detail (ticket 85): live while running, identical rendering for
+// Run detail (ticket 94): live while running, identical rendering for
 // historical runs (one component, data-source agnostic).
 // ---------------------------------------------------------------------------
 
@@ -145,7 +148,7 @@ export function WorkflowRunDetail({ runId, onBack }: { runId: string; onBack: ()
     void api.getWorkflowRun(activeProject, runId).then(setRun);
   }, [activeProject, runId]);
 
-  // Live updates stream the full run state on every step transition (ticket 80).
+  // Live updates stream the full run state on every step transition (ticket 89).
   useEffect(
     () =>
       on("workflowRun", (update) => {
@@ -232,10 +235,18 @@ export function WorkflowRunDetail({ runId, onBack }: { runId: string; onBack: ()
 }
 
 // ---------------------------------------------------------------------------
-// Dry-run plan rendering (ticket 86): nothing executed, nothing persisted.
+// Dry-run plan rendering (ticket 95): nothing executed, nothing persisted.
 // ---------------------------------------------------------------------------
 
-export function DryRunView({ plan, problems, onClose }: { plan: WorkflowPlanEntry[]; problems: string[]; onClose: () => void }) {
+export function DryRunView({
+  plan,
+  problems,
+  onClose,
+}: {
+  plan: WorkflowPlanEntry[];
+  problems: string[];
+  onClose: () => void;
+}) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3">

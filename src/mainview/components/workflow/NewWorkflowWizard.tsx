@@ -25,7 +25,7 @@ function emptyWorkflow(name: string, description: string): Workflow {
 }
 
 /**
- * Workflow creation wizard (ticket 83): describe the goal → the AI drafts
+ * Workflow creation wizard (ticket 92): describe the goal → the AI drafts
  * steps and wiring against the project's EXISTING forms → fine-tune in the
  * editor. AI accelerates, never gates — "Start empty" always works.
  */
@@ -46,7 +46,13 @@ export default function NewWorkflowWizard({ onClose }: { onClose: () => void }) 
     if (!activeProject || !goal.trim() || !serviceModel.serviceId) return;
     setDrafting(true);
     setError(null);
-    const res = await api.draftWorkflow(activeProject, goal.trim(), name.trim(), serviceModel.serviceId, serviceModel.model);
+    const res = await api.draftWorkflow(
+      activeProject,
+      goal.trim(),
+      name.trim(),
+      serviceModel.serviceId,
+      serviceModel.model,
+    );
     setDrafting(false);
     if (!res.ok || !res.workflow) {
       setError(res.error ?? "Couldn't draft a workflow.");
@@ -106,7 +112,12 @@ export default function NewWorkflowWizard({ onClose }: { onClose: () => void }) 
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[14px] font-bold text-white/70">Name</label>
-            <input className={inputBase} placeholder="Publish digest" value={name} onChange={(e) => setName(e.target.value)} />
+            <input
+              className={inputBase}
+              placeholder="Publish digest"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -122,7 +133,9 @@ export default function NewWorkflowWizard({ onClose }: { onClose: () => void }) 
               Drafting a workflow from your forms…
             </div>
           )}
-          {error && <div className="rounded border border-red-500/40 bg-red-500/5 p-3 text-[13px] text-red-300">{error}</div>}
+          {error && (
+            <div className="rounded border border-red-500/40 bg-red-500/5 p-3 text-[13px] text-red-300">{error}</div>
+          )}
         </div>
       </div>
 

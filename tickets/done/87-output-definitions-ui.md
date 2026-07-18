@@ -1,8 +1,8 @@
-# Ticket 78 — Output Definitions: Authoring UI & Run-Card Display
+# Ticket 87 — Output Definitions: Authoring UI & Run-Card Display
 
 ## Goal
 
-Surface ticket 77's output model. Wizard step 4 becomes a real outputs
+Surface ticket 86's output model. Wizard step 4 becomes a real outputs
 editor — add/edit/delete named output definitions with plain-language
 extraction controls and a live test — and the run card renders each defined
 output as its own labeled block alongside the always-present raw output.
@@ -11,21 +11,21 @@ output as its own labeled block alongside the always-present raw output.
 
 ### 1. Wizard step 4: outputs editor
 
-- Step 4 (events are gone per ticket 76) opens with copy that sets the
-  model: *"The command's raw output is always captured. Add outputs to
+- Step 4 (events are gone per ticket 85) opens with copy that sets the
+  model: _"The command's raw output is always captured. Add outputs to
   extract specific pieces from it — each becomes a named result you can
-  use later."*
+  use later."_
 - **"+ Add output"** creates a definition card (ticket 64's labeled-card
   pattern): Name, Kind, and an extraction section phrased in plain
   language —
-  - *Read from*: command output (stdout) / error output (stderr) / a file
+  - _Read from_: command output (stdout) / error output (stderr) / a file
     the command names;
-  - *Take*: everything / lines N–M / the part matching a pattern (regex +
+  - _Take_: everything / lines N–M / the part matching a pattern (regex +
     capture group) / the JSON value at a path / the last printed file path;
-  - *Then* (optional, per kind): pick & rename JSON keys, format into a
+  - _Then_ (optional, per kind): pick & rename JSON keys, format into a
     text template, parse as a number, trim.
 - Multiple definitions of any kind are allowed (two JSON outputs with
-  different paths is the headline case). Duplicate *names* get the
+  different paths is the headline case). Duplicate _names_ get the
   ticket-65-style warning hint.
 - **Live test**: a sample-output box (prefilled from the tool's most recent
   run when one exists, pasteable otherwise) runs the ticket-77 engine as

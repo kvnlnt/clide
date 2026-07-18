@@ -1,4 +1,4 @@
-# Ticket 85 — Workflow Run Log UI (Live Trace View)
+# Ticket 94 — Workflow Run Log UI (Live Trace View)
 
 Part of the Workflow epic (79-86). Depends on 80 (run persistence +
 streaming) and 84 (the surface it lives on).
@@ -14,7 +14,7 @@ a run is in progress.
 
 ### 1. Runs list
 
-- From the Workflows page (ticket 84) or the editor, a Runs tab per
+- From the Workflows page (ticket 93) or the editor, a Runs tab per
   workflow: reverse-chronological, each row showing status (the
   `STATUS_META` visual language, ticket 40), **trigger source** ("manual",
   "schedule", "on Fetch RSS"), start time, and duration. Live-updating row
@@ -32,10 +32,10 @@ a run is in progress.
     ticket-71 `SubmittedSummary` pattern).
 - **Skipped steps render grayed**; a skipped decision branch shows the
   evaluated condition and its result ("`items.length > 0` → false") so the
-  trace shows *why*. Steps skipped by the halt-on-failure policy say
+  trace shows _why_. Steps skipped by the halt-on-failure policy say
   "skipped — earlier step failed".
 - The currently running step shows a spinner (existing `running` status
-  icon); output streams in live via `onWorkflowRunUpdate` (ticket 80), and
+  icon); output streams in live via `onWorkflowRunUpdate` (ticket 89), and
   a completed run stops subscribing.
 - Header: workflow name, run status, trigger info, total duration, a
   Cancel button while running, and the definition-snapshot notice when the
@@ -43,7 +43,7 @@ a run is in progress.
 
 ### 3. Navigation
 
-- Starting a manual run (list page, editor, or ⌘K per ticket 84) lands on
+- Starting a manual run (list page, editor, or ⌘K per ticket 93) lands on
   the live run detail. Deep-linkable state: `workflowId` + `runId` in
   renderer state (no router — same pattern as surface state).
 
@@ -69,5 +69,5 @@ a run is in progress.
 
 ## Note
 
-The trace view is also where step replay (ticket 86) mounts its affordance
+The trace view is also where step replay (ticket 95) mounts its affordance
 — leave an action slot on `StepTraceRow`.

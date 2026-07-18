@@ -1,12 +1,12 @@
-# Ticket 79 — Workflow Model, File Schema & Expression Language
+# Ticket 88 — Workflow Model, File Schema & Expression Language
 
 Part of the **Workflow epic (79-86)**: orchestrate existing CLIDE forms into
 ordered, multi-step automations. A **Workflow** is a linear, vertically
 ordered list of **Steps** (no node/edge canvas); control flow is expandable
 nested blocks. Workflows start only via explicit **Triggers** — submitting a
 form on its own never propagates into a workflow. Vocabulary is fixed:
-*Workflow, Step (form step / decision step / loop step / parallel step),
-Trigger (manual / schedule / form-submitted), Run.*
+_Workflow, Step (form step / decision step / loop step / parallel step),
+Trigger (manual / schedule / form-submitted), Run._
 
 ## Goal
 
@@ -61,7 +61,7 @@ review before the editor is built** (per the feature spec).
 - Root scope names: prior step names, `trigger`, `item` (inside loops).
   Form-step output shape addressable per step name: `stdout`, `stderr`,
   `exitCode`, plus `outputs.<definitionName>` for the form's named output
-  definitions (ticket 77) — e.g. `{{fetch_rss.outputs.items}}`.
+  definitions (ticket 86) — e.g. `{{fetch_rss.outputs.items}}`.
 
 ### 4. Scope resolution (pure, shared with the editor)
 
@@ -69,8 +69,8 @@ review before the editor is built** (per the feature spec).
   reference: **earlier siblings and ancestors' earlier siblings** — steps
   guaranteed complete beforehand. Steps in a parallel sibling branch or an
   unexecuted decision branch are out of scope. This function is the single
-  source of truth for editor validation (ticket 82), autocomplete, and the
-  engine's resolution environment (ticket 80).
+  source of truth for editor validation (ticket 91), autocomplete, and the
+  engine's resolution environment (ticket 89).
 
 ### 5. CRUD RPC
 
@@ -101,6 +101,6 @@ review before the editor is built** (per the feature spec).
 
 ## Note
 
-Depends on tickets 76 (event bus removed — form-submitted *triggers* replace
+Depends on tickets 85 (event bus removed — form-submitted _triggers_ replace
 it) and 77 (named output definitions are the reference targets). Everything
 in 80-86 depends on this.

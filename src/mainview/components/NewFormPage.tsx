@@ -2,6 +2,8 @@ import { ArrowLeft, Loader, RefreshCw, Sparkles, Terminal, X } from "lucide-reac
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
+import type { FormField, OutputDefinition, OutputType, ToolRegistryEntry } from "../types/forms";
+import { buildCommand, formatCommandPreview } from "../types/forms";
 import CommandFieldsEditor from "./CommandFieldsEditor";
 import FormPreview from "./FormPreview";
 import { useEscapeToClose } from "./Modal";
@@ -9,8 +11,6 @@ import OutputDefinitionsEditor from "./OutputDefinitionsEditor";
 import ServiceModelPicker, { type ServiceModelValue } from "./ServiceModelPicker";
 import ToolChooser from "./ToolChooser";
 import WizardSteps from "./WizardSteps";
-import { buildCommand, formatCommandPreview } from "../types/forms";
-import type { FormField, OutputDefinition, OutputType, ToolRegistryEntry } from "../types/forms";
 
 interface NewFormPageProps {
   onClose: () => void;
@@ -105,7 +105,7 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
     }
   }, [fields]);
 
-  // Step 4 (ticket 78): raw output is always captured; definitions extract named pieces.
+  // Step 4 (ticket 87): raw output is always captured; definitions extract named pieces.
   const [outputs, setOutputs] = useState<OutputDefinition[]>([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -241,8 +241,8 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
               <div className="flex flex-col gap-1.5">
                 <label className="text-[14px] font-bold text-white/70">What should this form do?</label>
                 <span className="text-[12px] text-white/40">
-                  Describe the goal in a sentence or two — CLIDE will suggest command-line tools and draft the
-                  form's fields from this.
+                  Describe the goal in a sentence or two — CLIDE will suggest command-line tools and draft the form's
+                  fields from this.
                 </span>
                 <textarea
                   autoFocus
@@ -281,7 +281,8 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-[14px] font-bold text-white/70">
-                  AI assistance <span className="font-normal text-white/40">(optional — every step works without it)</span>
+                  AI assistance{" "}
+                  <span className="font-normal text-white/40">(optional — every step works without it)</span>
                 </label>
                 <ServiceModelPicker value={serviceModel} onChange={setServiceModel} />
               </div>

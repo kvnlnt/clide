@@ -115,7 +115,7 @@ export function formDir(projectPath: string, slug: string): string {
   return join(projectFormsDir(projectPath), slug);
 }
 
-/** Workflow definitions (ticket 79): one human-readable JSON file per workflow. */
+/** Workflow definitions (ticket 88): one human-readable JSON file per workflow. */
 export function projectWorkflowsDir(projectPath: string): string {
   return join(projectPath, "workflows");
 }
@@ -124,7 +124,7 @@ export function workflowPath(projectPath: string, slug: string): string {
   return join(projectWorkflowsDir(projectPath), `${slug}.json`);
 }
 
-/** Workflow run traces (ticket 80): one JSON file per run, snapshot embedded. */
+/** Workflow run traces (ticket 89): one JSON file per run, snapshot embedded. */
 export function projectWorkflowRunsDir(projectPath: string): string {
   return join(projectPath, "workflow-runs");
 }

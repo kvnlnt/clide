@@ -34,7 +34,7 @@ const MAX_CAPTURE_CHARS = 256 * 1024;
 
 /**
  * Fired when a standalone (user/scheduler-initiated) form run completes
- * successfully — the workflow form-submitted trigger hook (ticket 81).
+ * successfully — the workflow form-submitted trigger hook (ticket 90).
  * Replaces the event bus: nothing implicit, one explicit listener.
  */
 export interface RunCompletionInfo {
@@ -106,7 +106,10 @@ export async function startRun(
 }
 
 /** Spawns a form's process — direct tool invocation for command forms, interpreter+script for legacy. */
-function spawnForm(folder: FormFolder, inputs: Record<string, unknown>): {
+function spawnForm(
+  folder: FormFolder,
+  inputs: Record<string, unknown>,
+): {
   proc: ReturnType<typeof Bun.spawn>;
   commandDisplay: string;
   argv?: { tool: string; argv: string[] };
@@ -190,7 +193,7 @@ async function execute(
   const outputPath = await capture.flush();
   setOutputPath(runId, outputPath);
 
-  // Evaluate + persist named output definitions (ticket 77) — never blocks
+  // Evaluate + persist named output definitions (ticket 86) — never blocks
   // or fails the run itself.
   let outputs: OutputResult[] = [];
   try {
@@ -210,7 +213,7 @@ async function execute(
   updateRunStatus(runId, status, exitCode, finishedAt);
   emitters.emitStatus({ runId, status, exitCode, finishedAt });
 
-  // Workflow form-submitted triggers (ticket 81) fire on successful
+  // Workflow form-submitted triggers (ticket 90) fire on successful
   // standalone completion — outputs exist by now, which is the point.
   if (status === "success" && completionListener) {
     completionListener({
@@ -227,7 +230,7 @@ async function execute(
   }
 }
 
-/** Reads the persisted output-definition results for a run (ticket 77). */
+/** Reads the persisted output-definition results for a run (ticket 86). */
 export async function readRunOutputs(projectPath: string, runId: string): Promise<OutputResult[]> {
   try {
     const file = Bun.file(join(runDir(projectPath, runId), "outputs.json"));
@@ -240,7 +243,7 @@ export async function readRunOutputs(projectPath: string, runId: string): Promis
 }
 
 // ---------------------------------------------------------------------------
-// One-shot execution for workflow form steps (ticket 80): same spawn path as
+// One-shot execution for workflow form steps (ticket 89): same spawn path as
 // standalone runs — the single-compiler rule — but no history DB record, no
 // thread card, no completion trigger (workflow steps never cascade).
 // ---------------------------------------------------------------------------
@@ -289,7 +292,14 @@ export async function execFormOnce(
   if (procKey) registry.unregister(procKey);
 
   const outputs = evaluateOutputs(folder.form.outputs ?? [], { stdout, stderr }, existsSync);
-  return { commandDisplay: spawned.commandDisplay, stdout, stderr, exitCode, outputs, durationMs: Date.now() - started };
+  return {
+    commandDisplay: spawned.commandDisplay,
+    stdout,
+    stderr,
+    exitCode,
+    outputs,
+    durationMs: Date.now() - started,
+  };
 }
 
 function finishWithError(runId: string, emitters: RunEmitters, message: string): void {

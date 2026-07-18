@@ -58,7 +58,7 @@ export const DEFAULT_MODEL_FOR_KIND: Record<AIServiceKind, string> = {
   ollama: "llama3.2",
 };
 
-// Output definitions (ticket 77) ---------------------------------------------
+// Output definitions (ticket 86) ---------------------------------------------
 // The CLI's raw output is always captured as-is; each OutputDefinition
 // additionally EXTRACTS (and optionally transforms) a named piece of it.
 // These named outputs are the ports the workflow layer wires together.
@@ -86,7 +86,7 @@ export type OutputTransform =
   | { type: "parseNumber" }
   | { type: "trim" };
 
-/** A named, configured output of a form (ticket 77). */
+/** A named, configured output of a form (ticket 86). */
 export interface OutputDefinition {
   /** Stable within the form — the future pipeline wiring target. */
   id: string;
@@ -112,8 +112,8 @@ export interface OutputResult {
 
 /**
  * AI auto-fill configuration for a field (ticket 24). Prompt-based only —
- * the event-payload fill path was removed with the event bus (ticket 76);
- * workflow data wiring (tickets 79+) is its replacement.
+ * the event-payload fill path was removed with the event bus (ticket 85);
+ * workflow data wiring (tickets 88+) is its replacement.
  */
 export interface MagicField {
   /** Associative prompt used to fill the field, e.g. "today's date in ISO". */
@@ -167,7 +167,7 @@ export interface FormDefinition {
   aiPromptField?: boolean;
   /** Primary output kind, kept for backward compatibility with old readers. */
   outputType: OutputType;
-  /** Named output definitions (ticket 77). Legacy kind-lists normalize to these on load. */
+  /** Named output definitions (ticket 86). Legacy kind-lists normalize to these on load. */
   outputs?: OutputDefinition[];
   /** Present on command-backed forms (ticket 52); mutually exclusive with `scriptFile` in practice. */
   command?: CommandSpec;
@@ -372,7 +372,7 @@ export interface UIState {
   recentProjects: string[];
 }
 
-// Workflows (tickets 79-86) ---------------------------------------------------
+// Workflows (tickets 88-95) ---------------------------------------------------
 // A Workflow is a named, ordered list of Steps plus zero or more Triggers.
 // Steps: form step, decision step, loop step, parallel step; sub-lists nest
 // arbitrarily deep. Workflows start ONLY via explicit triggers. Full schema
@@ -450,7 +450,7 @@ export interface WorkflowStepRecord {
   resolvedInputs?: Record<string, unknown>;
   /** Decision: evaluated condition + result; skipped: why. */
   note?: string;
-  /** Form steps: evaluated named outputs (ticket 77). */
+  /** Form steps: evaluated named outputs (ticket 86). */
   outputs?: OutputResult[];
 }
 
@@ -485,7 +485,7 @@ export interface WorkflowRunSummary {
   finishedAt: string | null;
 }
 
-/** One line of a dry-run plan (ticket 86): compiled command or structural annotation, nothing executed. */
+/** One line of a dry-run plan (ticket 95): compiled command or structural annotation, nothing executed. */
 export interface WorkflowPlanEntry {
   name: string;
   type: WorkflowStep["type"];
@@ -656,13 +656,13 @@ export type ClideRPC = {
         };
         response: { ok: boolean; slug?: string; error?: string };
       };
-      /** Evaluated output-definition results persisted for a run (ticket 77). */
+      /** Evaluated output-definition results persisted for a run (ticket 86). */
       getRunOutputs: {
         params: { runId: string };
         response: OutputResult[];
       };
 
-      // Workflows (tickets 79-86) ---------------------------------------------
+      // Workflows (tickets 88-95) ---------------------------------------------
       listWorkflows: { params: { project: string }; response: Workflow[] };
       saveWorkflow: {
         params: { project: string; workflow: Workflow };
@@ -682,17 +682,17 @@ export type ClideRPC = {
         params: { project: string; runId: string };
         response: WorkflowRun | null;
       };
-      /** terraform-plan analogue: compiled commands, nothing executed, nothing persisted (ticket 86). */
+      /** terraform-plan analogue: compiled commands, nothing executed, nothing persisted (ticket 95). */
       dryRunWorkflow: {
         params: { project: string; workflowId: string; params?: Record<string, string> };
         response: { ok: boolean; plan?: WorkflowPlanEntry[]; problems?: string[]; error?: string };
       };
-      /** Re-run one form step from a past run's captured inputs; never mutates the run (ticket 86). */
+      /** Re-run one form step from a past run's captured inputs; never mutates the run (ticket 95). */
       replayWorkflowStep: {
         params: { project: string; runId: string; recordIndex: number };
         response: { ok: boolean; record?: WorkflowStepRecord; error?: string };
       };
-      /** AI-drafts a workflow from a goal against the project's existing forms (ticket 83). */
+      /** AI-drafts a workflow from a goal against the project's existing forms (ticket 92). */
       draftWorkflow: {
         params: { project: string; goal: string; name: string; serviceId: string; model: string };
         response: { ok: boolean; workflow?: Workflow; notes?: string[]; error?: string };
@@ -757,7 +757,7 @@ export type ClideRPC = {
       onRunStatus: RunStatusUpdate;
       /** Native application-menu item clicked (e.g. View → Forms); action is a `view:*` id. */
       onMenuAction: { action: string };
-      /** Live workflow-run state push (ticket 80/85): full run record on every step transition. */
+      /** Live workflow-run state push (ticket 89/94): full run record on every step transition. */
       onWorkflowRunUpdate: { run: WorkflowRun };
     };
   }>;

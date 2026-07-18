@@ -14,23 +14,10 @@ import {
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import {
-  STEP_NAME_RE,
-  allSteps,
-  computeScopes,
-  expressionRefs,
-  templateRefs,
-} from "../../../shared/workflowExpr";
+import { STEP_NAME_RE, allSteps, computeScopes, expressionRefs, templateRefs } from "../../../shared/workflowExpr";
 import { useApp } from "../../context/AppContext";
+import type { DecisionStep, FormFolder, FormStep, Workflow, WorkflowStep, WorkflowTrigger } from "../../types/forms";
 import { buildCommand, formatCommandPreview } from "../../types/forms";
-import type {
-  DecisionStep,
-  FormFolder,
-  FormStep,
-  Workflow,
-  WorkflowStep,
-  WorkflowTrigger,
-} from "../../types/forms";
 import { useEscapeToClose } from "../Modal";
 import { useUIFeedback } from "../UIFeedback";
 
@@ -42,7 +29,7 @@ const fieldHint = "text-[11px] text-white/30";
 const STEP_ICON = { form: Play, decision: GitBranch, loop: Repeat, parallel: Split } as const;
 
 // ---------------------------------------------------------------------------
-// Validation (ticket 82): unknown/out-of-scope references, duplicate names,
+// Validation (ticket 91): unknown/out-of-scope references, duplicate names,
 // missing forms, expression syntax, missing required fields. Non-blocking
 // flags per step + a summary that gates Save.
 // ---------------------------------------------------------------------------
@@ -98,11 +85,7 @@ function validate(workflow: Workflow, formsBySlug: Map<string, FormFolder>): Map
 }
 
 /** Reference suggestions for a step's scope: named outputs + stdout of in-scope form steps, trigger, item. */
-function buildSuggestions(
-  workflow: Workflow,
-  stepName: string,
-  formsBySlug: Map<string, FormFolder>,
-): string[] {
+function buildSuggestions(workflow: Workflow, stepName: string, formsBySlug: Map<string, FormFolder>): string[] {
   const scopes = computeScopes(workflow);
   const scope = scopes.get(stepName) ?? [];
   const stepBySlugName = new Map(allSteps(workflow.steps).map((s) => [s.name, s]));
@@ -136,7 +119,7 @@ function freshName(workflow: Workflow, base: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Reference-aware input (ticket 82): literal text; the ⟨+ ref⟩ picker inserts
+// Reference-aware input (ticket 91): literal text; the ⟨+ ref⟩ picker inserts
 // {{…}} from the in-scope suggestions — the "wire from previous step" path.
 // ---------------------------------------------------------------------------
 
@@ -311,7 +294,9 @@ function StepCard({
     "flex h-6 w-6 shrink-0 items-center justify-center rounded text-white/30 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:hover:bg-transparent";
 
   return (
-    <div className={`rounded-lg border bg-white/[0.02] ${issues.length > 0 ? "border-amber-400/30" : "border-white/5"}`}>
+    <div
+      className={`rounded-lg border bg-white/[0.02] ${issues.length > 0 ? "border-amber-400/30" : "border-white/5"}`}
+    >
       <div className="flex items-center gap-2 px-2.5 py-2">
         <button onClick={() => setOpen((o) => !o)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           {open ? (
@@ -385,7 +370,12 @@ function StepCard({
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className={fieldLabel}>Then</label>
-                <StepList steps={step.then} onChange={(then) => onChange({ ...step, then })} ctx={ctx} depth={depth + 1} />
+                <StepList
+                  steps={step.then}
+                  onChange={(then) => onChange({ ...step, then })}
+                  ctx={ctx}
+                  depth={depth + 1}
+                />
               </div>
               {step.else ? (
                 <div className="flex flex-col gap-1.5">
@@ -431,7 +421,12 @@ function StepCard({
                   Runs the steps below once per element; the current element is <span className="font-mono">item</span>
                 </span>
               </div>
-              <StepList steps={step.steps} onChange={(steps) => onChange({ ...step, steps })} ctx={ctx} depth={depth + 1} />
+              <StepList
+                steps={step.steps}
+                onChange={(steps) => onChange({ ...step, steps })}
+                ctx={ctx}
+                depth={depth + 1}
+              />
             </>
           )}
 
@@ -541,7 +536,7 @@ function StepList({
 }
 
 // ---------------------------------------------------------------------------
-// Trigger editor (ticket 81 UI).
+// Trigger editor (ticket 90 UI).
 // ---------------------------------------------------------------------------
 
 function TriggersEditor({
@@ -560,8 +555,8 @@ function TriggersEditor({
     <div className="flex flex-col gap-1.5">
       <label className="text-[11px] font-bold uppercase tracking-wider text-white/30">Triggers</label>
       <span className={fieldHint}>
-        Workflows start only from these — submitting a form on its own never propagates. Schedules fire only while
-        CLIDE is running.
+        Workflows start only from these — submitting a form on its own never propagates. Schedules fire only while CLIDE
+        is running.
       </span>
       {triggers.map((t, i) => (
         <div key={i} className="flex items-center gap-2">
@@ -635,7 +630,7 @@ function TriggersEditor({
 interface WorkflowEditorProps {
   initial: Workflow;
   onClose: () => void;
-  /** Notes from the AI draft (ticket 83), shown as a hint bar. */
+  /** Notes from the AI draft (ticket 92), shown as a hint bar. */
   draftNotes?: string[];
 }
 
@@ -755,7 +750,9 @@ export default function WorkflowEditor({ initial, onClose, draftNotes }: Workflo
           </div>
 
           {saveError && (
-            <div className="rounded border border-red-500/40 bg-red-500/5 p-3 text-[13px] text-red-300">{saveError}</div>
+            <div className="rounded border border-red-500/40 bg-red-500/5 p-3 text-[13px] text-red-300">
+              {saveError}
+            </div>
           )}
         </div>
       </div>

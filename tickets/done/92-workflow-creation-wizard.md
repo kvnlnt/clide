@@ -1,4 +1,4 @@
-# Ticket 83 — AI-Assisted Workflow Creation Wizard
+# Ticket 92 — AI-Assisted Workflow Creation Wizard
 
 Part of the Workflow epic (79-86). Depends on 79 (model) and 82 (editor —
 the wizard's fine-tune stage).
@@ -17,7 +17,7 @@ step lands in an empty editor.
 ### 1. Describe step
 
 - Step 1 mirrors the form wizard's goal-first layout (ticket 59): a labeled
-  description box (*"What should this workflow do?"* — with instructions
+  description box (_"What should this workflow do?"_ — with instructions
   that CLIDE will assemble it from the project's existing forms), name,
   and the session `ServiceModelPicker`.
 
@@ -25,8 +25,8 @@ step lands in an empty editor.
 
 - New RPC `draftWorkflow { project, goal, serviceId, model }`: the prompt
   carries a compact catalog of the project's forms — name, slug,
-  description, field ids/labels, output definition names (ticket 77) — and
-  the workflow schema (ticket 79), and asks for a draft `Workflow` JSON:
+  description, field ids/labels, output definition names (ticket 86) — and
+  the workflow schema (ticket 88), and asks for a draft `Workflow` JSON:
   ordered form steps referencing **only cataloged forms**, `{{…}}` wiring
   between outputs and inputs, decisions/loops where the goal implies them.
 - Validation on the response is as strict as `commandFields.ts`'s: unknown

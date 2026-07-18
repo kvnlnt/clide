@@ -1,9 +1,9 @@
-# Ticket 76 — Remove the Event Bus (Emits / Listens-For)
+# Ticket 85 — Remove the Event Bus (Emits / Listens-For)
 
 ## Goal
 
 Automation will be approached in a completely different way (workflow/
-pipeline layer, tickets 77-78 lay groundwork). Remove the internal event bus
+pipeline layer, tickets 86-87 lay groundwork). Remove the internal event bus
 and every trace of the emits/listens-for concept — runtime, data model,
 authoring, and display. This supersedes tickets 23 (bus), 24's event-fill
 path, and 56 (artifacts/payload mapping) — pure prompt-based magic fill
@@ -45,7 +45,7 @@ stays.
   ([NewFormPage.tsx](../src/mainview/components/NewFormPage.tsx)); if
   `TagEditor` ([OutputsEvents.tsx](../src/mainview/components/OutputsEvents.tsx))
   has no other consumer, delete it. Step 4 becomes outputs-only (reworked
-  further by ticket 78).
+  further by ticket 87).
 - [FormCardBody.tsx](../src/mainview/components/FormCardBody.tsx): the
   `FlowInfo` block (trigger line, artifacts, "emits X → N listeners") is
   removed. [FormCardHeader.tsx](../src/mainview/components/FormCardHeader.tsx):

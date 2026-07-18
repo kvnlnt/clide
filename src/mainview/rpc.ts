@@ -3,8 +3,8 @@ import type {
   AIService,
   ClideRPC,
   CommandSpec,
-  FormFolder,
   FormField,
+  FormFolder,
   FormMetaPatch,
   OutputChunk,
   OutputDefinition,
@@ -565,7 +565,10 @@ export const api = {
     }
   },
 
-  async registerDroppedTool(fileName: string, base64: string): Promise<{ ok: boolean; entry?: ToolRegistryEntry; error?: string }> {
+  async registerDroppedTool(
+    fileName: string,
+    base64: string,
+  ): Promise<{ ok: boolean; entry?: ToolRegistryEntry; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
@@ -604,7 +607,7 @@ export const api = {
     }
   },
 
-  // Workflows (tickets 79-86) -------------------------------------------------
+  // Workflows (tickets 88-95) -------------------------------------------------
 
   async listWorkflows(project: string): Promise<Workflow[]> {
     const r = request();

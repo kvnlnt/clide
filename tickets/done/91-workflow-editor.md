@@ -1,4 +1,4 @@
-# Ticket 82 — Workflow Editor: Vertical List, Nested Blocks, References
+# Ticket 91 — Workflow Editor: Vertical List, Nested Blocks, References
 
 Part of the Workflow epic (79-86). Depends on 79; pairs with 83 (AI wizard)
 and 84 (surface/navigation that hosts it).
@@ -17,7 +17,7 @@ are the rock-solid core: pick a form, fill its fields with literals or
 ### 1. List & blocks
 
 - Full-window editor surface (Settings/wizard overlay mechanic, tickets
-  37/67) with name/description/enabled at top, triggers section (ticket 81
+  37/67) with name/description/enabled at top, triggers section (ticket 90
   types), then the step list.
 - Step cards follow the ticket-64 labeled-card pattern: header with the
   step's **name** (unique, slug-safe, editable — duplicate names flagged),
@@ -33,7 +33,7 @@ are the rock-solid core: pick a form, fill its fields with literals or
   as the real card does (ticket 66's FormPreview reuse pattern).
 - **Each field accepts a literal value or a reference**: an inline `{{`
   triggers autocomplete over in-scope step outputs — powered by
-  `stepsInScope` (ticket 79) and each form's output definitions (ticket 77)
+  `stepsInScope` (ticket 88) and each form's output definitions (ticket 86)
   — listing `stepname.outputs.<name>`, `stepname.stdout`, `trigger.…`,
   `item.…` (inside loops). Chips or highlighted tokens make references
   visually distinct from literals.
@@ -84,6 +84,6 @@ are the rock-solid core: pick a form, fill its fields with literals or
 
 ## Note
 
-The editor is also the fine-tune stage of the AI wizard (ticket 83) — build
+The editor is also the fine-tune stage of the AI wizard (ticket 92) — build
 it as a controlled component over a `Workflow` value so the wizard can hand
 it a prefilled draft.

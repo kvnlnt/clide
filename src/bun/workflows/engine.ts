@@ -8,20 +8,14 @@ import type {
   WorkflowStep,
   WorkflowStepRecord,
 } from "../../shared/types";
-import {
-  ITEM_NAME,
-  TRIGGER_NAME,
-  evalExpressionString,
-  isTruthy,
-  resolveTemplate,
-} from "../../shared/workflowExpr";
+import { ITEM_NAME, TRIGGER_NAME, evalExpressionString, isTruthy, resolveTemplate } from "../../shared/workflowExpr";
 import { loadFormFolder } from "../forms/loader";
 import { execFormOnce } from "../runner/execute";
 import * as procRegistry from "../runner/registry";
 import { saveRun } from "./runStore";
 
 // ---------------------------------------------------------------------------
-// Workflow execution engine (ticket 80). Sequential per list; parallel steps
+// Workflow execution engine (ticket 89). Sequential per list; parallel steps
 // run concurrently and rejoin; decisions/loops evaluate via the shared
 // expression module. Form steps go through the SAME buildCommand/spawn path
 // as standalone runs (execFormOnce) — preview, dry run, and execution can
@@ -84,13 +78,7 @@ function pushSkippedTree(ctx: EngineCtx, steps: WorkflowStep[], depth: number, n
   }
 }
 
-async function runFormStep(
-  ctx: EngineCtx,
-  step: FormStep,
-  env: Env,
-  depth: number,
-  suffix: string,
-): Promise<boolean> {
+async function runFormStep(ctx: EngineCtx, step: FormStep, env: Env, depth: number, suffix: string): Promise<boolean> {
   const record: WorkflowStepRecord = { name: step.name + suffix, type: "form", status: "running", depth };
   ctx.run.records.push(record);
   await publish(ctx);
@@ -163,7 +151,13 @@ async function runFormStep(
  * recorded skipped and false is returned — each nesting level does the same
  * for its own siblings, which implements halt-on-failure end to end.
  */
-async function runSteps(ctx: EngineCtx, steps: WorkflowStep[], env: Env, depth: number, suffix: string): Promise<boolean> {
+async function runSteps(
+  ctx: EngineCtx,
+  steps: WorkflowStep[],
+  env: Env,
+  depth: number,
+  suffix: string,
+): Promise<boolean> {
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i]!;
 
@@ -200,8 +194,8 @@ async function runSteps(ctx: EngineCtx, steps: WorkflowStep[], env: Env, depth: 
           depth,
           note: `${step.condition} → ${taken}`,
         });
-        const branchTaken = taken ? step.then : step.else ?? [];
-        const branchSkipped = taken ? step.else ?? [] : step.then;
+        const branchTaken = taken ? step.then : (step.else ?? []);
+        const branchSkipped = taken ? (step.else ?? []) : step.then;
         pushSkippedTree(ctx, branchSkipped, depth + 1, `condition was ${taken} — branch not taken`, suffix);
         await publish(ctx);
         ok = await runSteps(ctx, branchTaken, env, depth + 1, suffix);
@@ -328,7 +322,7 @@ export function cancelWorkflowRun(runId: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Dry run (ticket 86): the terraform-plan analogue. Walks exactly as
+// Dry run (ticket 95): the terraform-plan analogue. Walks exactly as
 // execution would, compiles commands via the same buildCommand, resolves
 // what's statically known, placeholders the rest. Nothing executes, nothing
 // persists.
@@ -409,7 +403,12 @@ export async function dryRunWorkflow(
         case "parallel":
           plan.push({ name: step.name, type: "parallel", depth, summary: `${step.branches.length} parallel branches` });
           for (let bi = 0; bi < step.branches.length; bi++) {
-            plan.push({ name: `${step.name} · branch ${bi + 1}`, type: "parallel", depth: depth + 1, summary: "branch" });
+            plan.push({
+              name: `${step.name} · branch ${bi + 1}`,
+              type: "parallel",
+              depth: depth + 1,
+              summary: "branch",
+            });
             await walk(step.branches[bi]!, depth + 2);
           }
           break;
@@ -422,7 +421,7 @@ export async function dryRunWorkflow(
 }
 
 // ---------------------------------------------------------------------------
-// Step replay (ticket 86): re-run ONE form step using its captured resolved
+// Step replay (ticket 95): re-run ONE form step using its captured resolved
 // inputs — no re-resolution, no upstream execution, original run untouched.
 // ---------------------------------------------------------------------------
 

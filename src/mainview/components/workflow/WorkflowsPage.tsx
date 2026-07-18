@@ -18,7 +18,7 @@ function triggerSummary(w: Workflow): string {
     .join(" · ");
 }
 
-/** Prompt for a workflow's declared manual-run parameters (ticket 81). */
+/** Prompt for a workflow's declared manual-run parameters (ticket 90). */
 function ParamsPrompt({
   workflow,
   onRun,
@@ -66,9 +66,9 @@ type PageView =
   | { kind: "plan"; plan: WorkflowPlanEntry[]; problems: string[] };
 
 /**
- * Workflows surface (ticket 84): list with enable toggle, trigger summary,
+ * Workflows surface (ticket 93): list with enable toggle, trigger summary,
  * last-run status, and Run / Dry run / Edit / Runs / Delete — plus the runs
- * tab (ticket 85) and dry-run plan (ticket 86) hosted as drill-in views.
+ * tab (ticket 94) and dry-run plan (ticket 95) hosted as drill-in views.
  */
 export default function WorkflowsPage() {
   const { activeProject, workflows, saveWorkflow, deleteWorkflowById, openWorkflowEditor } = useApp();
@@ -160,11 +160,11 @@ export default function WorkflowsPage() {
       </div>
 
       <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">
-        {view.kind === "run" && (
-          <WorkflowRunDetail runId={view.runId} onBack={() => setView(view.backTo)} />
-        )}
+        {view.kind === "run" && <WorkflowRunDetail runId={view.runId} onBack={() => setView(view.backTo)} />}
 
-        {view.kind === "plan" && <DryRunView plan={view.plan} problems={view.problems} onClose={() => setView({ kind: "list" })} />}
+        {view.kind === "plan" && (
+          <DryRunView plan={view.plan} problems={view.problems} onClose={() => setView({ kind: "list" })} />
+        )}
 
         {view.kind === "runs" && (
           <div className="flex flex-col gap-3">
@@ -194,7 +194,11 @@ export default function WorkflowsPage() {
                     <StatusIcon status={runStatusIcon(r.status)} size={14} />
                     <span className="text-[13px] text-white/80">{new Date(r.startedAt).toLocaleString()}</span>
                     <span className="text-[12px] text-white/40">
-                      {r.trigger.type === "manual" ? "manual" : r.trigger.type === "schedule" ? "schedule" : `on ${r.trigger.detail}`}
+                      {r.trigger.type === "manual"
+                        ? "manual"
+                        : r.trigger.type === "schedule"
+                          ? "schedule"
+                          : `on ${r.trigger.detail}`}
                     </span>
                     <span className="ml-auto text-[11px] text-white/30">
                       {r.finishedAt
@@ -241,7 +245,9 @@ export default function WorkflowsPage() {
                     </label>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className={`truncate text-[14px] ${w.enabled ? "text-white" : "text-white/40"}`}>{w.name}</span>
+                        <span className={`truncate text-[14px] ${w.enabled ? "text-white" : "text-white/40"}`}>
+                          {w.name}
+                        </span>
                         {last && <StatusIcon status={runStatusIcon(last.status)} size={13} />}
                       </div>
                       <span className="block truncate text-[12px] text-white/40">

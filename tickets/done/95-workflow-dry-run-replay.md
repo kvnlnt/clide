@@ -1,4 +1,4 @@
-# Ticket 86 — Workflow Dry Run & Step Replay
+# Ticket 95 — Workflow Dry Run & Step Replay
 
 Part of the Workflow epic (79-86). Depends on 80 (engine) and 85 (trace UI).
 Closes out the epic's testability goals.
@@ -7,7 +7,7 @@ Closes out the epic's testability goals.
 
 Two affordances that make workflows trustworthy before and after the fact:
 **dry run** — the `terraform plan` analogue showing every command that
-*would* execute, resolving what's resolvable and placeholding what isn't,
+_would_ execute, resolving what's resolvable and placeholding what isn't,
 executing nothing; and **step replay** — re-run one step from a past run
 with its captured resolved inputs, without touching upstream steps or the
 original record.
@@ -62,8 +62,8 @@ original record.
 - Dry run of a workflow with validation errors (dangling references) shows
   the errors in place of the plan rather than a misleading partial plan.
 - Replaying a step whose form has since been edited or deleted: the run
-  snapshot (ticket 80) provides the definition — replay uses the
-  *snapshot's* command mapping, and the UI notes when the current form
+  snapshot (ticket 89) provides the definition — replay uses the
+  _snapshot's_ command mapping, and the UI notes when the current form
   differs.
 - Replay of a step inside a loop iteration replays that iteration's
   captured inputs specifically.
@@ -71,5 +71,5 @@ original record.
 
 ## Note
 
-Dry-run fidelity rests on the single-compiler rule from ticket 80 — preview,
+Dry-run fidelity rests on the single-compiler rule from ticket 89 — preview,
 dry run, and execution all call the same `buildCommand`. Don't fork it here.

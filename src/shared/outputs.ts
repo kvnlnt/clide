@@ -99,7 +99,7 @@ function applyTransform(value: unknown, t: OutputTransform): { ok: boolean; valu
 }
 
 /**
- * Evaluates a form's output definitions against captured output (ticket 77).
+ * Evaluates a form's output definitions against captured output (ticket 86).
  * Pure and deterministic — shared by the runner (real runs), the wizard's
  * live test, and the workflow engine, so extraction can never behave
  * differently in preview vs. execution. A failing selector yields

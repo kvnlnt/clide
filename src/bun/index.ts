@@ -12,10 +12,11 @@ import type {
   WorkflowRunTriggerInfo,
 } from "../shared/types";
 import { getAIService, listAIServices, listServiceModels, saveAIServices, testAIService } from "./ai/aiServices";
+import { draftCommandFields } from "./ai/commandFields";
 import { hasCredential, saveCredential } from "./ai/credentials";
 import { fillMagicFields } from "./ai/magicFill";
-import { draftCommandFields } from "./ai/commandFields";
 import { distillToolSpec, suggestTools } from "./ai/toolSpec";
+import { draftWorkflow } from "./ai/workflowDraft";
 import {
   addProject,
   listProjects,
@@ -33,28 +34,14 @@ import { watchForms } from "./forms/watcher";
 import { writeCommandForm } from "./forms/writer";
 import { formDir, projectFormsDir } from "./paths";
 import { cancelRun, readRunOutputs, setRunCompletionListener, startRun, type RunEmitters } from "./runner/execute";
-import { cancelScheduled, disposeScheduler, initScheduler, rescheduleRun, runScheduledNow, schedule } from "./scheduler";
-import { draftWorkflow } from "./ai/workflowDraft";
 import {
-  cancelWorkflowRun as engineCancelRun,
-  dryRunWorkflow as engineDryRun,
-  replayStep as engineReplayStep,
-  startWorkflowRun as engineStartRun,
-} from "./workflows/engine";
-import { failInterruptedRuns, getRun as getWorkflowRunFile, listRuns as listWorkflowRunFiles } from "./workflows/runStore";
-import {
-  deleteWorkflow as storeDeleteWorkflow,
-  getWorkflow,
-  listWorkflows as storeListWorkflows,
-  saveWorkflow as storeSaveWorkflow,
-  validateForSave,
-} from "./workflows/store";
-import {
-  disposeWorkflowTriggers,
-  initWorkflowTriggers,
-  onFormRunCompleted,
-  refreshWorkflowTriggers,
-} from "./workflows/triggers";
+  cancelScheduled,
+  disposeScheduler,
+  initScheduler,
+  rescheduleRun,
+  runScheduledNow,
+  schedule,
+} from "./scheduler";
 import { captureFingerprint, captureHelp, resolveTool as resolveToolPath } from "./tools/inspect";
 import {
   findByRealPath,
@@ -65,6 +52,30 @@ import {
   saveTool,
 } from "./tools/registry";
 import { readUIState, writeUIState } from "./uiState";
+import {
+  cancelWorkflowRun as engineCancelRun,
+  dryRunWorkflow as engineDryRun,
+  replayStep as engineReplayStep,
+  startWorkflowRun as engineStartRun,
+} from "./workflows/engine";
+import {
+  failInterruptedRuns,
+  getRun as getWorkflowRunFile,
+  listRuns as listWorkflowRunFiles,
+} from "./workflows/runStore";
+import {
+  getWorkflow,
+  deleteWorkflow as storeDeleteWorkflow,
+  listWorkflows as storeListWorkflows,
+  saveWorkflow as storeSaveWorkflow,
+  validateForSave,
+} from "./workflows/store";
+import {
+  disposeWorkflowTriggers,
+  initWorkflowTriggers,
+  onFormRunCompleted,
+  refreshWorkflowTriggers,
+} from "./workflows/triggers";
 
 const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
@@ -132,7 +143,7 @@ async function pushProjectsChanged(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Workflows (tickets 79-86): engine starter + trigger wiring.
+// Workflows (tickets 88-95): engine starter + trigger wiring.
 // ---------------------------------------------------------------------------
 
 function startWorkflow(
@@ -551,7 +562,7 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         return await readRunOutputs(project.path, runId);
       },
 
-      // Workflows (tickets 79-86) ---------------------------------------------
+      // Workflows (tickets 88-95) ---------------------------------------------
 
       listWorkflows: async ({ project }) => {
         const resolved = await pathForProjectName(project);

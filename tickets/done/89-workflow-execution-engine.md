@@ -1,4 +1,4 @@
-# Ticket 80 — Workflow Execution Engine & Run Persistence
+# Ticket 89 — Workflow Execution Engine & Run Persistence
 
 Part of the Workflow epic (79-86). Depends on 79 (model, expressions, scope).
 
@@ -30,7 +30,7 @@ run, and execution can never disagree.
     ([execute.ts](../src/bun/runner/execute.ts) / `buildCommand` — factor a
     callable that returns `{argv, stdout, stderr, exitCode, outputs}`
     without duplicating spawn logic). The form's output definitions
-    (ticket 77) are evaluated and exposed to later steps as
+    (ticket 86) are evaluated and exposed to later steps as
     `outputs.<name>`.
 - **Failure policy v1**: a failed step (nonzero exit, unresolvable
   reference, expression error) halts the workflow; all remaining steps are
@@ -55,7 +55,7 @@ run, and execution can never disagree.
 - Step status transitions and output chunks stream to the renderer over the
   existing push-message channel (new `onWorkflowRunUpdate` webview message),
   same mechanics as `onRunStatus`/`onOutputChunk` — this feeds the live
-  trace view (ticket 85).
+  trace view (ticket 94).
 
 ## Files to modify
 
@@ -71,7 +71,7 @@ run, and execution can never disagree.
 - A loop over a non-list (or an empty list) → step fails with a readable
   error / succeeds with zero iterations, respectively.
 - Two parallel branches finishing with one failure: the join fails the
-  workflow, but the *other* branch's completed records are preserved intact.
+  workflow, but the _other_ branch's completed records are preserved intact.
 - Workflow-run form executions do **not** appear as thread cards (they're
   inside the workflow trace); decide and document — v1: they don't, the run
   log is their home.
@@ -80,5 +80,5 @@ run, and execution can never disagree.
 
 ## Note
 
-The snapshot-at-run-time requirement is what makes step replay (ticket 86)
+The snapshot-at-run-time requirement is what makes step replay (ticket 95)
 honest — replays resolve against the definition that actually ran.

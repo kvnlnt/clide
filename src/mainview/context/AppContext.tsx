@@ -84,12 +84,12 @@ interface AppState {
   openViewSettings: () => void;
   closeViewSettings: () => void;
 
-  /** Workflows for the active project (tickets 79-86). */
+  /** Workflows for the active project (tickets 88-95). */
   workflows: Workflow[];
   refreshWorkflows: () => Promise<void>;
   saveWorkflow: (workflow: Workflow) => Promise<{ ok: boolean; error?: string }>;
   deleteWorkflowById: (id: string) => Promise<void>;
-  /** Full-window workflow editor/wizard hosting (tickets 82/83). */
+  /** Full-window workflow editor/wizard hosting (tickets 91/92). */
   workflowEditor: { mode: "new" } | { mode: "edit"; workflow: Workflow } | null;
   openWorkflowEditor: (workflow?: Workflow) => void;
   closeWorkflowEditor: () => void;
@@ -181,15 +181,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const [runPickerOpen, setRunPickerOpen] = useState(false);
   const [viewSettingsOpen, setViewSettingsOpen] = useState(false);
-<<<<<<< HEAD
   const [aiWizardOpen, setAiWizardOpen] = useState(false);
   const [aiWizardChained, setAiWizardChained] = useState(false);
   /** Skipped for this launch — don't re-open until the app restarts. */
   const aiWizardSkippedRef = useRef(false);
-=======
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
-  const [workflowEditor, setWorkflowEditor] = useState<{ mode: "new" } | { mode: "edit"; workflow: Workflow } | null>(null);
->>>>>>> 1dbb9a8 (workflows)
+  const [workflowEditor, setWorkflowEditor] = useState<{ mode: "new" } | { mode: "edit"; workflow: Workflow } | null>(
+    null,
+  );
 
   const [views, setViews] = useState<ThreadView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);

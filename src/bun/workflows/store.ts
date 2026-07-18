@@ -22,7 +22,10 @@ export function validateSteps(raw: unknown): WorkflowStep[] {
           name,
           formSlug: item.formSlug,
           inputs: isObject(item.inputs)
-            ? Object.fromEntries(Object.entries(item.inputs).filter(([, v]) => typeof v === "string")) as Record<string, string>
+            ? (Object.fromEntries(Object.entries(item.inputs).filter(([, v]) => typeof v === "string")) as Record<
+                string,
+                string
+              >)
             : {},
         });
         break;
@@ -57,7 +60,8 @@ function validateTriggers(raw: unknown): WorkflowTrigger[] {
   for (const item of raw) {
     if (!isObject(item)) continue;
     if (item.type === "manual") triggers.push({ type: "manual" });
-    else if (item.type === "schedule" && typeof item.cron === "string") triggers.push({ type: "schedule", cron: item.cron });
+    else if (item.type === "schedule" && typeof item.cron === "string")
+      triggers.push({ type: "schedule", cron: item.cron });
     else if (item.type === "form-submitted" && typeof item.formSlug === "string") {
       triggers.push({ type: "form-submitted", formSlug: item.formSlug });
     }
@@ -122,7 +126,7 @@ export async function getWorkflow(projectPath: string, id: string): Promise<Work
 }
 
 /**
- * Model-level validation on save (ticket 79): duplicate or malformed step
+ * Model-level validation on save (ticket 88): duplicate or malformed step
  * names break referencing, so they're rejected here, not just flagged in the
  * editor.
  */

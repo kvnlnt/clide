@@ -1,7 +1,7 @@
 import type { Workflow, WorkflowStep } from "./types";
 
 // ---------------------------------------------------------------------------
-// Workflow expression language (ticket 79). Minimal and safe — no eval, no
+// Workflow expression language (ticket 88). Minimal and safe — no eval, no
 // arbitrary JS. Grammar (documented in docs/workflow-schema.md):
 //
 //   expr    := or
@@ -332,7 +332,7 @@ export function expressionRefs(src: string): { roots: string[]; error?: string }
 }
 
 // ---------------------------------------------------------------------------
-// Scope rules (ticket 79): the single source of truth for what a step may
+// Scope rules (ticket 88): the single source of truth for what a step may
 // reference — earlier siblings and ancestors' earlier siblings. Steps inside
 // a parallel sibling branch or an unexecuted decision branch are out of
 // scope; after a parallel joins, its branches' form steps ARE in scope

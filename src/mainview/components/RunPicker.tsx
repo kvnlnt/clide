@@ -16,14 +16,22 @@ type Entry =
   | { kind: "workflow"; workflow: Workflow };
 
 /**
- * The ⌘K run dialog (ticket 84): one search over forms AND workflows,
+ * The ⌘K run dialog (ticket 93): one search over forms AND workflows,
  * grouped under labeled sections with per-row type distinction. Picking a
  * form drops a draft card; picking a workflow starts a manual run. Distinct
  * "New form…" / "New workflow…" actions live in the footer.
  */
 export default function RunPicker({ onClose }: RunPickerProps) {
-  const { forms, recentSlugs, addFormDraft, activeProject, openNewForm, openWorkflowEditor, workflows, setProjectSurface } =
-    useApp();
+  const {
+    forms,
+    recentSlugs,
+    addFormDraft,
+    activeProject,
+    openNewForm,
+    openWorkflowEditor,
+    workflows,
+    setProjectSurface,
+  } = useApp();
   const { toast } = useUIFeedback();
   const scopedForms = activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms;
   const [query, setQuery] = useState("");
@@ -33,13 +41,17 @@ export default function RunPicker({ onClose }: RunPickerProps) {
   const formResults = useFormSearch(scopedForms, query, recentSlugs);
   const workflowResults = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return workflows.filter((w) => q === "" || w.name.toLowerCase().includes(q) || w.description.toLowerCase().includes(q));
+    return workflows.filter(
+      (w) => q === "" || w.name.toLowerCase().includes(q) || w.description.toLowerCase().includes(q),
+    );
   }, [workflows, query]);
 
   // One flat keyboard-navigable list in visual order: forms section, then workflows.
   const entries: Entry[] = useMemo(
     () => [
-      ...formResults.map((f): Entry => ({ kind: "form", slug: f.meta.slug, name: f.meta.name, description: f.meta.description })),
+      ...formResults.map(
+        (f): Entry => ({ kind: "form", slug: f.meta.slug, name: f.meta.name, description: f.meta.description }),
+      ),
       ...workflowResults.map((w): Entry => ({ kind: "workflow", workflow: w })),
     ],
     [formResults, workflowResults],
@@ -108,7 +120,12 @@ export default function RunPicker({ onClose }: RunPickerProps) {
   let flatIndex = -1;
 
   return (
-    <Modal onClose={onClose} widthClassName="w-[520px]" backdropClassName="pt-24" panelClassName="flex max-h-[70%] flex-col overflow-hidden">
+    <Modal
+      onClose={onClose}
+      widthClassName="w-[520px]"
+      backdropClassName="pt-24"
+      panelClassName="flex max-h-[70%] flex-col overflow-hidden"
+    >
       {/* Search first. */}
       <div className="flex shrink-0 items-center gap-2 border-b border-clide-border px-4 py-3">
         <Search size={14} className="shrink-0 text-white/30" />
@@ -135,7 +152,12 @@ export default function RunPicker({ onClose }: RunPickerProps) {
           flatIndex++;
           const i = flatIndex;
           return (
-            <button key={form.meta.slug} onClick={() => void choose(i)} onMouseEnter={() => setActive(i)} className={rowClass(active === i)}>
+            <button
+              key={form.meta.slug}
+              onClick={() => void choose(i)}
+              onMouseEnter={() => setActive(i)}
+              className={rowClass(active === i)}
+            >
               <FileText size={14} className="shrink-0 text-white/40" />
               <span className="min-w-0 truncate text-white">{form.meta.name}</span>
               {form.meta.description && (
@@ -150,20 +172,27 @@ export default function RunPicker({ onClose }: RunPickerProps) {
           flatIndex++;
           const i = flatIndex;
           return (
-            <button key={w.id} onClick={() => void choose(i)} onMouseEnter={() => setActive(i)} className={rowClass(active === i)}>
+            <button
+              key={w.id}
+              onClick={() => void choose(i)}
+              onMouseEnter={() => setActive(i)}
+              className={rowClass(active === i)}
+            >
               <WorkflowIcon size={14} className="shrink-0 text-orange-300/70" />
               <span className="min-w-0 truncate text-white">{w.name}</span>
               <span className="shrink-0 rounded-full bg-orange-400/10 px-1.5 py-0.5 text-[10px] uppercase text-orange-300/70">
                 workflow
               </span>
               {!w.enabled && <span className="shrink-0 text-[11px] text-white/30">disabled</span>}
-              {w.description && <span className="min-w-0 shrink truncate text-[12px] text-white/40">{w.description}</span>}
+              {w.description && (
+                <span className="min-w-0 shrink truncate text-[12px] text-white/40">{w.description}</span>
+              )}
             </button>
           );
         })}
       </div>
 
-      {/* Distinct create actions (ticket 84) — a footer bar, not look-alike rows. */}
+      {/* Distinct create actions (ticket 93) — a footer bar, not look-alike rows. */}
       <div className="flex shrink-0 items-center gap-2 border-t border-clide-border px-3 py-2.5">
         <button
           onClick={() => {

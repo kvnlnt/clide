@@ -27,12 +27,15 @@ function decodeBase64ToText(base64: string): string {
   }
 }
 
-/** One labeled block per evaluated output definition (ticket 78): value rendered by kind, failures visible. */
+/** One labeled block per evaluated output definition (ticket 87): value rendered by kind, failures visible. */
 function NamedOutputBlock({ result }: { result: OutputResult }) {
   const text = typeof result.value === "string" ? result.value : JSON.stringify(result.value, null, 2);
   return (
     <div className="overflow-hidden rounded-[5px] border border-clide-border bg-clide-bg">
-      <OutputToolbar label={`${result.name} · ${result.kind}`} onCopy={result.ok ? () => void copyToClipboard(text) : undefined} />
+      <OutputToolbar
+        label={`${result.name} · ${result.kind}`}
+        onCopy={result.ok ? () => void copyToClipboard(text) : undefined}
+      />
       {!result.ok ? (
         <div className="px-3 py-2 text-[13px] text-amber-300/80">{result.error}</div>
       ) : result.kind === "table" ? (
@@ -98,7 +101,7 @@ export default function OutputBlock({ runId, outputType, status, chunks }: Outpu
     };
   }, [completed, isMedia, liveStdout.length, mediaSrc, runId]);
 
-  // Named output definitions evaluated for this run (ticket 77/78).
+  // Named output definitions evaluated for this run (ticket 86/87).
   useEffect(() => {
     if (!completed) return;
     let cancelled = false;

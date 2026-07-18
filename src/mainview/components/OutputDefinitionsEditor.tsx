@@ -1,13 +1,7 @@
 import { AlertTriangle, ChevronDown, ChevronRight, FlaskConical, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import type { Extraction, ExtractionSelector, OutputDefinition, OutputTransform, OutputType } from "../types/forms";
 import { evaluateOutputs } from "../types/forms";
-import type {
-  Extraction,
-  ExtractionSelector,
-  OutputDefinition,
-  OutputTransform,
-  OutputType,
-} from "../types/forms";
 
 const OUTPUT_KINDS: OutputType[] = ["text", "table", "json", "image", "audio", "video"];
 
@@ -38,7 +32,7 @@ interface Props {
 }
 
 /**
- * Wizard step-4 outputs editor (ticket 78): the raw output is always
+ * Wizard step-4 outputs editor (ticket 87): the raw output is always
  * captured; each definition here EXTRACTS a named piece of it. Extraction is
  * designed by watching it work — the live test box below runs the exact
  * evaluator the runner uses.
@@ -67,7 +61,7 @@ export default function OutputDefinitionsEditor({ outputs, onChange }: Props) {
     if (key) nameCounts.set(key, (nameCounts.get(key) ?? 0) + 1);
   }
 
-  // Live test (ticket 78): same evaluator as the runner — no fs check here,
+  // Live test (ticket 87): same evaluator as the runner — no fs check here,
   // so file-source values show their resolved path.
   const testResults = useMemo(() => {
     if (outputs.length === 0) return [];
@@ -77,8 +71,8 @@ export default function OutputDefinitionsEditor({ outputs, onChange }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <span className="text-[13px] text-white/40">
-        The command's raw output is always captured. Add outputs to extract specific pieces from it — each becomes
-        a named result you can use later.
+        The command's raw output is always captured. Add outputs to extract specific pieces from it — each becomes a
+        named result you can use later.
       </span>
 
       <div className="flex flex-col gap-1.5">
@@ -175,11 +169,7 @@ function DefinitionCard({
   const transforms = def.transforms ?? [];
   const addTransform = (type: OutputTransform["type"]) => {
     const t: OutputTransform =
-      type === "pickKeys"
-        ? { type, mapping: {} }
-        : type === "template"
-          ? { type, template: "{{value}}" }
-          : { type };
+      type === "pickKeys" ? { type, mapping: {} } : type === "template" ? { type, template: "{{value}}" } : { type };
     onUpdate({ transforms: [...transforms, t] });
   };
   const updateTransform = (index: number, t: OutputTransform) =>

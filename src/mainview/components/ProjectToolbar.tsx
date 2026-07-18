@@ -22,12 +22,12 @@ export default function ProjectToolbar() {
         Run
       </button>
       <button
-        onClick={() => setProjectSurface(projectSurface === "calendar" ? "thread" : "calendar")}
-        title="Calendar (⌘⇧C)"
-        className={`${btnBase} ${projectSurface === "calendar" ? btnActive : btnInactive}`}
+        onClick={() => setProjectSurface(projectSurface === "workflows" ? "thread" : "workflows")}
+        title="Workflows (⌘⇧U)"
+        className={`${btnBase} ${projectSurface === "workflows" ? btnActive : btnInactive}`}
       >
-        <CalendarDays size={13} />
-        Calendar
+        <Workflow size={13} />
+        Workflows
       </button>
       <button
         onClick={() => setProjectSurface(projectSurface === "forms" ? "thread" : "forms")}
@@ -38,6 +38,15 @@ export default function ProjectToolbar() {
         Forms
       </button>
       <button
+        onClick={() => setProjectSurface(projectSurface === "calendar" ? "thread" : "calendar")}
+        title="Calendar (⌘⇧C)"
+        className={`${btnBase} ${projectSurface === "calendar" ? btnActive : btnInactive}`}
+      >
+        <CalendarDays size={13} />
+        Calendar
+      </button>
+
+      <button
         onClick={() => setProjectSurface(projectSurface === "views" ? "thread" : "views")}
         title="Views (⌘⇧V)"
         className={`${btnBase} ${projectSurface === "views" ? btnActive : btnInactive}`}
@@ -45,14 +54,7 @@ export default function ProjectToolbar() {
         <Layers size={13} />
         Views
       </button>
-      <button
-        onClick={() => setProjectSurface(projectSurface === "workflows" ? "thread" : "workflows")}
-        title="Workflows (⌘⇧U)"
-        className={`${btnBase} ${projectSurface === "workflows" ? btnActive : btnInactive}`}
-      >
-        <Workflow size={13} />
-        Workflows
-      </button>
+
       <button
         onClick={() => setProjectSurface(projectSurface === "project-settings" ? "thread" : "project-settings")}
         title="Project settings (⌘,)"

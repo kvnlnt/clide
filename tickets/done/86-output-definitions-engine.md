@@ -1,4 +1,4 @@
-# Ticket 77 — Output Definitions: Explicit, Configurable, ETL-Capable (Model & Engine)
+# Ticket 86 — Output Definitions: Explicit, Configurable, ETL-Capable (Model & Engine)
 
 ## Goal
 
@@ -6,10 +6,10 @@ Today a form's outputs are a flat list of bare kinds (`text`, `table`,
 `json`, …) — nothing is configurable, nothing extracts or transforms, and
 two JSON outputs can't even be told apart. Replace that with **named,
 explicitly defined outputs**: the CLI's raw output is always returned as-is,
-and each *output definition* additionally extracts (and optionally lightly
+and each _output definition_ additionally extracts (and optionally lightly
 transforms) a piece of it. These named outputs are the ports the upcoming
 pipeline/workflow automation will wire together — this ticket builds the
-model, engine, and per-run persistence; ticket 78 builds the authoring UI
+model, engine, and per-run persistence; ticket 87 builds the authoring UI
 and display.
 
 ## Acceptance criteria
@@ -28,7 +28,7 @@ and display.
   ```
 - `Extraction` is explicit about where and what:
   - `source`: `"stdout"` (default) | `"stderr"` | `"file"` (a filesystem
-    path *named by* the selector below — how media outputs work today,
+    path _named by_ the selector below — how media outputs work today,
     finally made explicit instead of the implicit "last printed line" rule);
   - `selector`: `{ type: "whole" }` | `{ type: "regex", pattern, group? }`
     | `{ type: "jsonPath", path }` (dot-path into parsed stdout)
@@ -36,11 +36,11 @@ and display.
 - `Transform` starts small and composable (applied in order):
   `{ type: "pickKeys", mapping: Record<string,string> }` (select + rename
   JSON keys — the "translate them a bit" case), `{ type: "template",
-  template: "..." }` (string with `{{value}}` / `{{key}}` slots),
+template: "..." }` (string with `{{value}}` / `{{key}}` slots),
   `{ type: "parseNumber" }`, `{ type: "trim" }`.
 - `FormDefinition.outputs` becomes `OutputDefinition[]`. **Migration on
   load** ([loader.ts](../src/bun/forms/loader.ts)): legacy `outputs:
-  [{kind}]` / bare `outputType` normalize to one definition per kind —
+[{kind}]` / bare `outputType` normalize to one definition per kind —
   `whole`-stdout extraction for text/table/json, `lastPathLine`+file for
   media — named after the kind. Legacy `outputType` field stays populated
   (first definition's kind) for old readers.
@@ -49,7 +49,7 @@ and display.
 
 - New pure module (e.g. `src/shared/outputs.ts` or `src/bun/runner/outputs.ts`
   if node-only): `evaluateOutputs(defs, { stdout, stderr }) →
-  { id, name, kind, ok, value?, error? }[]`. Deterministic, no AI, no shell.
+{ id, name, kind, ok, value?, error? }[]`. Deterministic, no AI, no shell.
   A failing selector (no regex match, bad JSON path) yields `ok: false`
   with a human-readable error — never throws, never blocks the run result.
 - Multiple definitions of the same kind are fully supported (the point):
@@ -63,7 +63,7 @@ and display.
   `runDir(...)/outputs.json`, media values as the resolved file path) — the
   durable, named artifact set the workflow layer will consume.
 - New RPC `getRunOutputs { runId } → { id, name, kind, ok, value|path,
-  error }[]` for the renderer (ticket 78) and future automation.
+error }[]` for the renderer (ticket 87) and future automation.
   `readOutputFile` keeps working for legacy runs.
 
 ## Files to modify
@@ -86,5 +86,5 @@ and display.
 
 ## Note
 
-Depends on 76 (events out of the outputs step). Ticket 78 delivers the
+Depends on 85 (events out of the outputs step). Ticket 87 delivers the
 wizard authoring UI and run-card rendering on top of this.

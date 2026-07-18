@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { WorkflowRun, WorkflowRunSummary } from "../../shared/types";
 import { ensureDir, projectWorkflowRunsDir, workflowRunPath } from "../paths";
 
-/** Persists a run trace (ticket 80) — one human-readable JSON file per run, snapshot embedded. */
+/** Persists a run trace (ticket 89) — one human-readable JSON file per run, snapshot embedded. */
 export async function saveRun(projectPath: string, run: WorkflowRun): Promise<void> {
   ensureDir(projectWorkflowRunsDir(projectPath));
   await Bun.write(workflowRunPath(projectPath, run.runId), JSON.stringify(run, null, 2));
@@ -49,7 +49,7 @@ export async function listRuns(projectPath: string, workflowId?: string): Promis
   return out;
 }
 
-/** App-launch sweep (ticket 80): in-flight runs from a previous session are marked failed. */
+/** App-launch sweep (ticket 89): in-flight runs from a previous session are marked failed. */
 export async function failInterruptedRuns(projectPath: string): Promise<void> {
   for (const summary of await listRuns(projectPath)) {
     if (summary.status !== "running") continue;

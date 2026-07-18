@@ -1,4 +1,4 @@
-# Ticket 84 — Workflows Surface, Reworked Run Dialog & Menu Entry
+# Ticket 93 — Workflows Surface, Reworked Run Dialog & Menu Entry
 
 Part of the Workflow epic (79-86). Depends on 79 (CRUD); the list page's Run
 button needs 80/81.
@@ -6,7 +6,7 @@ button needs 80/81.
 ## Goal
 
 Navigation and entry points: a **Workflows** button on the project toolbar
-with a list page; the ⌘K **Run dialog re-envisioned** to search forms *and*
+with a list page; the ⌘K **Run dialog re-envisioned** to search forms _and_
 workflows with clear visual distinction, distinct create buttons, and a
 better overall layout; and Workflows added to the native **View menu**.
 
@@ -22,8 +22,8 @@ better overall layout; and Workflows added to the native **View menu**.
 - The page (full-width, ticket-39 conventions) lists the project's
   workflows: name, description, enabled toggle, trigger summary ("manual ·
   daily 9:00 · on Fetch RSS"), last-run status/time, actions — **Run**,
-  Edit (ticket 82), Runs (ticket 85), Delete (ticket-74 confirm dialog +
-  toast). Empty state points at "New workflow" (ticket 83 wizard).
+  Edit (ticket 91), Runs (ticket 94), Delete (ticket-74 confirm dialog +
+  toast). Empty state points at "New workflow" (ticket 92 wizard).
 
 ### 2. Run dialog rework ([RunFormPicker.tsx](../src/mainview/components/RunFormPicker.tsx))
 
@@ -33,7 +33,7 @@ better overall layout; and Workflows added to the native **View menu**.
   survives mixed keyboard navigation — icon + subtle badge, not color
   alone.
 - Choosing a form drops a draft card (unchanged); choosing a workflow
-  starts a manual run (params prompt per ticket 81) and links to its live
+  starts a manual run (params prompt per ticket 90) and links to its live
   trace.
 - **Two distinct create actions** — "New form…" and "New workflow…" — as
   clearly separated footer buttons (not look-alike list rows blended into

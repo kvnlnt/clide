@@ -1,11 +1,11 @@
-# Ticket 81 — Workflow Triggers: Manual, Schedule, Form-Submitted
+# Ticket 90 — Workflow Triggers: Manual, Schedule, Form-Submitted
 
 Part of the Workflow epic (79-86). Depends on 79 (model) and 80 (engine).
 
 ## Goal
 
 Triggers live **on the workflow, not on forms** — a form never emits into a
-workflow implicitly (the event bus died in ticket 76; this is its principled
+workflow implicitly (the event bus died in ticket 85; this is its principled
 replacement). V1 trigger types: **manual**, **schedule** (cron-style),
 **form-submitted**. Webhook and file-watch are explicit follow-ups.
 
@@ -13,7 +13,7 @@ replacement). V1 trigger types: **manual**, **schedule** (cron-style),
 
 ### 1. Manual
 
-- A Run button on the workflow (list page + editor, ticket 82/84) starts a
+- A Run button on the workflow (list page + editor, ticket 91/93) starts a
   run via `startWorkflowRun` with trigger info `{ type: "manual" }`.
 - Workflows may declare input parameters (simple named text fields, v1);
   the manual trigger prompts for them and they're addressable as
@@ -38,12 +38,12 @@ replacement). V1 trigger types: **manual**, **schedule** (cron-style),
   that form completes (v1: successfully), every enabled workflow with a
   matching form-submitted trigger starts, with the triggering run's data as
   the payload: `{{trigger.inputs.<fieldId>}}`, `{{trigger.stdout}}`,
-  `{{trigger.exitCode}}`, `{{trigger.outputs.<name>}}` (ticket 77
+  `{{trigger.exitCode}}`, `{{trigger.outputs.<name>}}` (ticket 86
   definitions).
 - Hook point: the run-completion path in
   [execute.ts](../src/bun/runner/execute.ts)/[index.ts](../src/bun/index.ts)
   — **only** for user/scheduler-initiated form runs; form steps executed
-  *inside* a workflow run never trigger other workflows (no cascades, v1).
+  _inside_ a workflow run never trigger other workflows (no cascades, v1).
 - **"Starts workflows" on the form itself**: the form card's expanded body
   ([FormCardBody.tsx](../src/mainview/components/FormCardBody.tsx), where
   FlowInfo used to live) and the FormsPanel row show every workflow that
@@ -73,6 +73,6 @@ replacement). V1 trigger types: **manual**, **schedule** (cron-style),
 
 ## Note
 
-The form-submitted trigger fires on *completion* (so outputs exist), not at
+The form-submitted trigger fires on _completion_ (so outputs exist), not at
 submit-click — the trigger payload includes outputs, which don't exist
 earlier. UI copy should say "when this form finishes running".

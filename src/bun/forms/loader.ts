@@ -62,7 +62,7 @@ function validateMeta(raw: unknown, slug: string, projectName: string): FormMeta
   };
 }
 
-/** Prompt-only since ticket 76 — legacy `source`/`payloadMapping` keys on disk are ignored. */
+/** Prompt-only since ticket 85 — legacy `source`/`payloadMapping` keys on disk are ignored. */
 function validateMagic(raw: unknown): MagicField | undefined {
   if (!isObject(raw) || typeof raw.prompt !== "string" || !raw.prompt.trim()) return undefined;
   return { prompt: raw.prompt };
@@ -162,7 +162,7 @@ function validateTransforms(raw: unknown): OutputTransform[] | undefined {
 }
 
 /**
- * Validates output definitions (ticket 77), migrating the two legacy shapes
+ * Validates output definitions (ticket 86), migrating the two legacy shapes
  * losslessly: bare-kind lists (`[{kind}]`, possibly with retired "effect"
  * entries — dropped) and the older single `outputType` become one
  * whole-output definition per kind.
@@ -198,7 +198,14 @@ function validateOutputs(raw: unknown, outputType: OutputType): OutputDefinition
     }
   }
   if (defs.length > 0) return defs;
-  return [{ id: `legacy-${outputType}`, name: outputType, kind: outputType, extraction: defaultExtractionForKind(outputType) }];
+  return [
+    {
+      id: `legacy-${outputType}`,
+      name: outputType,
+      kind: outputType,
+      extraction: defaultExtractionForKind(outputType),
+    },
+  ];
 }
 
 function validateForm(raw: unknown): FormDefinition | null {
@@ -212,7 +219,7 @@ function validateForm(raw: unknown): FormDefinition | null {
     aiPromptField: raw.aiPromptField === true,
     outputType,
     outputs: validateOutputs(raw.outputs, outputType),
-    // `events` keys on disk are ignored since ticket 76 (bus removed).
+    // `events` keys on disk are ignored since ticket 85 (bus removed).
     command,
     // Legacy script forms always had a scriptFile; a command form has none.
     scriptFile: typeof raw.scriptFile === "string" ? raw.scriptFile : command ? undefined : "script.sh",

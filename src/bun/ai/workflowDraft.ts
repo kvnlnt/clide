@@ -41,9 +41,9 @@ where Step is one of:
   "Rules:",
   '- Step names: unique, slug-safe (^[a-z][a-z0-9_-]*$), descriptive, e.g. "fetch_rss".',
   "- formSlug MUST be one of the cataloged forms. Never invent forms or field ids.",
-  '- Input values are literals or contain {{references}}: {{stepname.outputs.<outputName>}}, {{stepname.stdout}}, {{item.<prop>}} inside loops, {{trigger.params.<name>}}.',
+  "- Input values are literals or contain {{references}}: {{stepname.outputs.<outputName>}}, {{stepname.stdout}}, {{item.<prop>}} inside loops, {{trigger.params.<name>}}.",
   "- Only reference steps that complete earlier (earlier siblings / ancestors' earlier siblings).",
-  '- Expressions (condition/over) support property access, .length, comparisons (== != < <= > >=), && || !, literals.',
+  "- Expressions (condition/over) support property access, .length, comparisons (== != < <= > >=), && || !, literals.",
   "- Prefer a flat sequence; use decision/loop/parallel only when the goal clearly implies them.",
 ].join("\n");
 
@@ -54,7 +54,7 @@ export interface WorkflowDraftResult {
 
 /**
  * Drafts a workflow from the user's goal against the project's existing
- * forms (ticket 83). Validation is strict and partial: unknown form slugs
+ * forms (ticket 92). Validation is strict and partial: unknown form slugs
  * are dropped with a visible note, unknown field ids are dropped, reference
  * syntax is checked, names de-duplicated — a partially valid draft is
  * delivered partially, never all-or-nothing.
@@ -95,7 +95,8 @@ export async function draftWorkflow(
         }
         return [{ ...step, inputs }];
       }
-      if (step.type === "decision") return [{ ...step, then: prune(step.then), else: step.else ? prune(step.else) : undefined }];
+      if (step.type === "decision")
+        return [{ ...step, then: prune(step.then), else: step.else ? prune(step.else) : undefined }];
       if (step.type === "loop") return [{ ...step, steps: prune(step.steps) }];
       return [{ ...step, branches: step.branches.map(prune) }];
     });
@@ -104,7 +105,12 @@ export async function draftWorkflow(
   // De-duplicate / sanitize step names.
   const seen = new Set<string>();
   for (const step of allSteps(steps)) {
-    let candidate = STEP_NAME_RE.test(step.name) ? step.name : step.name.toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/^[^a-z]+/, "step_");
+    let candidate = STEP_NAME_RE.test(step.name)
+      ? step.name
+      : step.name
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]+/g, "_")
+          .replace(/^[^a-z]+/, "step_");
     if (!candidate || !STEP_NAME_RE.test(candidate)) candidate = "step";
     let n = 2;
     let unique = candidate;
