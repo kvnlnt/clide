@@ -66,3 +66,26 @@ export async function failInterruptedRuns(projectPath: string): Promise<void> {
     await saveRun(projectPath, run);
   }
 }
+
+/** Mark workflow runs as read (ticket 97). */
+export async function markWorkflowRunsRead(projectPath: string, runIds: string[]): Promise<void> {
+  if (runIds.length === 0) return;
+  const now = new Date().toISOString();
+  for (const runId of runIds) {
+    const run = await getRun(projectPath, runId);
+    if (!run) continue;
+    run.readAt = now;
+    await saveRun(projectPath, run);
+  }
+}
+
+/** Mark all unread workflow runs in a project as read (ticket 97 toggle-on bulk-mark). */
+export async function markAllWorkflowRunsRead(projectPath: string): Promise<void> {
+  const now = new Date().toISOString();
+  for (const summary of await listRuns(projectPath)) {
+    const run = await getRun(projectPath, summary.runId);
+    if (!run || run.readAt) continue;
+    run.readAt = now;
+    await saveRun(projectPath, run);
+  }
+}

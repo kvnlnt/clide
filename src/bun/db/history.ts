@@ -16,6 +16,8 @@ interface RunRow {
   scheduled_at: string | null;
   repeat_interval: string | null;
   resolved_command: string | null;
+  triggered_by: string | null;
+  read_at: string | null;
 }
 
 /** projectPath -> open Database. */
@@ -70,6 +72,14 @@ function rowToRecord(row: RunRow): RunRecord {
       command = null;
     }
   }
+  let triggeredBy: unknown = null;
+  if (row.triggered_by) {
+    try {
+      triggeredBy = JSON.parse(row.triggered_by);
+    } catch {
+      triggeredBy = null;
+    }
+  }
   return {
     id: row.id,
     taskSlug: row.form_slug, // Disk: form_slug → Memory: taskSlug
@@ -83,6 +93,8 @@ function rowToRecord(row: RunRow): RunRecord {
     scheduledAt: row.scheduled_at,
     repeatInterval: (row.repeat_interval as RepeatInterval | null) ?? null,
     command,
+    readAt: row.read_at,
+    triggeredBy,
   };
 }
 
@@ -95,12 +107,15 @@ export interface CreateRunInput {
   outputPath?: string | null;
   scheduledAt?: string | null;
   repeatInterval?: RepeatInterval | null;
+  triggeredBy?: unknown;
+  /** When not null, the run is created pre-read (ticket 97). */
+  readAt?: string | null;
 }
 
 export function createRun(projectPath: string, input: CreateRunInput): RunRecord {
   getDb(projectPath).run(
-    `INSERT INTO runs (id, form_slug, inputs, status, started_at, output_path, scheduled_at, repeat_interval, pinned)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+    `INSERT INTO runs (id, form_slug, inputs, status, started_at, output_path, scheduled_at, repeat_interval, pinned, triggered_by, read_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
     [
       input.id,
       input.taskSlug, // Memory: taskSlug → Disk: form_slug column
@@ -110,6 +125,8 @@ export function createRun(projectPath: string, input: CreateRunInput): RunRecord
       input.outputPath ?? null,
       input.scheduledAt ?? null,
       input.repeatInterval ?? null,
+      input.triggeredBy ? JSON.stringify(input.triggeredBy) : null,
+      input.readAt ?? null,
     ],
   );
   runIndex.set(input.id, projectPath);
@@ -160,6 +177,30 @@ export function setPinned(id: string, pinned: boolean): void {
   const projectPath = runIndex.get(id);
   if (!projectPath) return;
   getDb(projectPath).run(`UPDATE runs SET pinned = ? WHERE id = ?`, [pinned ? 1 : 0, id]);
+}
+
+/** Mark runs as read (ticket 97). */
+export function markRunsRead(runIds: string[]): void {
+  if (runIds.length === 0) return;
+  const now = new Date().toISOString();
+  // Group by project to batch updates.
+  const byProject = new Map<string, string[]>();
+  for (const id of runIds) {
+    const projectPath = runIndex.get(id);
+    if (!projectPath) continue;
+    if (!byProject.has(projectPath)) byProject.set(projectPath, []);
+    byProject.get(projectPath)!.push(id);
+  }
+  for (const [projectPath, ids] of byProject) {
+    const placeholders = ids.map(() => "?").join(", ");
+    getDb(projectPath).run(`UPDATE runs SET read_at = ? WHERE id IN (${placeholders})`, [now, ...ids]);
+  }
+}
+
+/** Mark all unread runs in a project as read (ticket 97 toggle-on bulk-mark). */
+export function markAllRunsRead(projectPath: string): void {
+  const now = new Date().toISOString();
+  getDb(projectPath).run(`UPDATE runs SET read_at = ? WHERE read_at IS NULL`, [now]);
 }
 
 export function deleteRun(id: string): void {

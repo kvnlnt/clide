@@ -288,6 +288,10 @@ export interface RunRecord {
   repeatInterval: RepeatInterval | null;
   /** Resolved tool + argv actually executed, for command-backed tasks (ticket 52). */
   command?: { tool: string; argv: string[] } | null;
+  /** When the run was marked read (ticket 97). */
+  readAt: string | null;
+  /** Provenance of auto-submitted runs (ticket 23). */
+  triggeredBy?: unknown;
 }
 
 export interface OutputChunk {
@@ -474,6 +478,8 @@ export interface WorkflowRun {
   startedAt: string;
   finishedAt: string | null;
   records: WorkflowStepRecord[];
+  /** When the workflow run was marked read (ticket 97). */
+  readAt?: string | null;
 }
 
 export interface WorkflowRunSummary {
@@ -521,6 +527,16 @@ export type ClideRPC = {
       };
       removeProject: {
         params: { path: string; deleteFiles?: boolean };
+        response: void;
+      };
+      /** Get the trackUnread flag for a project (ticket 97). */
+      getTrackUnread: {
+        params: { path: string };
+        response: boolean;
+      };
+      /** Set the trackUnread flag for a project (ticket 97). */
+      setTrackUnread: {
+        params: { path: string; trackUnread: boolean };
         response: void;
       };
       listTasks: { params: Record<string, never>; response: TaskFolder[] };
@@ -703,6 +719,16 @@ export type ClideRPC = {
         response: void;
       };
       deleteRun: { params: { runId: string }; response: void };
+      /** Mark task runs as read (ticket 97). */
+      markRunsRead: {
+        params: { runIds: string[] };
+        response: void;
+      };
+      /** Mark workflow runs as read (ticket 97). */
+      markWorkflowRunsRead: {
+        params: { project: string; runIds: string[] };
+        response: void;
+      };
       scheduleRun: { params: ScheduleInput; response: { runId: string } };
       updateScheduledRun: {
         params: { runId: string; scheduledAt: string; repeatInterval: RepeatInterval };

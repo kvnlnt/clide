@@ -125,6 +125,8 @@ interface AppState {
   rerun: (run: RunRecord) => Promise<void>;
   setPinned: (runId: string, pinned: boolean) => Promise<void>;
   deleteRun: (runId: string) => Promise<void>;
+  /** Mark a run as read (ticket 97). Optimistically updates local state. */
+  markRunRead: (runId: string) => Promise<void>;
 
   refreshForms: () => Promise<void>;
   refreshRuns: () => Promise<void>;
@@ -574,6 +576,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       pinned: false,
       scheduledAt: null,
       repeatInterval: null,
+      readAt: null,
     };
     setRuns((prev) => [optimistic, ...prev.filter((r) => r.id !== runId)]);
     setRecentSlugs((prev) => [taskSlug, ...prev.filter((s) => s !== taskSlug)].slice(0, 5));
@@ -622,6 +625,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteRun = useCallback(async (runId: string) => {
     await api.deleteRun(runId);
     setRuns((prev) => prev.filter((r) => r.id !== runId));
+  }, []);
+
+  const markRunRead = useCallback(async (runId: string) => {
+    const now = new Date().toISOString();
+    // Optimistic update
+    setRuns((prev) => prev.map((r) => (r.id === runId ? { ...r, readAt: now } : r)));
+    // Background RPC
+    await api.markRunsRead([runId]);
   }, []);
 
   const value: AppState = {
@@ -691,6 +702,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     rerun,
     setPinned,
     deleteRun,
+    markRunRead,
     refreshForms,
     refreshRuns,
   };

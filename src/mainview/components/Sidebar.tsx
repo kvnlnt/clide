@@ -13,19 +13,32 @@ export default function Sidebar() {
     return m;
   }, [forms]);
 
-  // Pending/running run counts per project (badge counts).
+  // Unread terminal runs per project (ticket 97): red if any unread error, green otherwise, zero → no badge.
   const counts = useMemo(() => {
-    const map = new Map<string, { active: number; error: number }>();
+    const map = new Map<string, { unreadCount: number; hasError: boolean }>();
     for (const run of runs) {
       const project = slugToProject.get(run.taskSlug);
       if (!project) continue;
-      const entry = map.get(project) ?? { active: 0, error: 0 };
-      if (run.status === "running" || run.status === "pending" || run.status === "scheduled") {
-        entry.active += 1;
-      } else if (run.status === "error") {
-        entry.error += 1;
+      // Only count terminal runs (success or error) that are unread
+      if ((run.status === "success" || run.status === "error") && !run.readAt) {
+        const entry = map.get(project) ?? { unreadCount: 0, hasError: false };
+        entry.unreadCount += 1;
+        if (run.status === "error") entry.hasError = true;
+        map.set(project, entry);
       }
-      map.set(project, entry);
+    }
+    return map;
+  }, [runs, slugToProject]);
+
+  // Keep a small pulsing dot for in-flight runs (ticket 97 §4 decision).
+  const hasRunning = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const run of runs) {
+      const project = slugToProject.get(run.taskSlug);
+      if (!project) continue;
+      if (run.status === "running" || run.status === "pending" || run.status === "scheduled") {
+        map.set(project, true);
+      }
     }
     return map;
   }, [runs, slugToProject]);
@@ -47,8 +60,8 @@ export default function Sidebar() {
           {projects.length === 0 && <div className="px-2 py-2 text-[13px] text-white/30">No projects yet</div>}
           {projects.map((project) => {
             const c = counts.get(project);
-            const badgeCount = c ? c.active || c.error : 0;
-            const badgeColor = c && c.active > 0 ? "green" : "red";
+            const badgeCount = c?.unreadCount ?? 0;
+            const badgeColor = c?.hasError ? "red" : "green";
             return (
               <SidebarProject
                 key={project}
@@ -56,6 +69,7 @@ export default function Sidebar() {
                 active={activeProject === project}
                 badgeCount={badgeCount}
                 badgeColor={badgeColor}
+                hasRunning={hasRunning.get(project) ?? false}
                 onClick={() => setActiveProject(activeProject === project ? null : project)}
               />
             );

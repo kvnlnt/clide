@@ -1,5 +1,5 @@
 import { FolderOpen, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
 import { useUIFeedback } from "./UIFeedback";
@@ -22,6 +22,12 @@ export default function ProjectSettingsPage({ path, name, onDone }: ProjectSetti
   const [newName, setNewName] = useState(name);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [trackUnread, setTrackUnread] = useState(true);
+
+  // Load trackUnread setting on mount
+  useEffect(() => {
+    void api.getTrackUnread(path).then(setTrackUnread);
+  }, [path]);
 
   const save = async () => {
     const trimmed = newName.trim();
@@ -113,6 +119,29 @@ export default function ProjectSettingsPage({ path, name, onDone }: ProjectSetti
                 {busy ? "Saving…" : "Save"}
               </button>
             </div>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-white/5 pt-4">
+            <span className="text-[12px] font-bold uppercase tracking-wider text-white/40">Results</span>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={trackUnread}
+                onChange={async (e) => {
+                  const next = e.target.checked;
+                  setTrackUnread(next);
+                  await api.setTrackUnread(path, next);
+                }}
+                className="h-4 w-4 rounded border-white/20 bg-clide-surface text-white focus:ring-0 focus:ring-offset-0"
+              />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[13px] font-medium text-white/80">Track unread results</span>
+                <span className="text-[12px] text-white/40">
+                  Show a badge when runs finish in this project
+                </span>
+              </div>
+            </label>
           </div>
 
           <div className="flex flex-col gap-3 border-t border-white/5 pt-4">

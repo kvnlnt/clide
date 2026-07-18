@@ -85,6 +85,7 @@ export default function Thread() {
                 pinned: false,
                 scheduledAt: null,
                 repeatInterval: null,
+                readAt: null,
               };
               return (
                 <TaskCard

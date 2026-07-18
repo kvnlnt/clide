@@ -309,6 +309,23 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         await pushTasksChanged();
       },
 
+      getTrackUnread: async ({ path }) => {
+        return await import("./config").then((m) => m.getTrackUnread(path));
+      },
+
+      setTrackUnread: async ({ path, trackUnread }) => {
+        const { setTrackUnread, getTrackUnread } = await import("./config");
+        const wasTracking = await getTrackUnread(path);
+        await setTrackUnread(path, trackUnread);
+        // Turning on after being off: bulk-mark existing unread as read (ticket 97).
+        if (!wasTracking && trackUnread) {
+          const { markAllRunsRead } = await import("./db/history");
+          const { markAllWorkflowRunsRead } = await import("./workflows/runStore");
+          markAllRunsRead(path);
+          await markAllWorkflowRunsRead(path);
+        }
+      },
+
       listTasks: async () => await listTasks(),
 
       getRunHistory: async ({ taskSlug, limit }) => {
@@ -663,6 +680,18 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         // clearing that timer left it firing later and recreating itself.
         if (getRun(runId)?.status === "scheduled") cancelScheduled(runId);
         else dbDeleteRun(runId);
+      },
+
+      markRunsRead: ({ runIds }) => {
+        const { markRunsRead } = require("./db/history");
+        markRunsRead(runIds);
+      },
+
+      markWorkflowRunsRead: async ({ project, runIds }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return;
+        const { markWorkflowRunsRead } = await import("./workflows/runStore");
+        await markWorkflowRunsRead(resolved.path, runIds);
       },
 
       scheduleRun: async ({ taskSlug, inputs, scheduledAt, repeatInterval }) => {

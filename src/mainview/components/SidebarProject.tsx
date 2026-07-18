@@ -3,6 +3,7 @@ interface SidebarProjectProps {
   active: boolean;
   badgeCount: number;
   badgeColor: "red" | "green" | "orange";
+  hasRunning?: boolean;
   onClick: () => void;
 }
 
@@ -13,7 +14,7 @@ const BADGE_BG: Record<string, string> = {
 };
 
 /** A plain project row: name + activity badge. Project actions live on the title tab. */
-export default function SidebarProject({ name, active, badgeCount, badgeColor, onClick }: SidebarProjectProps) {
+export default function SidebarProject({ name, active, badgeCount, badgeColor, hasRunning, onClick }: SidebarProjectProps) {
   return (
     <div
       className={`group flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 ${
@@ -31,6 +32,9 @@ export default function SidebarProject({ name, active, badgeCount, badgeColor, o
         >
           {badgeCount}
         </span>
+      )}
+      {badgeCount === 0 && hasRunning && (
+        <span className="flex h-[6px] w-[6px] shrink-0 animate-pulse rounded-full bg-white/30" title="Running" />
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import type {
   OutputType,
   RunRecord,
 } from "../types/tasks";
+import { useApp } from "../context/AppContext";
 import SubmittedSummary from "./SubmittedSummary";
 import OutputBlock from "./output/OutputBlock";
 import StatusIcon from "./statusIcon";
@@ -64,6 +65,7 @@ export default function SubmissionAccordionRow({
   onToggle,
   activeTab,
 }: SubmissionAccordionRowProps) {
+  const { markRunRead } = useApp();
   const time = formatTime(run.finishedAt ?? run.startedAt);
   const summary = summarize(form, run.inputs, run);
   const hasOutput =
@@ -72,11 +74,19 @@ export default function SubmissionAccordionRow({
     run.status === "success" ||
     run.status === "error";
 
+  const handleToggle = () => {
+    onToggle();
+    // Mark read when expanding (ticket 97). Already-read runs are harmless.
+    if (!open && (run.status === "success" || run.status === "error") && !run.readAt) {
+      void markRunRead(run.id);
+    }
+  };
+
   return (
     <div>
       <div
         className="flex cursor-pointer items-center gap-2.5 px-4 py-2.5 hover:bg-white/[0.03]"
-        onClick={onToggle}
+        onClick={handleToggle}
       >
         <span className="flex h-4 w-4 shrink-0 items-center justify-center">
           <StatusIcon status={run.status} size={14} />

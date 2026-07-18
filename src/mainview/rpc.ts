@@ -153,6 +153,20 @@ export const api = {
     await request()?.removeProject({ path, deleteFiles });
   },
 
+  async getTrackUnread(path: string): Promise<boolean> {
+    const r = request();
+    if (!r) return true; // Default to tracking
+    try {
+      return await r.getTrackUnread({ path });
+    } catch {
+      return true;
+    }
+  },
+
+  async setTrackUnread(path: string, trackUnread: boolean): Promise<void> {
+    await request()?.setTrackUnread({ path, trackUnread });
+  },
+
   async listTasks(): Promise<TaskFolder[]> {
     const r = request();
     if (!r) return [];
@@ -275,6 +289,16 @@ export const api = {
 
   async deleteRun(runId: string): Promise<void> {
     await request()?.deleteRun({ runId });
+  },
+
+  async markRunsRead(runIds: string[]): Promise<void> {
+    if (runIds.length === 0) return;
+    await request()?.markRunsRead({ runIds });
+  },
+
+  async markWorkflowRunsRead(project: string, runIds: string[]): Promise<void> {
+    if (runIds.length === 0) return;
+    await request()?.markWorkflowRunsRead({ project, runIds });
   },
 
   async scheduleRun(

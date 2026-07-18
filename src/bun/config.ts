@@ -18,6 +18,8 @@ import {
  */
 interface ProjectConfig {
   name: string;
+  /** Whether to track unread results (ticket 97). Defaults to true. */
+  trackUnread?: boolean;
 }
 
 /** In-memory registry: absolute paths of the user's project folders. */
@@ -224,4 +226,16 @@ export async function ensureDefaultProject(): Promise<Project> {
   const list = await loadProjects();
   if (list.length > 0) return list[0];
   return addProject("Default");
+}
+
+/** Get the trackUnread flag for a project (ticket 97). Defaults to true. */
+export async function getTrackUnread(path: string): Promise<boolean> {
+  const config = await readProjectConfig(path);
+  return config.trackUnread ?? true;
+}
+
+/** Set the trackUnread flag for a project (ticket 97). */
+export async function setTrackUnread(path: string, trackUnread: boolean): Promise<void> {
+  const config = await readProjectConfig(path);
+  await writeProjectConfig(path, { ...config, trackUnread });
 }

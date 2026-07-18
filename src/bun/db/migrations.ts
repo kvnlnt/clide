@@ -30,6 +30,8 @@ export function migrate(db: Database): void {
     triggered_by: "ALTER TABLE runs ADD COLUMN triggered_by TEXT",
     // Ticket 52: resolved tool + argv for command-backed forms (JSON { tool, argv }).
     resolved_command: "ALTER TABLE runs ADD COLUMN resolved_command TEXT",
+    // Ticket 97: when the run was marked read (ISO timestamp).
+    read_at: "ALTER TABLE runs ADD COLUMN read_at TEXT",
   };
 
   for (const [column, sql] of Object.entries(additions)) {
