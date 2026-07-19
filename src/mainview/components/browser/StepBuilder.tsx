@@ -1,7 +1,8 @@
 /**
- * Browser automation step builder (ticket 99 slice 2): vertical list of step
+ * Browser automation step builder (ticket 99 slice 2-3): vertical list of step
  * cards with expand/edit/reorder/enable/disable/delete controls. Each step
  * type has its own editor fields. Per-step "play" and top-level "run all".
+ * Slice 3 adds recording mode and coordinate authoring.
  */
 
 import {
@@ -9,6 +10,7 @@ import {
   ArrowUp,
   ChevronDown,
   ChevronRight,
+  Circle,
   Clock,
   Eye,
   FileText,
@@ -76,6 +78,10 @@ export default function StepBuilder({ projectPath, slug, config, onSave, readOnl
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [runningStepId, setRunningStepId] = useState<string | null>(null);
   const [stepTrace, setStepTrace] = useState<Map<string, string[]>>(new Map());
+  const [recording, setRecording] = useState(false);
+  const [recordingId, setRecordingId] = useState<string | null>(null);
+  const [recordStartUrl, setRecordStartUrl] = useState("");
+  const [showRecordPrompt, setShowRecordPrompt] = useState(false);
 
   const save = async () => {
     const updated: BrowserAutomationConfig = { steps };
@@ -111,8 +117,20 @@ export default function StepBuilder({ projectPath, slug, config, onSave, readOnl
       case "screenshot":
         newStep = { id, type: "screenshot", name: "Screenshot", enabled: true, label: "" };
         break;
+      case "coordinate":
+        newStep = {
+          id,
+          type: "coordinate",
+          name: "Coordinate action",
+          enabled: true,
+          x: 0,
+          y: 0,
+          event: "click",
+          viewport: { width: 1920, height: 1080, dpr: 1.0 },
+        };
+        break;
       default:
-        // recorded and coordinate steps are not directly addable yet (slice 3)
+        // recorded steps are only created via the recorder
         return;
     }
     setSteps([...steps, newStep]);
@@ -163,6 +181,59 @@ export default function StepBuilder({ projectPath, slug, config, onSave, readOnl
     alert("Run-all not yet implemented — use the normal task run flow");
   };
 
+  const startRecording = async () => {
+    // Prompt for start URL (default to first navigate step's URL if present)
+    const firstNav = steps.find((s) => s.type === "navigate");
+    const defaultUrl = firstNav && "url" in firstNav ? firstNav.url : "https://";
+    setRecordStartUrl(defaultUrl);
+    setShowRecordPrompt(true);
+  };
+
+  const confirmStartRecording = async () => {
+    setShowRecordPrompt(false);
+    if (!recordStartUrl) return;
+
+    const res = await api.startBrowserRecording(recordStartUrl);
+    if (res.ok && res.recordingId) {
+      setRecording(true);
+      setRecordingId(res.recordingId);
+    } else {
+      alert(`Failed to start recording: ${res.error ?? "Unknown error"}`);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recordingId) return;
+
+    const res = await api.stopBrowserRecording(recordingId);
+    if (res.ok && res.events) {
+      // Create a new "recorded" step with the captured events
+      const id = freshStepId();
+      const newStep: BrowserStep = {
+        id,
+        type: "recorded",
+        name: "Recorded interaction",
+        enabled: true,
+        events: res.events,
+      };
+      setSteps([...steps, newStep]);
+      setOpenStepId(id);
+    } else {
+      alert(`Failed to stop recording: ${res.error ?? "Unknown error"}`);
+    }
+
+    setRecording(false);
+    setRecordingId(null);
+  };
+
+  const toggleRecording = () => {
+    if (recording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
   return (
     <div className="flex h-full flex-col gap-4">
       {readOnly && (
@@ -174,6 +245,16 @@ export default function StepBuilder({ projectPath, slug, config, onSave, readOnl
       <div className="flex items-center justify-between">
         <h2 className="text-[16px] font-bold text-white">Browser Automation Steps</h2>
         <div className="flex items-center gap-2">
+          <button
+            onClick={toggleRecording}
+            disabled={readOnly}
+            className={`${buttonBase} flex items-center gap-1.5 ${
+              recording ? "bg-red-500/20 text-red-400 ring-1 ring-red-400/50" : "text-white"
+            }`}
+          >
+            <Circle size={13} className={recording ? "fill-current" : ""} />
+            {recording ? "Stop Recording" : "Record"}
+          </button>
           <button
             onClick={runAll}
             disabled={readOnly || steps.length === 0}
@@ -193,6 +274,36 @@ export default function StepBuilder({ projectPath, slug, config, onSave, readOnl
         </div>
       </div>
 
+      {showRecordPrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setShowRecordPrompt(false)}
+        >
+          <div
+            className="rounded-lg border border-clide-border bg-clide-surface p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-3 text-[14px] font-bold text-white">Start Recording</h3>
+            <label className={`${fieldLabel} mb-1 block`}>Start URL</label>
+            <input
+              className={`${inputBase} mb-3 w-[400px]`}
+              value={recordStartUrl}
+              onChange={(e) => setRecordStartUrl(e.target.value)}
+              placeholder="https://example.com"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowRecordPrompt(false)} className={`${buttonBase} text-white/70`}>
+                Cancel
+              </button>
+              <button onClick={confirmStartRecording} className={`${buttonBase} bg-white/10 text-white`}>
+                Start
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="relative">
         <button
           onClick={() => setAddMenuOpen(!addMenuOpen)}
@@ -204,17 +315,17 @@ export default function StepBuilder({ projectPath, slug, config, onSave, readOnl
         </button>
         {addMenuOpen && (
           <div className="absolute left-0 top-full z-10 mt-1 rounded-md border border-clide-border bg-clide-surface py-1 shadow-lg">
-            {(["navigate", "click", "type", "select", "wait", "extract", "assert", "screenshot"] as const).map(
-              (type) => (
-                <button
-                  key={type}
-                  onClick={() => addStep(type)}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-white hover:bg-white/5"
-                >
-                  {STEP_TYPE_LABEL[type]}
-                </button>
-              ),
-            )}
+            {(
+              ["navigate", "click", "type", "select", "wait", "extract", "assert", "screenshot", "coordinate"] as const
+            ).map((type) => (
+              <button
+                key={type}
+                onClick={() => addStep(type)}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-white hover:bg-white/5"
+              >
+                {STEP_TYPE_LABEL[type]}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -364,8 +475,37 @@ function StepEditor({ step, onUpdate, readOnly }: StepEditorProps) {
 
     case "recorded":
       return (
-        <div className="rounded-md bg-amber-400/5 px-3 py-2 text-[12px] text-amber-200">
-          Recorded steps — recording mode coming in slice 3
+        <div className="flex flex-col gap-2">
+          <label className={fieldLabel}>Name</label>
+          <input
+            className={inputBase}
+            value={step.name ?? ""}
+            onChange={(e) => onUpdate({ name: e.target.value })}
+            disabled={readOnly}
+          />
+          <label className={fieldLabel}>Recorded Events ({step.events.length})</label>
+          <div className="flex flex-col gap-1 rounded border border-clide-border bg-clide-bg p-2">
+            {step.events.map((event, i) => (
+              <div key={i} className="flex items-center gap-2 text-[11px] text-white/60">
+                <span className="font-mono text-white/80">{event.kind}</span>
+                <span className="flex-1 truncate">
+                  {event.selectors[0]?.strategy}:{event.selectors[0]?.selector}
+                </span>
+                {event.value && <span className="text-white/40">= {event.value.slice(0, 20)}</span>}
+                <button
+                  onClick={() => {
+                    const updated = step.events.filter((_, idx) => idx !== i);
+                    onUpdate({ events: updated });
+                  }}
+                  disabled={readOnly}
+                  className="text-red-400 hover:text-red-300"
+                >
+                  <Trash2 size={11} />
+                </button>
+              </div>
+            ))}
+            {step.events.length === 0 && <div className="text-[11px] text-white/40">No events</div>}
+          </div>
         </div>
       );
 
@@ -576,8 +716,91 @@ function StepEditor({ step, onUpdate, readOnly }: StepEditorProps) {
 
     case "coordinate":
       return (
-        <div className="rounded-md bg-amber-400/5 px-3 py-2 text-[12px] text-amber-200">
-          Coordinate actions — coordinate authoring UI coming in final slice
+        <div className="flex flex-col gap-2">
+          <label className={fieldLabel}>Name</label>
+          <input
+            className={inputBase}
+            value={step.name ?? ""}
+            onChange={(e) => onUpdate({ name: e.target.value })}
+            disabled={readOnly}
+          />
+          <label className={fieldLabel}>Event type</label>
+          <select
+            className={inputBase}
+            value={step.event}
+            onChange={(e) => onUpdate({ event: e.target.value as "click" | "dblclick" })}
+            disabled={readOnly}
+          >
+            <option value="click">Click</option>
+            <option value="dblclick">Double-click</option>
+          </select>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={fieldLabel}>X coordinate</label>
+              <input
+                type="number"
+                className={inputBase}
+                value={step.x}
+                onChange={(e) => onUpdate({ x: parseInt(e.target.value) || 0 })}
+                disabled={readOnly}
+              />
+            </div>
+            <div>
+              <label className={fieldLabel}>Y coordinate</label>
+              <input
+                type="number"
+                className={inputBase}
+                value={step.y}
+                onChange={(e) => onUpdate({ y: parseInt(e.target.value) || 0 })}
+                disabled={readOnly}
+              />
+            </div>
+          </div>
+          <label className={fieldLabel}>Viewport dimensions</label>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className={`${fieldLabel} text-[10px]`}>Width</label>
+              <input
+                type="number"
+                className={inputBase}
+                value={step.viewport.width}
+                onChange={(e) => onUpdate({ viewport: { ...step.viewport, width: parseInt(e.target.value) || 1920 } })}
+                disabled={readOnly}
+              />
+            </div>
+            <div>
+              <label className={`${fieldLabel} text-[10px]`}>Height</label>
+              <input
+                type="number"
+                className={inputBase}
+                value={step.viewport.height}
+                onChange={(e) => onUpdate({ viewport: { ...step.viewport, height: parseInt(e.target.value) || 1080 } })}
+                disabled={readOnly}
+              />
+            </div>
+            <div>
+              <label className={`${fieldLabel} text-[10px]`}>DPR</label>
+              <input
+                type="number"
+                step="0.1"
+                className={inputBase}
+                value={step.viewport.dpr}
+                onChange={(e) => onUpdate({ viewport: { ...step.viewport, dpr: parseFloat(e.target.value) || 1.0 } })}
+                disabled={readOnly}
+              />
+            </div>
+          </div>
+          <label className={fieldLabel}>Reference screenshot label (optional)</label>
+          <input
+            className={inputBase}
+            placeholder="e.g., login-button.png"
+            value={step.referenceShot ?? ""}
+            onChange={(e) => onUpdate({ referenceShot: e.target.value })}
+            disabled={readOnly}
+          />
+          <div className="rounded-md bg-amber-400/5 px-2 py-1.5 text-[11px] text-amber-200">
+            Note: Full click-on-live-view picker is follow-up work. For now, manually enter coordinates.
+          </div>
         </div>
       );
 

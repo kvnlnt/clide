@@ -998,7 +998,7 @@ export type ClideRPC = {
         params: { projectPath: string; workflowId: string; stepNames: string[]; newVersion: number };
         response: { ok: boolean; error?: string };
       };
-      // Native browser automation (ticket 99 slice 2) ------------------------
+      // Native browser automation (ticket 99 slice 2-3) ----------------------
       saveBrowserConfig: {
         params: { projectPath: string; slug: string; config: BrowserAutomationConfig };
         response: { ok: boolean; error?: string };
@@ -1006,6 +1006,14 @@ export type ClideRPC = {
       runBrowserStep: {
         params: { projectPath: string; slug: string; stepId: string; inputs: Record<string, unknown> };
         response: { ok: boolean; trace?: string[]; error?: string };
+      };
+      startBrowserRecording: {
+        params: { url: string };
+        response: { ok: boolean; recordingId?: string; error?: string };
+      };
+      stopBrowserRecording: {
+        params: { recordingId: string };
+        response: { ok: boolean; events?: RecordedEvent[]; error?: string };
       };
     };
     messages: {

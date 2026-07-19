@@ -637,6 +637,28 @@ export const api = {
     }
   },
 
+  async startBrowserRecording(url: string): Promise<{ ok: boolean; recordingId?: string; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.startBrowserRecording({ url });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async stopBrowserRecording(
+    recordingId: string,
+  ): Promise<{ ok: boolean; events?: import("../shared/types").RecordedEvent[]; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.stopBrowserRecording({ recordingId });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
   async savePackageManagers(list: any[]): Promise<{ ok: boolean; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };

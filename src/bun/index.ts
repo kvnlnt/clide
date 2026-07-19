@@ -1112,6 +1112,24 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           return { ok: false, error: String(err) };
         }
       },
+
+      startBrowserRecording: async ({ url }) => {
+        try {
+          const { startRecording } = await import("./browser/recorder");
+          return await startRecording(url);
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      stopBrowserRecording: async ({ recordingId }) => {
+        try {
+          const { stopRecording } = await import("./browser/recorder");
+          return await stopRecording(recordingId);
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
     },
     messages: {
       logToBun: ({ msg, type }) => {
