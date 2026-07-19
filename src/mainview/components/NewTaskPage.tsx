@@ -155,6 +155,7 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
       tool.spec,
       serviceModel.serviceId,
       serviceModel.model,
+      project || undefined,
     );
     setDraftBusy(false);
     if (!res.ok || !res.fields) {

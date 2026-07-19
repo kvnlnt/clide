@@ -2,6 +2,7 @@ import { FolderOpen, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
+import ProfileSettingsSection from "./ProfileSettingsSection";
 import { useUIFeedback } from "./UIFeedback";
 
 interface ProjectSettingsPageProps {
@@ -141,6 +142,11 @@ export default function ProjectSettingsPage({ path, name, onDone }: ProjectSetti
                 <span className="text-[12px] text-white/40">Show a badge when runs finish in this project</span>
               </div>
             </label>
+          </div>
+
+          {/* Per-project AI-interviewed profile (ticket 101). */}
+          <div className="border-t border-white/5 pt-4">
+            <ProfileSettingsSection scope="project" projectPath={path} projectName={name} />
           </div>
 
           <div className="flex flex-col gap-3 border-t border-white/5 pt-4">

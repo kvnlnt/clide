@@ -18,6 +18,7 @@ export type {
   FilterEntryType,
   GridCardLayout,
   GridCardSize,
+  InterviewTurn,
   LoopStep,
   MagicField,
   NativeTool,
@@ -27,8 +28,12 @@ export type {
   OutputTransform,
   OutputType,
   ParallelStep,
+  ProfileAmendment,
+  ProfileScope,
+  ProfileSection,
   Project,
   ProjectLayout,
+  ProjectProfile,
   RepeatInterval,
   RunRecord,
   RunStatus,
@@ -49,6 +54,7 @@ export type {
   ToolSpecPositional,
   ToolSpecSubcommand,
   UIState,
+  UserProfile,
   Workflow,
   WorkflowPlanEntry,
   WorkflowRun,
@@ -62,6 +68,16 @@ export type {
 
 // Runtime value re-exports.
 export { AI_SERVICE_KIND_LABEL, AI_SERVICE_KIND_NEEDS_BASE_URL, DEFAULT_MODEL_FOR_KIND } from "../../shared/types";
+
+// Profile section specs & converters (tickets 100/101) — shared with the bun
+// side so the review UI and the engine agree on one section shape.
+export {
+  isProfileContentEmpty,
+  projectProfileToSections,
+  sectionsToProjectProfile,
+  sectionsToUserProfile,
+  userProfileToSections,
+} from "../../shared/profile";
 
 // Pure command builder/preview — shared by the runner and the UI so the
 // preview shown always matches what will actually execute (ticket 52).

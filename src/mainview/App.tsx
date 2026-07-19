@@ -5,6 +5,7 @@ import FirstRunAIWizard from "./components/FirstRunAIWizard";
 import FirstRunWelcome from "./components/FirstRunWelcome";
 import NewProjectModal from "./components/NewProjectModal";
 import NewTaskPage from "./components/NewTaskPage";
+import ProfileInterviewPage, { ProfileOfferCard } from "./components/ProfileInterviewPage";
 import ProjectSettingsPage from "./components/ProjectSettingsPage";
 import ProjectToolbar from "./components/ProjectToolbar";
 import RunPicker from "./components/RunPicker";
@@ -55,6 +56,13 @@ function Workspace() {
     closeViewSettings,
     workflowEditor,
     closeWorkflowEditor,
+    profileInterview,
+    openProfileInterview,
+    closeProfileInterview,
+    appProfileOffer,
+    dismissAppProfileOffer,
+    projectProfileOffer,
+    dismissProjectProfileOffer,
   } = useApp();
 
   const activeProjectMeta = activeProject ? projectMeta.find((p) => p.name === activeProject) : undefined;
@@ -72,7 +80,13 @@ function Workspace() {
   const dispatchViewAction = useCallback(
     (action: string) => {
       const overlayOpen =
-        newFormOpen || appSettingsOpen || newProjectOpen || viewSettingsOpen || aiWizardOpen || workflowEditor !== null;
+        newFormOpen ||
+        appSettingsOpen ||
+        newProjectOpen ||
+        viewSettingsOpen ||
+        aiWizardOpen ||
+        workflowEditor !== null ||
+        profileInterview !== null;
       if (overlayOpen || !activeProject) return;
       const now = Date.now();
       if (lastActionRef.current.action === action && now - lastActionRef.current.at < 400) return;
@@ -109,6 +123,7 @@ function Workspace() {
       viewSettingsOpen,
       aiWizardOpen,
       workflowEditor,
+      profileInterview,
       activeProject,
       openRunPicker,
       setProjectSurface,
@@ -126,7 +141,13 @@ function Workspace() {
     const onKeyDown = (e: KeyboardEvent) => {
       // All shortcuts are inert while a blocking overlay is open or no project is active.
       const overlayOpen =
-        newFormOpen || appSettingsOpen || newProjectOpen || viewSettingsOpen || aiWizardOpen || workflowEditor !== null;
+        newFormOpen ||
+        appSettingsOpen ||
+        newProjectOpen ||
+        viewSettingsOpen ||
+        aiWizardOpen ||
+        workflowEditor !== null ||
+        profileInterview !== null;
       if (overlayOpen || !activeProject) return;
 
       // ⌘P Forms, ⌘⇧C Calendar, ⌘⇧V Views, ⌘⇧U Workflows, ⌘, Settings.
@@ -173,6 +194,7 @@ function Workspace() {
     viewSettingsOpen,
     aiWizardOpen,
     workflowEditor,
+    profileInterview,
     activeProject,
     isMac,
   ]);
@@ -282,6 +304,54 @@ function Workspace() {
           )}
         </div>
       )}
+
+      {/* AI profile interview (tickets 100/101) — same takeover mechanic, but
+          z-60: it can be launched from inside Settings and must cover it. */}
+      {profileInterview && (
+        <div className="absolute inset-0 z-[60] flex flex-col bg-clide-bg">
+          <div className="flex electrobun-webkit-app-region-drag">
+            <TrafficLights />
+          </div>
+          <ProfileInterviewPage
+            scope={profileInterview.scope}
+            projectPath={profileInterview.projectPath}
+            projectName={profileInterview.projectName}
+            onClose={closeProfileInterview}
+          />
+        </div>
+      )}
+
+      {/* Gentle profile-interview offers (tickets 100 §3 / 101 §3) — dismissible
+          corner cards, hidden while any takeover is open, never blocking. */}
+      {appProfileOffer && !profileInterview && !aiWizardOpen && !appSettingsOpen && !newFormOpen && !workflowEditor && (
+        <ProfileOfferCard
+          title="Want CLIDE to know you?"
+          body="A two-minute interview builds a profile that makes AI features personal. It stays on this machine."
+          onAccept={() => {
+            dismissAppProfileOffer();
+            openProfileInterview({ scope: "app" });
+          }}
+          onDismiss={dismissAppProfileOffer}
+        />
+      )}
+      {projectProfileOffer &&
+        !appProfileOffer &&
+        !profileInterview &&
+        !aiWizardOpen &&
+        !appSettingsOpen &&
+        !newFormOpen &&
+        !workflowEditor && (
+          <ProfileOfferCard
+            title={`Tell CLIDE about "${projectProfileOffer.name}"`}
+            body="A short interview about what this project is for makes its AI features sharper. It stays on this machine."
+            onAccept={() => {
+              const target = projectProfileOffer;
+              dismissProjectProfileOffer();
+              openProfileInterview({ scope: "project", projectPath: target.path, projectName: target.name });
+            }}
+            onDismiss={dismissProjectProfileOffer}
+          />
+        )}
 
       {/* Same reasoning as NewProjectModal above — full-window backdrop dim. */}
       {viewSettingsOpen && activeView && <ViewSettingsModal view={activeView} onClose={closeViewSettings} />}

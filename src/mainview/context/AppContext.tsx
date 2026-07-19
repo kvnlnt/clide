@@ -20,6 +20,11 @@ export interface DraftCard {
 /** Which surface the title tab's body shows. Only meaningful when no view tab is active. */
 export type ProjectSurface = "thread" | "forms" | "views" | "calendar" | "files" | "project-settings" | "workflows";
 
+/** What the profile interview takeover (tickets 100/101) is interviewing about. */
+export type ProfileInterviewTarget =
+  | { scope: "app"; projectPath?: undefined; projectName?: undefined }
+  | { scope: "project"; projectPath: string; projectName: string };
+
 interface AppState {
   forms: TaskFolder[];
   formsBySlug: Map<string, TaskFolder>;
@@ -62,6 +67,20 @@ interface AppState {
   runPickerOpen: boolean;
   openRunPicker: () => void;
   closeRunPicker: () => void;
+
+  /** Full-window AI profile interview takeover (tickets 100/101). */
+  profileInterview: ProfileInterviewTarget | null;
+  openProfileInterview: (target: ProfileInterviewTarget) => void;
+  /** saved=true bumps profileRevision so profile-displaying views reload. */
+  closeProfileInterview: (saved: boolean) => void;
+  /** Bumped whenever an interview saves a profile. */
+  profileRevision: number;
+  /** Gentle one-time app-profile offer after first-run setup completes (ticket 100 §3). */
+  appProfileOffer: boolean;
+  dismissAppProfileOffer: () => void;
+  /** Post-creation "tell CLIDE about this project" offer (ticket 101 §3). */
+  projectProfileOffer: { path: string; name: string } | null;
+  dismissProjectProfileOffer: () => void;
 
   /** Saved thread views for the active project. "All" is implicit (activeViewId === null). */
   views: ThreadView[];
@@ -187,6 +206,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [aiWizardChained, setAiWizardChained] = useState(false);
   /** Skipped for this launch — don't re-open until the app restarts. */
   const aiWizardSkippedRef = useRef(false);
+  const [profileInterview, setProfileInterview] = useState<ProfileInterviewTarget | null>(null);
+  const [profileRevision, setProfileRevision] = useState(0);
+  const [appProfileOffer, setAppProfileOffer] = useState(false);
+  /** The app-profile offer is one-shot per launch — never re-raised after any dismissal. */
+  const appProfileOfferedRef = useRef(false);
+  const [projectProfileOffer, setProjectProfileOffer] = useState<{ path: string; name: string } | null>(null);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [workflowEditor, setWorkflowEditor] = useState<
     { mode: "new" } | { mode: "edit"; workflow: Workflow; focusName?: boolean } | null
@@ -436,7 +461,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     aiWizardSkippedRef.current = true;
     setAiWizardOpen(false);
   }, []);
-  const notifyAIServiceAdded = useCallback(() => setAiWizardOpen(false), []);
+  const notifyAIServiceAdded = useCallback(() => {
+    setAiWizardOpen(false);
+    // First-run setup just completed — offer the profile interview once,
+    // never forced (ticket 100 §3). Only when no profile exists yet.
+    if (!appProfileOfferedRef.current) {
+      void api.getUserProfile().then((profile) => {
+        if (!profile && !appProfileOfferedRef.current) {
+          appProfileOfferedRef.current = true;
+          setAppProfileOffer(true);
+        }
+      });
+    }
+  }, []);
   const openAIWizard = useCallback((chained = false) => {
     if (aiWizardSkippedRef.current) return;
     setAiWizardChained(chained);
@@ -444,6 +481,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
   const openRunPicker = useCallback(() => setRunPickerOpen(true), []);
   const closeRunPicker = useCallback(() => setRunPickerOpen(false), []);
+  const openProfileInterview = useCallback((target: ProfileInterviewTarget) => setProfileInterview(target), []);
+  const closeProfileInterview = useCallback((saved: boolean) => {
+    setProfileInterview(null);
+    if (saved) setProfileRevision((r) => r + 1);
+  }, []);
+  const dismissAppProfileOffer = useCallback(() => setAppProfileOffer(false), []);
+  const dismissProjectProfileOffer = useCallback(() => setProjectProfileOffer(null), []);
   const openViewSettings = useCallback(() => setViewSettingsOpen(true), []);
   const closeViewSettings = useCallback(() => setViewSettingsOpen(false), []);
 
@@ -504,14 +548,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const createProject = useCallback(
     async (name: string, path?: string) => {
+      const wasFirstProject = projectList.length === 0;
       const res = await api.addProject(name, path);
       if (res.ok) {
         await refreshProjects();
-        if (res.project) setActiveProject(res.project.name);
+        if (res.project) {
+          setActiveProject(res.project.name);
+          // Offer the project interview (ticket 101 §3) — dismissible, never
+          // blocks the thread. The very first project skips it: the first-run
+          // chain (AI wizard → app-profile offer) owns that onboarding moment.
+          if (!wasFirstProject) setProjectProfileOffer({ path: res.project.path, name: res.project.name });
+        }
       }
       return { ok: res.ok, error: res.error };
     },
-    [refreshProjects],
+    [refreshProjects, projectList],
   );
 
   const renameProject = useCallback(
@@ -667,6 +718,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     runPickerOpen,
     openRunPicker,
     closeRunPicker,
+    profileInterview,
+    openProfileInterview,
+    closeProfileInterview,
+    profileRevision,
+    appProfileOffer,
+    dismissAppProfileOffer,
+    projectProfileOffer,
+    dismissProjectProfileOffer,
     views,
     activeViewId,
     setActiveView,

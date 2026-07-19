@@ -450,6 +450,63 @@ export interface RunArtifact {
   source: RunArtifactSource;
 }
 
+// Profiles (tickets 100/101) --------------------------------------------------
+// An AI-led interview produces a structured profile that feeds every AI
+// feature as standing context. Sections are plain text/markdown — human-
+// readable, human-editable, no opaque blobs.
+
+export type ProfileScope = "app" | "project";
+
+/** App-scoped user profile (ticket 100), stored at dev.clide/profile.json. */
+export interface UserProfile {
+  identity: string;
+  roles: string;
+  responsibilities: string;
+  goals: string[];
+  frustrations: string[];
+  updatedAt: string;
+  interviewCount: number;
+  /** The AI's own accumulated interviewing notes: post-session self-critiques
+   *  and rejected amendments, seeding the next session's question generation. */
+  selfNotes: string;
+}
+
+/** Project-scoped profile (ticket 101), stored at <projectPath>/profile.json. */
+export interface ProjectProfile {
+  purpose: string;
+  userRole: string;
+  responsibilities: string;
+  goals: string[];
+  frustrations: string[];
+  updatedAt: string;
+  interviewCount: number;
+  selfNotes: string;
+}
+
+/** One asked/answered turn of a profile interview. Empty answer = skipped. */
+export interface InterviewTurn {
+  question: string;
+  answer: string;
+}
+
+/** One editable section of a profile draft, as shown on the review screen. */
+export interface ProfileSection {
+  id: string;
+  label: string;
+  kind: "text" | "list";
+  value: string | string[];
+}
+
+/** One proposed change from a reflection pass — always a reviewed diff, never auto-applied. */
+export interface ProfileAmendment {
+  sectionId: string;
+  label: string;
+  kind: "text" | "list";
+  current: string | string[];
+  proposed: string | string[];
+  reason: string;
+}
+
 // Package manager discovery/search/install ----------------------------------
 
 export interface PackageManagerInfo {
@@ -773,6 +830,53 @@ export type ClideRPC = {
         };
         response: { ok: boolean; values?: Record<string, unknown>; error?: string };
       };
+      // Profiles (tickets 100/101) --------------------------------------------
+      getUserProfile: { params: Record<string, never>; response: UserProfile | null };
+      saveUserProfile: {
+        params: { profile: UserProfile };
+        response: { ok: boolean; error?: string };
+      };
+      deleteUserProfile: { params: Record<string, never>; response: void };
+      getProjectProfile: { params: { projectPath: string }; response: ProjectProfile | null };
+      saveProjectProfile: {
+        params: { projectPath: string; profile: ProjectProfile };
+        response: { ok: boolean; error?: string };
+      };
+      deleteProjectProfile: { params: { projectPath: string }; response: void };
+      /** Next interview question given the transcript so far; done ends the session. */
+      profileInterviewNext: {
+        params: { scope: ProfileScope; projectPath?: string; transcript: InterviewTurn[] };
+        response: { ok: boolean; question?: string; done?: boolean; error?: string };
+      };
+      /** Draft profile sections from the transcript + run the engine's self-critique (§4). */
+      profileInterviewFinish: {
+        params: { scope: ProfileScope; projectPath?: string; transcript: InterviewTurn[] };
+        response: {
+          ok: boolean;
+          sections?: ProfileSection[];
+          selfNotes?: string;
+          /** Project scope with no app profile yet: the review screen suggests the app interview. */
+          suggestAppInterview?: boolean;
+          error?: string;
+        };
+      };
+      /** Reflection over recent activity → proposed amendments (reviewed diff, ticket 100 §4). */
+      profileReflect: {
+        params: { scope: ProfileScope; projectPath?: string };
+        response: {
+          ok: boolean;
+          amendments?: ProfileAmendment[];
+          /** Project reflections may surface app-profile suggestions (ticket 101 §4). */
+          appAmendments?: ProfileAmendment[];
+          error?: string;
+        };
+      };
+      /** Record a rejected amendment in selfNotes so it isn't re-proposed. */
+      recordProfileRejection: {
+        params: { scope: ProfileScope; projectPath?: string; note: string };
+        response: void;
+      };
+
       // Tool registry & inspection (ticket 53) --------------------------------
       listTools: { params: Record<string, never>; response: ToolRegistryEntry[] };
       listNativeTools: { params: Record<string, never>; response: NativeTool[] };
@@ -875,6 +979,8 @@ export type ClideRPC = {
           spec: ToolSpec;
           serviceId: string;
           model: string;
+          /** Project name, when drafting inside one — pulls the project profile into context (ticket 101). */
+          project?: string;
         };
         response: { ok: boolean; fields?: TaskField[]; error?: string };
       };

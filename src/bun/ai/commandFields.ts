@@ -1,4 +1,5 @@
 import type { AIService, ArgMapping, ArgMappingKind, FieldType, TaskField, ToolSpec } from "../../shared/types";
+import { profileContext } from "./profileContext";
 import { complete } from "./providers";
 
 function extractJson(text: string): unknown {
@@ -80,13 +81,20 @@ export async function draftCommandFields(
   spec: ToolSpec,
   service: AIService,
   model: string,
+  projectPath?: string,
+  projectName?: string,
 ): Promise<TaskField[]> {
+  // Standing profile context (tickets 100/101) — capped, background only.
+  const profile = await profileContext(projectPath, projectName);
   const user = [
+    profile || null,
     `The form's goal, as stated by the user: ${goal}`,
     `Tool: ${toolName}`,
     `Action: ${actionName}`,
     `Tool spec:\n${JSON.stringify(spec, null, 2)}`,
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   const raw = await complete({ ...service, model }, { system: SYSTEM_PROMPT, user });
   const parsed = extractJson(raw);
   const list = isObject(parsed) && Array.isArray(parsed.fields) ? parsed.fields : [];

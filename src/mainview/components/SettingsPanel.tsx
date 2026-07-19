@@ -6,6 +6,7 @@ import { AI_SERVICE_KIND_LABEL, AI_SERVICE_KIND_NEEDS_BASE_URL } from "../types/
 import { FilesPage } from "./files/FilesPage";
 import { useEscapeToClose } from "./Modal";
 import PackageManagersSection from "./PackageManagersSection";
+import ProfileSettingsSection from "./ProfileSettingsSection";
 import ToolsSection from "./ToolsSection";
 import { useUIFeedback } from "./UIFeedback";
 
@@ -154,6 +155,11 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
               )}
             </div>
           )}
+
+          {/* Who CLIDE is working for (ticket 100) — app-scoped profile. */}
+          <div className="mt-6">
+            <ProfileSettingsSection scope="app" />
+          </div>
 
           {/* Tools registry (ticket 57) — machine-global, so it lives here, not on a project toolbar. */}
           <div className="mt-6">

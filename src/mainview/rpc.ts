@@ -3,12 +3,17 @@ import type {
   AIService,
   ClideRPC,
   CommandSpec,
+  InterviewTurn,
   OutputChunk,
   OutputDefinition,
   OutputResult,
   OutputType,
+  ProfileAmendment,
+  ProfileScope,
+  ProfileSection,
   Project,
   ProjectLayout,
+  ProjectProfile,
   RepeatInterval,
   RunRecord,
   RunStatusUpdate,
@@ -20,6 +25,7 @@ import type {
   ToolSource,
   ToolSpec,
   UIState,
+  UserProfile,
   Workflow,
   WorkflowPlanEntry,
   WorkflowRun,
@@ -281,6 +287,107 @@ export const api = {
     } catch (err) {
       return { ok: false, error: String(err) };
     }
+  },
+
+  // Profiles (tickets 100/101) ------------------------------------------------
+
+  async getUserProfile(): Promise<UserProfile | null> {
+    const r = request();
+    if (!r) return null;
+    try {
+      return await r.getUserProfile({});
+    } catch {
+      return null;
+    }
+  },
+
+  async saveUserProfile(profile: UserProfile): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.saveUserProfile({ profile });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async deleteUserProfile(): Promise<void> {
+    await request()?.deleteUserProfile({});
+  },
+
+  async getProjectProfile(projectPath: string): Promise<ProjectProfile | null> {
+    const r = request();
+    if (!r) return null;
+    try {
+      return await r.getProjectProfile({ projectPath });
+    } catch {
+      return null;
+    }
+  },
+
+  async saveProjectProfile(projectPath: string, profile: ProjectProfile): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.saveProjectProfile({ projectPath, profile });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async deleteProjectProfile(projectPath: string): Promise<void> {
+    await request()?.deleteProjectProfile({ projectPath });
+  },
+
+  async profileInterviewNext(
+    scope: ProfileScope,
+    projectPath: string | undefined,
+    transcript: InterviewTurn[],
+  ): Promise<{ ok: boolean; question?: string; done?: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.profileInterviewNext({ scope, projectPath, transcript });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async profileInterviewFinish(
+    scope: ProfileScope,
+    projectPath: string | undefined,
+    transcript: InterviewTurn[],
+  ): Promise<{
+    ok: boolean;
+    sections?: ProfileSection[];
+    selfNotes?: string;
+    suggestAppInterview?: boolean;
+    error?: string;
+  }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.profileInterviewFinish({ scope, projectPath, transcript });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async profileReflect(
+    scope: ProfileScope,
+    projectPath?: string,
+  ): Promise<{ ok: boolean; amendments?: ProfileAmendment[]; appAmendments?: ProfileAmendment[]; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.profileReflect({ scope, projectPath });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async recordProfileRejection(scope: ProfileScope, projectPath: string | undefined, note: string): Promise<void> {
+    await request()?.recordProfileRejection({ scope, projectPath, note });
   },
 
   async setPinned(runId: string, pinned: boolean): Promise<void> {
@@ -763,11 +870,12 @@ export const api = {
     spec: ToolSpec,
     serviceId: string,
     model: string,
+    project?: string,
   ): Promise<{ ok: boolean; fields?: TaskField[]; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
-      return await r.draftCommandFields({ goal, toolName, actionName, spec, serviceId, model });
+      return await r.draftCommandFields({ goal, toolName, actionName, spec, serviceId, model, project });
     } catch (err) {
       return { ok: false, error: String(err) };
     }

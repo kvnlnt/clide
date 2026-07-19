@@ -1,6 +1,7 @@
 import { maskSecrets } from "../../shared/secrets";
 import type { AIService, OutputResult, TaskFolder, Workflow, WorkflowRun } from "../../shared/types";
 import { getDefaultAIService, legacyProviderForKind, listAIServices } from "./aiServices";
+import { profileContext } from "./profileContext";
 import { complete } from "./providers";
 
 /** Max chars of stdout/stderr included in the summary prompt (ticket 98). */
@@ -28,8 +29,8 @@ function truncateOutput(text: string, maxChars: number): string {
 
 /**
  * Compose the self-reflection prompt for a run (ticket 98).
- * This is the ONE function that assembles the prompt — ticket 100 will
- * prepend a profile block here later.
+ * This is the ONE function that assembles the prompt — the profile block
+ * (tickets 100/101) is passed in and appended to the system prompt here.
  */
 function buildPrompt(
   folder: TaskFolder,
@@ -38,6 +39,7 @@ function buildPrompt(
   stdout: string,
   stderr: string,
   outputs: OutputResult[],
+  profileBlock: string,
 ): { system: string; user: string } {
   const maskedInputs = maskSecrets(inputs, folder.task.fields);
 
@@ -63,6 +65,7 @@ function buildPrompt(
     "The summary is ~90 chars max, no leading status word (success/error).",
     "The icon already shows success/failure — your line says WHAT and WHY.",
     'Examples: "Backed up ~/Documents → 42 MB zip", "Publish failed: network unreachable"',
+    ...(profileBlock ? ["", profileBlock] : []),
   ].join("\n");
 
   const user = [
@@ -96,7 +99,8 @@ export async function generateRunSummary(
     const service = await resolveService(folder);
     if (!service) return null; // No AI configured — skip silently
 
-    const { system, user } = buildPrompt(folder, inputs, exitCode, stdout, stderr, outputs);
+    const profileBlock = await profileContext(folder.projectPath, folder.meta.project);
+    const { system, user } = buildPrompt(folder, inputs, exitCode, stdout, stderr, outputs, profileBlock);
     const raw = await complete(service, { system, user });
 
     // Extract first non-empty line, trim to ~90 chars
@@ -169,11 +173,14 @@ export async function generateWorkflowSummary(workflow: Workflow, run: WorkflowR
     const failedSteps = run.records.filter((r) => r.status === "failed");
     const succeededSteps = run.records.filter((r) => r.status === "succeeded");
 
+    // Workflow runs don't carry a project path here — app profile only.
+    const profileBlock = await profileContext();
     const system = [
       "You generate one-line status summaries for CLIDE workflow runs.",
       "The summary is ~90 chars max, no leading status word (success/error).",
       "The icon already shows success/failure — your line says WHAT and WHY.",
       'Examples: "Processed 3 images, uploaded to S3", "Build failed: missing dependency"',
+      ...(profileBlock ? ["", profileBlock] : []),
     ].join("\n");
 
     const user = [

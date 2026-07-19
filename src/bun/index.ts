@@ -4,6 +4,7 @@ import { extname, join, resolve, sep } from "node:path";
 import type {
   ClideRPC,
   OutputChunk,
+  ProfileScope,
   Project,
   RunStatusUpdate,
   ToolRegistryEntry,
@@ -11,10 +12,26 @@ import type {
   Workflow,
   WorkflowRunTriggerInfo,
 } from "../shared/types";
-import { getAIService, listAIServices, listServiceModels, saveAIServices, testAIService } from "./ai/aiServices";
+import { projectProfileToSections, userProfileToSections } from "../shared/profile";
+import {
+  getAIService,
+  getDefaultAIService,
+  listAIServices,
+  listServiceModels,
+  saveAIServices,
+  testAIService,
+} from "./ai/aiServices";
 import { draftCommandFields } from "./ai/commandFields";
 import { hasCredential, saveCredential } from "./ai/credentials";
+import {
+  critiqueInterviewSession,
+  draftProfileSections,
+  nextInterviewQuestion,
+  reflectOnActivity,
+  type InterviewContext,
+} from "./ai/interview";
 import { fillMagicFields } from "./ai/magicFill";
+import { renderUserProfileBlock } from "./ai/profileContext";
 import { distillToolSpec, suggestTools } from "./ai/toolSpec";
 import { draftWorkflow } from "./ai/workflowDraft";
 import {
@@ -28,6 +45,18 @@ import {
 } from "./config";
 import { deleteRun as dbDeleteRun, getAllRuns, getRun, getRunHistory, indexRuns, setPinned } from "./db/history";
 import { formDir, projectFormsDir } from "./paths";
+import {
+  appendUserSelfNote,
+  deleteUserProfile as deleteUserProfileFile,
+  readUserProfile,
+  writeUserProfile,
+} from "./profile";
+import {
+  appendProjectSelfNote,
+  deleteProjectProfile as deleteProjectProfileFile,
+  readProjectProfile,
+  writeProjectProfile,
+} from "./projectProfile";
 import { cancelRun, readRunOutputs, setRunCompletionListener, startRun, type RunEmitters } from "./runner/execute";
 import {
   cancelScheduled,
@@ -267,6 +296,84 @@ async function resolveOrCreateEntry(
 }
 
 // ---------------------------------------------------------------------------
+// Profile interview helpers (tickets 100/101).
+// ---------------------------------------------------------------------------
+
+/** Assemble the scope-specific engine context: schema sections, existing profile, selfNotes, app context. */
+async function buildInterviewContext(scope: ProfileScope, projectPath?: string): Promise<InterviewContext> {
+  if (scope === "project") {
+    if (!projectPath) throw new Error("projectPath required for project-scope profiles");
+    const [proj, app, projects] = await Promise.all([
+      readProjectProfile(projectPath),
+      readUserProfile(),
+      listProjects(),
+    ]);
+    return {
+      scope,
+      projectName: projects.find((p) => p.path === projectPath)?.name ?? basename(projectPath),
+      existing: projectProfileToSections(proj),
+      hasProfile: proj !== null,
+      selfNotes: proj?.selfNotes ?? "",
+      appProfileBlock: app ? renderUserProfileBlock(app) || null : null,
+      appSections: app ? userProfileToSections(app) : undefined,
+    };
+  }
+  const app = await readUserProfile();
+  return {
+    scope,
+    existing: userProfileToSections(app),
+    hasProfile: app !== null,
+    selfNotes: app?.selfNotes ?? "",
+    appProfileBlock: null,
+  };
+}
+
+/**
+ * Compact recent-usage digest for the reflection pass (ticket 100 §4). Built
+ * from task names, statuses and (already secret-masked) run summaries only —
+ * raw inputs never reach the prompt.
+ */
+async function buildActivitySummary(scope: ProfileScope, projectPath?: string): Promise<string> {
+  const projects = await listProjects();
+  const scoped = scope === "project" ? projects.filter((p) => p.path === projectPath) : projects;
+  const paths = scoped.map((p) => p.path);
+  if (paths.length === 0) return "(no activity recorded)";
+
+  const tasks = await listTasks();
+  const nameBySlug = new Map(tasks.map((t) => [t.meta.slug, t.meta.name]));
+  const runs = getAllRuns(paths).slice(0, 200);
+
+  const byTask = new Map<string, { total: number; error: number; summaries: string[] }>();
+  for (const run of runs) {
+    const entry = byTask.get(run.taskSlug) ?? { total: 0, error: 0, summaries: [] };
+    entry.total += 1;
+    if (run.status === "error") entry.error += 1;
+    if (run.summary && entry.summaries.length < 2) entry.summaries.push(run.summary);
+    byTask.set(run.taskSlug, entry);
+  }
+
+  const lines = [...byTask.entries()]
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 25)
+    .map(([slug, e]) => {
+      const label = nameBySlug.get(slug) ?? slug;
+      const failures = e.error > 0 ? `, ${e.error} failed` : "";
+      const samples = e.summaries.length > 0 ? ` — e.g. ${e.summaries.join(" / ")}` : "";
+      return `- Task "${label}": ${e.total} recent runs${failures}${samples}`;
+    });
+
+  if (scope === "app") {
+    const taskCounts = new Map<string, number>();
+    for (const t of tasks) taskCounts.set(t.meta.project, (taskCounts.get(t.meta.project) ?? 0) + 1);
+    lines.unshift(
+      `Projects: ${scoped.map((p) => `"${p.name}" (${taskCounts.get(p.name) ?? 0} tasks)`).join(", ")}`,
+    );
+  }
+
+  return lines.length > 0 ? lines.join("\n") : "(no activity recorded)";
+}
+
+// ---------------------------------------------------------------------------
 // RPC definition.
 // ---------------------------------------------------------------------------
 const rpc = BrowserView.defineRPC<ClideRPC>({
@@ -381,6 +488,92 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         } catch (err) {
           return { ok: false, error: String(err) };
         }
+      },
+
+      // Profiles (tickets 100/101) --------------------------------------------
+
+      getUserProfile: async () => await readUserProfile(),
+
+      saveUserProfile: async ({ profile }) => {
+        try {
+          await writeUserProfile(profile);
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      deleteUserProfile: async () => {
+        deleteUserProfileFile();
+      },
+
+      getProjectProfile: async ({ projectPath }) => await readProjectProfile(projectPath),
+
+      saveProjectProfile: async ({ projectPath, profile }) => {
+        try {
+          await writeProjectProfile(projectPath, profile);
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      deleteProjectProfile: async ({ projectPath }) => {
+        deleteProjectProfileFile(projectPath);
+      },
+
+      profileInterviewNext: async ({ scope, projectPath, transcript }) => {
+        try {
+          const service = await getDefaultAIService();
+          if (!service) return { ok: false, error: "No AI service configured — add one in Settings" };
+          const ctx = await buildInterviewContext(scope, projectPath);
+          const { question } = await nextInterviewQuestion(service, ctx, transcript);
+          return question ? { ok: true, question } : { ok: true, done: true };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      profileInterviewFinish: async ({ scope, projectPath, transcript }) => {
+        try {
+          const service = await getDefaultAIService();
+          if (!service) return { ok: false, error: "No AI service configured — add one in Settings" };
+          const ctx = await buildInterviewContext(scope, projectPath);
+          const sections = await draftProfileSections(service, ctx, transcript);
+          // Self-critique (§4) is best-effort — a drafted profile never fails on it.
+          let selfNotes = ctx.selfNotes;
+          try {
+            selfNotes = await critiqueInterviewSession(service, ctx, transcript);
+          } catch (err) {
+            console.warn("[interview] self-critique failed:", err);
+          }
+          return {
+            ok: true,
+            sections,
+            selfNotes,
+            suggestAppInterview: scope === "project" && ctx.appProfileBlock === null,
+          };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      profileReflect: async ({ scope, projectPath }) => {
+        try {
+          const service = await getDefaultAIService();
+          if (!service) return { ok: false, error: "No AI service configured — add one in Settings" };
+          const ctx = await buildInterviewContext(scope, projectPath);
+          const activity = await buildActivitySummary(scope, projectPath);
+          const { amendments, appAmendments } = await reflectOnActivity(service, ctx, activity);
+          return { ok: true, amendments, appAmendments };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      recordProfileRejection: async ({ scope, projectPath, note }) => {
+        if (scope === "project" && projectPath) await appendProjectSelfNote(projectPath, note);
+        else await appendUserSelfNote(note);
       },
 
       listTools: async () => await listRegisteredTools(),
@@ -657,11 +850,21 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
-      draftCommandFields: async ({ goal, toolName, actionName, spec, serviceId, model }) => {
+      draftCommandFields: async ({ goal, toolName, actionName, spec, serviceId, model, project }) => {
         const service = await getAIService(serviceId);
         if (!service) return { ok: false, error: "Selected AI service not found." };
         try {
-          const fields = await draftCommandFields(goal, toolName, actionName, spec, service, model);
+          const resolved = project ? await pathForProjectName(project) : null;
+          const fields = await draftCommandFields(
+            goal,
+            toolName,
+            actionName,
+            spec,
+            service,
+            model,
+            resolved?.path,
+            resolved?.name,
+          );
           return { ok: true, fields };
         } catch (err) {
           return { ok: false, error: String(err) };
@@ -981,7 +1184,7 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         const tasks = (await listTasks()).filter((f) => f.meta.project === resolved.name);
         if (tasks.length === 0) return { ok: false, error: "This project has no tasks yet — create one first." };
         try {
-          const { workflow, notes } = await draftWorkflow(goal, name, tasks, service, model);
+          const { workflow, notes } = await draftWorkflow(goal, name, tasks, service, model, resolved.path, resolved.name);
           return { ok: true, workflow, notes };
         } catch (err) {
           return { ok: false, error: String(err) };

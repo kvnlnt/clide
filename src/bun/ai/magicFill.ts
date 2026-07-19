@@ -1,5 +1,6 @@
 import type { AIService, TaskField, TaskFolder } from "../../shared/types";
 import { getDefaultAIService, legacyProviderForKind, listAIServices } from "./aiServices";
+import { profileContext } from "./profileContext";
 import { complete } from "./providers";
 
 /** The form's creation service kind when a matching service exists, else the default service. */
@@ -102,7 +103,10 @@ export async function fillMagicFields(
     `Fields to fill:\n${JSON.stringify(fieldSpecs, null, 2)}`,
   ].join("\n\n");
 
-  const raw = await complete(service, { system, user });
+  // Standing profile context (tickets 100/101) — capped, appended to the system prompt.
+  const profile = await profileContext(folder.projectPath, folder.meta.project);
+
+  const raw = await complete(service, { system: profile ? `${system}\n\n${profile}` : system, user });
   const parsed = extractJson(raw);
   if (typeof parsed !== "object" || parsed === null) return {};
 

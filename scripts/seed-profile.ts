@@ -21,6 +21,8 @@ import { saveAIServices } from "../src/bun/ai/aiServices";
 import { addProject } from "../src/bun/config";
 import { createRun, setPinned, updateRunStatus } from "../src/bun/db/history";
 import { appDataDir, ensureDir, formDir } from "../src/bun/paths";
+import { writeUserProfile } from "../src/bun/profile";
+import { writeProjectProfile } from "../src/bun/projectProfile";
 import { writeViews } from "../src/bun/tasks/views";
 import { slugify } from "../src/bun/tasks/writer";
 import { writeUIState } from "../src/bun/uiState";
@@ -282,6 +284,21 @@ async function seedRegular(): Promise<void> {
     recents.push(project.name);
     const slugs = await Promise.all(TEMPLATES.map((t) => writeTemplateForm(project.path, project.name, t, now)));
 
+    // Canned project profile on the first project (tickets 100/101) so this
+    // persona exercises the profile-context injection paths.
+    if (p === 0) {
+      await writeProjectProfile(project.path, {
+        purpose: "Keeps the company marketing site fresh: content updates, image optimization, deploy checks.",
+        userRole: "You own the site end to end — content, assets and publishing.",
+        responsibilities: "Weekly content refreshes, image pipeline, verifying deploys didn't break pages.",
+        goals: ["Publish updates without touching a terminal", "Catch broken deploys before visitors do"],
+        frustrations: ["Manual image resizing", "Deploys silently failing at 5pm on Fridays"],
+        updatedAt: now,
+        interviewCount: 1,
+        selfNotes: "",
+      });
+    }
+
     // ~60 runs per project, spread over the last ~45 days, mostly success with some failures.
     for (let i = 0; i < 60; i++) {
       const daysAgo = Math.floor((i / 60) * 45);
@@ -310,6 +327,18 @@ async function seedRegular(): Promise<void> {
     },
     { id: crypto.randomUUID(), name: "Work Claude", kind: "anthropic" },
   ]);
+  // Canned app profile (ticket 100) — every AI feature in this persona runs
+  // with standing profile context, like a real interviewed user.
+  await writeUserProfile({
+    identity: "You are a marketing ops generalist at a small SaaS company, comfortable with tools but not a coder.",
+    roles: "Marketing operations; unofficial 'automation person' for the team.",
+    responsibilities: "Website updates, the weekly podcast, data backups and small internal tooling.",
+    goals: ["Automate the repetitive weekly grind", "Stop depending on engineers for one-line scripts"],
+    frustrations: ["Cryptic command-line errors", "Tasks that silently fail overnight"],
+    updatedAt: now,
+    interviewCount: 1,
+    selfNotes: "",
+  });
   await writeUIState({ activeProject: null, activeViewByProject: {}, recentProjects: recents });
 }
 
