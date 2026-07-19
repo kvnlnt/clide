@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../rpc";
 import type { AIService, AIServiceKind } from "../types/tasks";
 import { AI_SERVICE_KIND_LABEL, AI_SERVICE_KIND_NEEDS_BASE_URL } from "../types/tasks";
+import { FilesPage } from "./files/FilesPage";
 import { useEscapeToClose } from "./Modal";
 import PackageManagersSection from "./PackageManagersSection";
 import ToolsSection from "./ToolsSection";
@@ -161,8 +162,37 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
           <div className="mt-6">
             <PackageManagersSection />
           </div>
+
+          {/* Files (ticket 102) — app-scoped VFS locations. */}
+          <div className="mt-6">
+            <FilesSection />
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Files section for app-scoped VFS locations (ticket 102). */
+function FilesSection() {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between rounded-md px-3 py-2 text-[12px] font-bold uppercase tracking-wider text-white/40 hover:bg-white/5"
+      >
+        <span>Files</span>
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      </button>
+      {expanded && (
+        <div className="mt-2 rounded-md border border-white/10 bg-white/[0.02] overflow-hidden">
+          <div className="h-[500px]">
+            <FilesPage scope="app" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

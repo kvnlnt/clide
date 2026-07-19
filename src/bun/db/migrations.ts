@@ -44,4 +44,19 @@ export function migrate(db: Database): void {
 
   db.run(`CREATE INDEX IF NOT EXISTS idx_runs_form ON runs(form_slug);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_runs_started ON runs(started_at);`);
+
+  // Ticket 102: run artifacts table (files touched by a run).
+  db.run(`
+		CREATE TABLE IF NOT EXISTS run_artifacts (
+			run_id TEXT NOT NULL,
+			uri TEXT NOT NULL,
+			name TEXT NOT NULL,
+			kind TEXT NOT NULL,
+			size INTEGER,
+			mime TEXT,
+			source TEXT NOT NULL,
+			FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
+		);
+	`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_artifacts_run ON run_artifacts(run_id);`);
 }

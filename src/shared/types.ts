@@ -179,6 +179,8 @@ export interface TaskDefinition {
   engine?: "command" | "native";
   /** Native tool id when engine === "native", e.g. "browser-automation" (ticket 99). */
   nativeTool?: string;
+  /** File locations this task works with, for artifact detection (ticket 102). */
+  fileAssociations?: { locationId: string; pattern?: string }[];
 }
 
 // Tool registry & AI inspection (ticket 53) ----------------------------------
@@ -404,6 +406,48 @@ export interface RunStatusUpdate {
   finishedAt: string | null;
   /** AI-generated summary (ticket 98), streamed when available. */
   summary?: string | null;
+}
+
+// VFS & Run Artifacts (ticket 102) -------------------------------------------
+
+export type VfsLocationScope = "app" | "project";
+
+/** A registered file location (local disk, Dropbox, Google Drive, etc.). */
+export interface VfsLocation {
+  id: string;
+  name: string;
+  /** Provider id: "local", "dropbox", "gdrive". */
+  provider: string;
+  /** Provider-specific config, e.g. { root: "/Users/..." } for local. */
+  config: Record<string, unknown>;
+  scope: VfsLocationScope;
+  /** Project path when scope === "project"; undefined otherwise. */
+  project?: string;
+  /** Opt-in fs watching (off by default). */
+  watch?: boolean;
+}
+
+export interface VfsStatResult {
+  name: string;
+  size: number;
+  mtime: string;
+  isDirectory: boolean;
+}
+
+export type RunArtifactKind = "created" | "modified" | "deleted";
+export type RunArtifactSource = "declared" | "observed";
+
+/** A file touched by a run (ticket 102). */
+export interface RunArtifact {
+  runId: string;
+  /** Provider-scoped URI, e.g. "local:///Users/..." or "dropbox:/reports/q3.pdf". */
+  uri: string;
+  name: string;
+  kind: RunArtifactKind;
+  size?: number;
+  mime?: string;
+  /** "declared" = from output definitions; "observed" = from snapshot diff. */
+  source: RunArtifactSource;
 }
 
 // Package manager discovery/search/install ----------------------------------
@@ -865,6 +909,48 @@ export type ClideRPC = {
       getRunOutputs: {
         params: { runId: string };
         response: OutputResult[];
+      };
+
+      // VFS & file locations (ticket 102) -------------------------------------
+      listVfsLocations: {
+        params: { project?: string };
+        response: VfsLocation[];
+      };
+      addVfsLocation: {
+        params: { location: VfsLocation };
+        response: { ok: boolean; error?: string };
+      };
+      updateVfsLocation: {
+        params: { location: VfsLocation };
+        response: { ok: boolean; error?: string };
+      };
+      removeVfsLocation: {
+        params: { id: string; project?: string };
+        response: { ok: boolean; error?: string };
+      };
+      vfsList: {
+        params: { locationId: string; path?: string };
+        response: { entries: VfsStatResult[]; error?: string };
+      };
+      vfsStat: {
+        params: { locationId: string; path: string };
+        response: VfsStatResult | null;
+      };
+      vfsSearch: {
+        params: { locationId: string; query: string };
+        response: { paths: string[]; truncated?: boolean; error?: string };
+      };
+      vfsOpen: {
+        params: { locationId: string; path: string; reveal?: boolean };
+        response: { ok: boolean; error?: string };
+      };
+      vfsReadPreview: {
+        params: { locationId: string; path: string; maxBytes?: number };
+        response: { base64: string; mime: string; error?: string };
+      };
+      getRunArtifacts: {
+        params: { runId: string };
+        response: RunArtifact[];
       };
 
       // Workflows (tickets 88-95) ---------------------------------------------

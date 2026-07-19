@@ -235,6 +235,24 @@ async function executeStep(
         data: `Screenshot: ${path} (not implemented)\n`,
         timestamp: Date.now(),
       });
+
+      // Ticket 102: when screenshot is actually captured, register it as an artifact.
+      // For now, this is a placeholder showing where the registration would happen.
+      // When implemented:
+      // const { addRunArtifact } = await import("../db/history");
+      // const { LocalProvider } = await import("../vfs/local");
+      // const provider = new LocalProvider();
+      // const stats = await stat(path);
+      // addRunArtifact(projectPath, {
+      //   runId,
+      //   uri: provider.pathToUri(path),
+      //   name: filename,
+      //   kind: "created",
+      //   size: stats.size,
+      //   mime: "image/png",
+      //   source: "declared",
+      // });
+
       break;
     }
 

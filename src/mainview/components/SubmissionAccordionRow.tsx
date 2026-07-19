@@ -1,7 +1,11 @@
 import { ChevronDown } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { RunArtifact } from "../../shared/types";
 import { useApp } from "../context/AppContext";
+import { api } from "../rpc";
 import type { OutputChunk, OutputType, RunRecord, TaskDefinition } from "../types/tasks";
 import SubmittedSummary from "./SubmittedSummary";
+import { ArtifactModal } from "./files/ArtifactModal";
 import OutputBlock from "./output/OutputBlock";
 import StatusIcon from "./statusIcon";
 
@@ -67,6 +71,15 @@ export default function SubmissionAccordionRow({
   activeTab,
 }: SubmissionAccordionRowProps) {
   const { markRunRead } = useApp();
+  const [artifacts, setArtifacts] = useState<RunArtifact[]>([]);
+  const [selectedArtifact, setSelectedArtifact] = useState<RunArtifact | null>(null);
+
+  useEffect(() => {
+    if (open && (run.status === "success" || run.status === "error")) {
+      api.getRunArtifacts(run.id).then(setArtifacts);
+    }
+  }, [open, run.id, run.status]);
+
   const time = formatTime(run.finishedAt ?? run.startedAt);
   const summary = summarize(form, run.inputs, run);
   const hasOutput =
@@ -82,6 +95,27 @@ export default function SubmissionAccordionRow({
     if (!open && (run.status === "success" || run.status === "error") && !run.readAt) {
       void markRunRead(run.id);
     }
+  };
+
+  const getKindIcon = (kind: RunArtifact["kind"]) => {
+    switch (kind) {
+      case "created":
+        return "✨";
+      case "modified":
+        return "✏️";
+      case "deleted":
+        return "🗑️";
+    }
+  };
+
+  const getTypeIcon = (mime?: string) => {
+    if (!mime) return "📄";
+    if (mime.startsWith("image/")) return "🖼️";
+    if (mime.startsWith("video/")) return "🎬";
+    if (mime.startsWith("audio/")) return "🎵";
+    if (mime === "application/pdf") return "📕";
+    if (mime === "application/json" || mime === "text/") return "📝";
+    return "📄";
   };
 
   return (
@@ -112,11 +146,39 @@ export default function SubmissionAccordionRow({
         <div className="px-4 pb-3">
           {hasOutput ? (
             activeTab === "results" ? (
-              outputType ? (
-                <OutputBlock runId={run.id} outputType={outputType} status={run.status} chunks={chunks} />
-              ) : (
-                <div className="py-2 text-[13px] text-white/40">No results.</div>
-              )
+              <>
+                {outputType ? (
+                  <OutputBlock runId={run.id} outputType={outputType} status={run.status} chunks={chunks} />
+                ) : (
+                  <div className="py-2 text-[13px] text-white/40">No results.</div>
+                )}
+
+                {/* Artifacts strip (ticket 102) */}
+                {artifacts.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-white/10">
+                    <div className="text-[11px] text-white/40 mb-2 uppercase tracking-wide">Artifacts</div>
+                    <div className="flex flex-wrap gap-2">
+                      {artifacts.map((artifact, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedArtifact(artifact)}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-[12px] transition-colors ${
+                            artifact.kind === "deleted"
+                              ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                              : artifact.kind === "modified"
+                                ? "bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20"
+                                : "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                          }`}
+                        >
+                          <span>{getTypeIcon(artifact.mime)}</span>
+                          <span className="truncate max-w-[200px]">{artifact.name}</span>
+                          <span className="opacity-70">{getKindIcon(artifact.kind)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <SubmittedSummary form={form} run={run} />
             )
@@ -125,6 +187,9 @@ export default function SubmissionAccordionRow({
           )}
         </div>
       )}
+
+      {/* Artifact preview modal */}
+      {selectedArtifact && <ArtifactModal artifact={selectedArtifact} onClose={() => setSelectedArtifact(null)} />}
     </div>
   );
 }

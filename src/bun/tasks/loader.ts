@@ -231,6 +231,22 @@ function validateForm(raw: unknown): TaskDefinition | null {
   // Ticket 99: engine discriminator + native tool id.
   const engine = raw.engine === "native" ? "native" : raw.engine === "command" ? "command" : undefined;
   const nativeTool = typeof raw.nativeTool === "string" && raw.nativeTool.trim() ? raw.nativeTool : undefined;
+
+  // Ticket 102: parse fileAssociations if present.
+  let fileAssociations: { locationId: string; pattern?: string }[] | undefined;
+  if (Array.isArray(raw.fileAssociations)) {
+    const validated: { locationId: string; pattern?: string }[] = [];
+    for (const assoc of raw.fileAssociations) {
+      if (isObject(assoc) && typeof assoc.locationId === "string") {
+        validated.push({
+          locationId: assoc.locationId,
+          pattern: typeof assoc.pattern === "string" ? assoc.pattern : undefined,
+        });
+      }
+    }
+    if (validated.length > 0) fileAssociations = validated;
+  }
+
   return {
     fields,
     aiPromptField: raw.aiPromptField === true,
@@ -242,6 +258,7 @@ function validateForm(raw: unknown): TaskDefinition | null {
     scriptFile: typeof raw.scriptFile === "string" ? raw.scriptFile : command ? undefined : "script.sh",
     engine,
     nativeTool,
+    fileAssociations,
   };
 }
 

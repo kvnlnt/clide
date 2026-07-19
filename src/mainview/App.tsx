@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import CalendarPage from "./components/CalendarPage";
+import { FilesPage } from "./components/files/FilesPage";
 import FirstRunAIWizard from "./components/FirstRunAIWizard";
 import FirstRunWelcome from "./components/FirstRunWelcome";
 import NewProjectModal from "./components/NewProjectModal";
@@ -201,6 +202,11 @@ function Workspace() {
               {projectSurface === "views" && <ViewsPage />}
               {projectSurface === "workflows" && <WorkflowsPage />}
               {projectSurface === "calendar" && <CalendarPage />}
+              {projectSurface === "files" && (
+                <div className="flex-1 overflow-hidden">
+                  <FilesPage projectName={activeProject} scope="project" />
+                </div>
+              )}
               {projectSurface === "project-settings" && activeProjectMeta && (
                 <ProjectSettingsPage
                   path={activeProjectMeta.path}

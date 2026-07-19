@@ -720,6 +720,182 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         return await readRunOutputs(project.path, runId);
       },
 
+      // VFS & file locations (ticket 102) -------------------------------------
+
+      listVfsLocations: async ({ project }) => {
+        const { listAppLocations, listProjectLocations } = await import("./vfs/registry");
+        if (!project) return await listAppLocations();
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return [];
+        const appLocs = await listAppLocations();
+        const projLocs = await listProjectLocations(resolved.path);
+        return [...appLocs, ...projLocs];
+      },
+
+      addVfsLocation: async ({ location }) => {
+        try {
+          const { addLocation } = await import("./vfs/registry");
+          await addLocation(location);
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      updateVfsLocation: async ({ location }) => {
+        try {
+          const { updateLocation } = await import("./vfs/registry");
+          await updateLocation(location);
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      removeVfsLocation: async ({ id, project }) => {
+        try {
+          const { removeLocation } = await import("./vfs/registry");
+          const projectPath = project ? (await pathForProjectName(project))?.path : undefined;
+          await removeLocation(id, projectPath);
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      vfsList: async ({ locationId, path }) => {
+        try {
+          const { getLocation, getProvider } = await import("./vfs/registry");
+          const { LocalProvider } = await import("./vfs/local");
+          const location = await getLocation(locationId);
+          if (!location) return { entries: [], error: "Location not found" };
+          const provider = getProvider(location.provider);
+          if (!provider) return { entries: [], error: "Provider not found" };
+
+          let uri: string;
+          if (provider instanceof LocalProvider) {
+            const root = location.config.root as string;
+            uri = provider.pathToUri(path ? join(root, path) : root);
+          } else {
+            uri = `${location.provider}://${path ?? ""}`;
+          }
+
+          const result = await provider.list(uri);
+          return result;
+        } catch (err) {
+          return { entries: [], error: String(err) };
+        }
+      },
+
+      vfsStat: async ({ locationId, path }) => {
+        try {
+          const { getLocation, getProvider } = await import("./vfs/registry");
+          const { LocalProvider } = await import("./vfs/local");
+          const location = await getLocation(locationId);
+          if (!location) return null;
+          const provider = getProvider(location.provider);
+          if (!provider) return null;
+
+          let uri: string;
+          if (provider instanceof LocalProvider) {
+            const root = location.config.root as string;
+            uri = provider.pathToUri(join(root, path));
+          } else {
+            uri = `${location.provider}://${path}`;
+          }
+
+          return await provider.stat(uri);
+        } catch {
+          return null;
+        }
+      },
+
+      vfsSearch: async ({ locationId, query }) => {
+        try {
+          const { getLocation, getProvider } = await import("./vfs/registry");
+          const { LocalProvider } = await import("./vfs/local");
+          const location = await getLocation(locationId);
+          if (!location) return { paths: [], error: "Location not found" };
+          const provider = getProvider(location.provider);
+          if (!provider) return { paths: [], error: "Provider not found" };
+
+          let rootUri: string;
+          if (provider instanceof LocalProvider) {
+            const root = location.config.root as string;
+            rootUri = provider.pathToUri(root);
+          } else {
+            rootUri = `${location.provider}://`;
+          }
+
+          return await provider.search(rootUri, query);
+        } catch (err) {
+          return { paths: [], error: String(err) };
+        }
+      },
+
+      vfsOpen: async ({ locationId, path, reveal }) => {
+        try {
+          const { getLocation, getProvider } = await import("./vfs/registry");
+          const { LocalProvider } = await import("./vfs/local");
+          const location = await getLocation(locationId);
+          if (!location) return { ok: false, error: "Location not found" };
+          const provider = getProvider(location.provider);
+          if (!provider) return { ok: false, error: "Provider not found" };
+
+          let uri: string;
+          if (provider instanceof LocalProvider) {
+            const root = location.config.root as string;
+            uri = provider.pathToUri(join(root, path));
+          } else {
+            uri = `${location.provider}://${path}`;
+          }
+
+          return await provider.openNative(uri, reveal);
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      vfsReadPreview: async ({ locationId, path, maxBytes }) => {
+        try {
+          const { getLocation, getProvider, resolveSafe } = await import("./vfs/registry");
+          const { LocalProvider } = await import("./vfs/local");
+          const location = await getLocation(locationId);
+          if (!location) return { base64: "", mime: "", error: "Location not found" };
+          const provider = getProvider(location.provider);
+          if (!provider) return { base64: "", mime: "", error: "Provider not found" };
+
+          // Security check for local provider
+          if (provider instanceof LocalProvider) {
+            const safe = await resolveSafe(location, path);
+            if (!safe) return { base64: "", mime: "", error: "Path escapes location root" };
+          }
+
+          let uri: string;
+          if (provider instanceof LocalProvider) {
+            const root = location.config.root as string;
+            uri = provider.pathToUri(join(root, path));
+          } else {
+            uri = `${location.provider}://${path}`;
+          }
+
+          const result = await provider.read(uri, maxBytes);
+          if (result.error) return { base64: "", mime: "", error: result.error };
+
+          return {
+            base64: Buffer.from(result.data).toString("base64"),
+            mime: result.mime,
+          };
+        } catch (err) {
+          return { base64: "", mime: "", error: String(err) };
+        }
+      },
+
+      getRunArtifacts: async ({ runId }) => {
+        const { getRunArtifacts } = await import("./db/history");
+        return getRunArtifacts(runId);
+      },
+
       // Workflows (tickets 88-95) ---------------------------------------------
 
       listWorkflows: async ({ project }) => {

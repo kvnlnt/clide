@@ -815,6 +815,118 @@ export const api = {
     }
   },
 
+  // VFS & file locations (ticket 102) -----------------------------------------
+
+  async listVfsLocations(project?: string): Promise<import("../shared/types").VfsLocation[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.listVfsLocations({ project });
+    } catch {
+      return [];
+    }
+  },
+
+  async addVfsLocation(location: import("../shared/types").VfsLocation): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.addVfsLocation({ location });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async updateVfsLocation(location: import("../shared/types").VfsLocation): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.updateVfsLocation({ location });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async removeVfsLocation(id: string, project?: string): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.removeVfsLocation({ id, project });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async vfsList(
+    locationId: string,
+    path?: string,
+  ): Promise<{ entries: import("../shared/types").VfsStatResult[]; error?: string }> {
+    const r = request();
+    if (!r) return { entries: [] };
+    try {
+      return await r.vfsList({ locationId, path });
+    } catch (err) {
+      return { entries: [], error: String(err) };
+    }
+  },
+
+  async vfsStat(locationId: string, path: string): Promise<import("../shared/types").VfsStatResult | null> {
+    const r = request();
+    if (!r) return null;
+    try {
+      return await r.vfsStat({ locationId, path });
+    } catch {
+      return null;
+    }
+  },
+
+  async vfsSearch(
+    locationId: string,
+    query: string,
+  ): Promise<{ paths: string[]; truncated?: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { paths: [] };
+    try {
+      return await r.vfsSearch({ locationId, query });
+    } catch (err) {
+      return { paths: [], error: String(err) };
+    }
+  },
+
+  async vfsOpen(locationId: string, path: string, reveal?: boolean): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.vfsOpen({ locationId, path, reveal });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async vfsReadPreview(
+    locationId: string,
+    path: string,
+    maxBytes?: number,
+  ): Promise<{ base64: string; mime: string; error?: string }> {
+    const r = request();
+    if (!r) return { base64: "", mime: "", error: "Bridge unavailable" };
+    try {
+      return await r.vfsReadPreview({ locationId, path, maxBytes });
+    } catch (err) {
+      return { base64: "", mime: "", error: String(err) };
+    }
+  },
+
+  async getRunArtifacts(runId: string): Promise<import("../shared/types").RunArtifact[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.getRunArtifacts({ runId });
+    } catch {
+      return [];
+    }
+  },
+
   // Workflows (tickets 88-95) -------------------------------------------------
 
   async listWorkflows(project: string): Promise<Workflow[]> {

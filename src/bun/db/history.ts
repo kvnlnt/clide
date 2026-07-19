@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import type { RepeatInterval, RunRecord, RunStatus } from "../../shared/types";
+import type { RepeatInterval, RunArtifact, RunRecord, RunStatus } from "../../shared/types";
 import { ensureProjectDirs, projectHistoryDb } from "../paths";
 import { migrate } from "./migrations";
 
@@ -267,4 +267,70 @@ export function getPendingScheduledRuns(projectPaths: string[]): { run: RunRecor
     }
   }
   return out;
+}
+
+// Run artifacts (ticket 102) -------------------------------------------------
+
+interface ArtifactRow {
+  run_id: string;
+  uri: string;
+  name: string;
+  kind: string;
+  size: number | null;
+  mime: string | null;
+  source: string;
+}
+
+function rowToArtifact(row: ArtifactRow): RunArtifact {
+  return {
+    runId: row.run_id,
+    uri: row.uri,
+    name: row.name,
+    kind: row.kind as RunArtifact["kind"],
+    size: row.size ?? undefined,
+    mime: row.mime ?? undefined,
+    source: row.source as RunArtifact["source"],
+  };
+}
+
+/** Add a run artifact (ticket 102). */
+export function addRunArtifact(projectPath: string, artifact: RunArtifact): void {
+  const db = getDb(projectPath);
+  db.run(`INSERT INTO run_artifacts (run_id, uri, name, kind, size, mime, source) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
+    artifact.runId,
+    artifact.uri,
+    artifact.name,
+    artifact.kind,
+    artifact.size ?? null,
+    artifact.mime ?? null,
+    artifact.source,
+  ]);
+}
+
+/** Batch-add run artifacts (ticket 102). */
+export function addRunArtifacts(projectPath: string, artifacts: RunArtifact[]): void {
+  const db = getDb(projectPath);
+  const insert = db.prepare(
+    `INSERT INTO run_artifacts (run_id, uri, name, kind, size, mime, source) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  );
+  for (const artifact of artifacts) {
+    insert.run(
+      artifact.runId,
+      artifact.uri,
+      artifact.name,
+      artifact.kind,
+      artifact.size ?? null,
+      artifact.mime ?? null,
+      artifact.source,
+    );
+  }
+}
+
+/** Get all artifacts for a run (ticket 102). */
+export function getRunArtifacts(runId: string): RunArtifact[] {
+  const projectPath = resolveRunProject(runId);
+  if (!projectPath) return [];
+  const db = getDb(projectPath);
+  const rows = db.query(`SELECT * FROM run_artifacts WHERE run_id = ? ORDER BY name`).all(runId) as ArtifactRow[];
+  return rows.map(rowToArtifact);
 }

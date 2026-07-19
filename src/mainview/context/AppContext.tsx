@@ -18,7 +18,7 @@ export interface DraftCard {
 }
 
 /** Which surface the title tab's body shows. Only meaningful when no view tab is active. */
-export type ProjectSurface = "thread" | "forms" | "views" | "calendar" | "project-settings" | "workflows";
+export type ProjectSurface = "thread" | "forms" | "views" | "calendar" | "files" | "project-settings" | "workflows";
 
 interface AppState {
   forms: TaskFolder[];

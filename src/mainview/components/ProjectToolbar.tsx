@@ -1,4 +1,4 @@
-import { CalendarDays, FileText, Layers, Play, Settings, Workflow } from "lucide-react";
+import { CalendarDays, FileText, Files, Layers, Play, Settings, Workflow } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import Toolbar from "./Toolbar";
 
@@ -44,6 +44,15 @@ export default function ProjectToolbar() {
       >
         <CalendarDays size={13} />
         Calendar
+      </button>
+
+      <button
+        onClick={() => setProjectSurface(projectSurface === "files" ? "thread" : "files")}
+        title="Files"
+        className={`${btnBase} ${projectSurface === "files" ? btnActive : btnInactive}`}
+      >
+        <Files size={13} />
+        Files
       </button>
 
       <button

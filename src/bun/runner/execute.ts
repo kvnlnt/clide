@@ -204,6 +204,12 @@ async function execute(
     return;
   }
 
+  // Ticket 102: snapshot associated locations before the run.
+  const { snapshotAssociatedLocations } = await import("./artifacts");
+  const locationSnapshots = await snapshotAssociatedLocations(folder, (msg) => {
+    emitters.emitChunk({ runId, type: "stderr", data: msg + "\n", timestamp: Date.now() });
+  });
+
   const capture = new OutputCapture(projectPath, runId);
 
   let spawned: ReturnType<typeof spawnForm>;
@@ -252,6 +258,25 @@ async function execute(
     await Bun.write(join(runDir(projectPath, runId), "outputs.json"), JSON.stringify(outputs, null, 2));
   } catch (err) {
     console.warn(`[outputs] evaluation failed for ${runId}:`, err);
+  }
+
+  // Ticket 102: detect and persist run artifacts (declared + observed).
+  try {
+    const { diffSnapshots, extractDeclaredArtifacts } = await import("./artifacts");
+    const { addRunArtifacts } = await import("../db/history");
+
+    // Channel 1: Declared artifacts from output definitions
+    const declaredArtifacts = extractDeclaredArtifacts(runId, outputs);
+
+    // Channel 2: Observed artifacts from snapshot diff
+    const observedArtifacts = await diffSnapshots(runId, folder, locationSnapshots);
+
+    const allArtifacts = [...declaredArtifacts, ...observedArtifacts];
+    if (allArtifacts.length > 0) {
+      addRunArtifacts(projectPath, allArtifacts);
+    }
+  } catch (err) {
+    console.warn(`[artifacts] detection failed for ${runId}:`, err);
   }
 
   // A cancelled process is killed and already marked error; don't override.
