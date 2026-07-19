@@ -175,6 +175,10 @@ export interface TaskDefinition {
   command?: CommandSpec;
   /** @deprecated Legacy script-backed tasks only. Absent on command-backed tasks. */
   scriptFile?: string;
+  /** Engine discriminator (ticket 99): absent or "command" = command-backed, "native" = native tool. */
+  engine?: "command" | "native";
+  /** Native tool id when engine === "native", e.g. "browser-automation" (ticket 99). */
+  nativeTool?: string;
 }
 
 // Tool registry & AI inspection (ticket 53) ----------------------------------
@@ -242,6 +246,81 @@ export interface ToolRegistryEntry {
   sourceHash?: string;
 }
 
+// Native tools & browser automation (ticket 99) ------------------------------
+
+/** A native (non-CLI) tool capability built into CLIDE. */
+export interface NativeTool {
+  id: string;
+  name: string;
+  description: string;
+  icon?: string;
+}
+
+/** Selector strategy for targeting DOM elements (ticket 99). */
+export type SelectorStrategy = "testid" | "id" | "aria" | "text" | "css";
+
+/** One selector candidate; replay tries them in order. */
+export interface SelectorCandidate {
+  strategy: SelectorStrategy;
+  selector: string;
+}
+
+/** Recorded event during browser recording (ticket 99). */
+export interface RecordedEvent {
+  kind: "click" | "input" | "key" | "scroll";
+  selectors: SelectorCandidate[];
+  value?: string;
+  key?: string;
+  x?: number;
+  y?: number;
+}
+
+/** Base for all browser automation steps. */
+interface BrowserStepBase {
+  id: string;
+  name?: string;
+  enabled: boolean;
+}
+
+export type BrowserStep =
+  | (BrowserStepBase & { type: "navigate"; url: string })
+  | (BrowserStepBase & { type: "recorded"; events: RecordedEvent[] })
+  | (BrowserStepBase & { type: "click"; selectors: SelectorCandidate[] })
+  | (BrowserStepBase & { type: "type"; selectors: SelectorCandidate[]; value: string })
+  | (BrowserStepBase & { type: "select"; selectors: SelectorCandidate[]; value: string })
+  | (BrowserStepBase & {
+      type: "wait";
+      for: "selector" | "navigation" | "delay";
+      selector?: string;
+      ms?: number;
+    })
+  | (BrowserStepBase & {
+      type: "extract";
+      selectors: SelectorCandidate[];
+      attribute?: string;
+      outputName: string;
+    })
+  | (BrowserStepBase & {
+      type: "assert";
+      selectors: SelectorCandidate[];
+      textContains?: string;
+      message?: string;
+    })
+  | (BrowserStepBase & { type: "screenshot"; label?: string })
+  | (BrowserStepBase & {
+      type: "coordinate";
+      x: number;
+      y: number;
+      event: "click" | "dblclick";
+      viewport: { width: number; height: number; dpr: number };
+      referenceShot?: string;
+    });
+
+/** Browser automation configuration stored in browser.json (ticket 99). */
+export interface BrowserAutomationConfig {
+  steps: BrowserStep[];
+}
+
 export interface TaskMeta {
   name: string;
   slug: string;
@@ -266,6 +345,10 @@ export interface TaskFolder {
   task: TaskDefinition;
   /** Absolute path of the project folder this task belongs to. */
   projectPath: string;
+  /** Native tool configuration when task.engine === "native" (ticket 99). */
+  native?: {
+    browser?: BrowserAutomationConfig;
+  };
 }
 
 /** Editable display metadata for a task. Never includes `slug` — slug is identity. */
@@ -648,6 +731,7 @@ export type ClideRPC = {
       };
       // Tool registry & inspection (ticket 53) --------------------------------
       listTools: { params: Record<string, never>; response: ToolRegistryEntry[] };
+      listNativeTools: { params: Record<string, never>; response: NativeTool[] };
       resolveTool: {
         params: { nameOrPath: string };
         response: { ok: boolean; execPath?: string; error?: string };

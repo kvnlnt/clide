@@ -123,6 +123,11 @@ export async function saveTaskVersion(
   await Bun.write(join(versionDir, "meta.json"), JSON.stringify(versionMeta, null, 2));
   await Bun.write(join(versionDir, "form.json"), JSON.stringify(task, null, 2));
 
+  // Copy browser.json if present (ticket 99 native tool config).
+  if (existsSync(join(dir, "browser.json"))) {
+    cpSync(join(dir, "browser.json"), join(versionDir, "browser.json"));
+  }
+
   // Update root meta to point to latest version.
   const rootMeta: TaskMeta = {
     ...meta,

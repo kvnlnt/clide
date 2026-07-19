@@ -385,6 +385,11 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
 
       listTools: async () => await listRegisteredTools(),
 
+      listNativeTools: async () => {
+        const { listNativeTools } = await import("./tools/native");
+        return listNativeTools();
+      },
+
       resolveTool: async ({ nameOrPath }) => {
         const result = resolveToolPath(nameOrPath);
         return result.ok ? { ok: true, execPath: result.execPath } : { ok: false, error: result.error };

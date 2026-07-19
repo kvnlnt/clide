@@ -228,6 +228,9 @@ function validateForm(raw: unknown): TaskDefinition | null {
   const fields = raw.fields.map(validateField).filter((f): f is TaskField => f !== null);
   const outputType = OUTPUT_TYPES.includes(raw.outputType as OutputType) ? (raw.outputType as OutputType) : "text";
   const command = validateCommand(raw.command);
+  // Ticket 99: engine discriminator + native tool id.
+  const engine = raw.engine === "native" ? "native" : raw.engine === "command" ? "command" : undefined;
+  const nativeTool = typeof raw.nativeTool === "string" && raw.nativeTool.trim() ? raw.nativeTool : undefined;
   return {
     fields,
     aiPromptField: raw.aiPromptField === true,
@@ -237,6 +240,8 @@ function validateForm(raw: unknown): TaskDefinition | null {
     command,
     // Legacy script forms always had a scriptFile; a command form has none.
     scriptFile: typeof raw.scriptFile === "string" ? raw.scriptFile : command ? undefined : "script.sh",
+    engine,
+    nativeTool,
   };
 }
 
@@ -248,6 +253,21 @@ async function readJson(path: string): Promise<unknown | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Load native tool configuration (ticket 99). For browser-automation tasks,
+ * reads browser.json from the task folder.
+ */
+async function loadNativeConfig(
+  dir: string,
+  nativeTool: string | undefined,
+): Promise<TaskFolder["native"] | undefined> {
+  if (nativeTool !== "browser-automation") return undefined;
+  const browserRaw = await readJson(join(dir, "browser.json"));
+  if (!browserRaw || !isObject(browserRaw) || !Array.isArray(browserRaw.steps)) return undefined;
+  // Type assertion is safe here because we've validated the structure above.
+  return { browser: { steps: browserRaw.steps } as import("../../shared/types").BrowserAutomationConfig };
 }
 
 export async function loadTaskFolder(
@@ -264,7 +284,8 @@ export async function loadTaskFolder(
     console.warn(`[tasks] Skipping malformed task folder: ${slug}`);
     return null;
   }
-  return { meta, task, projectPath };
+  const native = await loadNativeConfig(dir, task.nativeTool);
+  return { meta, task, projectPath, native };
 }
 
 /**
@@ -283,7 +304,8 @@ export async function loadTaskVersion(
   const meta = validateMeta(metaRaw, slug, projectName);
   const task = validateForm(formRaw);
   if (!meta || !task) return null;
-  return { meta, task, projectPath };
+  const native = await loadNativeConfig(versionDir, task.nativeTool);
+  return { meta, task, projectPath, native };
 }
 
 /**

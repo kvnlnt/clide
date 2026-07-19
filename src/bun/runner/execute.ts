@@ -190,6 +190,20 @@ async function execute(
   inputs: Record<string, unknown>,
   emitters: RunEmitters,
 ): Promise<void> {
+  // Ticket 99: branch on engine type — native tasks bypass the spawn path.
+  if (folder.task.engine === "native" && folder.task.nativeTool === "browser-automation") {
+    const { runBrowserTask } = await import("./browserRun");
+    try {
+      await runBrowserTask(projectPath, runId, folder, inputs, emitters);
+      const finishedAt = new Date().toISOString();
+      updateRunStatus(runId, "success", 0, finishedAt);
+      emitters.emitStatus({ runId, status: "success", exitCode: 0, finishedAt });
+    } catch (err) {
+      finishWithError(runId, emitters, err instanceof Error ? err.message : `Browser run failed: ${String(err)}`);
+    }
+    return;
+  }
+
   const capture = new OutputCapture(projectPath, runId);
 
   let spawned: ReturnType<typeof spawnForm>;

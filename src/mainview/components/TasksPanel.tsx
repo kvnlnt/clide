@@ -230,6 +230,11 @@ function TasksPanelRow({
             ) : (
               <Lock size={10} className="text-white/30" />
             )}
+            {form.task.engine === "native" && (
+              <span className="rounded-full bg-purple-500/20 px-1.5 py-0.5 text-[9px] font-medium text-purple-400">
+                native
+              </span>
+            )}
           </div>
           <span className="min-w-0 flex-1 truncate text-[12px] text-white/40">{form.meta.description || "—"}</span>
           {form.meta.tags.length > 0 && (
