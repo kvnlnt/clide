@@ -164,4 +164,48 @@ export async function updateTaskMeta(
   await Bun.write(join(dir, "meta.json"), JSON.stringify(updated, null, 2));
 }
 
+/**
+ * Save browser automation configuration for a native browser-automation task
+ * (ticket 99 slice 2). Writes browser.json to the task's folder.
+ */
+export async function saveBrowserConfig(
+  projectPath: string,
+  slug: string,
+  config: import("../../shared/types").BrowserAutomationConfig,
+): Promise<void> {
+  const dir = formDir(projectPath, slug);
+  await Bun.write(join(dir, "browser.json"), JSON.stringify(config, null, 2));
+}
+
+/**
+ * Write a native browser-automation task (ticket 99 slice 2): engine:"native",
+ * nativeTool:"browser-automation", and browser.json config.
+ */
+export async function writeNativeTask(
+  projectPath: string,
+  meta: Omit<TaskMeta, "slug" | "createdAt" | "updatedAt"> & { slug?: string },
+  task: TaskDefinition,
+  browserConfig: import("../../shared/types").BrowserAutomationConfig,
+): Promise<string> {
+  const slug = await reserveSlug(projectPath, meta.slug ?? "", meta.name);
+  const dir = formDir(projectPath, slug);
+  ensureDir(dir);
+
+  const now = new Date().toISOString();
+  const fullMeta: TaskMeta = {
+    ...meta,
+    slug,
+    createdAt: now,
+    updatedAt: now,
+    lifecycle: "draft",
+    version: 1,
+  };
+
+  await Bun.write(join(dir, "meta.json"), JSON.stringify(fullMeta, null, 2));
+  await Bun.write(join(dir, "form.json"), JSON.stringify(task, null, 2));
+  await Bun.write(join(dir, "browser.json"), JSON.stringify(browserConfig, null, 2));
+
+  return slug;
+}
+
 export { projectFormsDir, slugify };

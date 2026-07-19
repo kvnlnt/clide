@@ -1,9 +1,10 @@
-import { CheckCircle, FolderOpen, History, Lock, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { CheckCircle, FolderOpen, Globe, History, Lock, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useTaskSearch } from "../hooks/useTaskSearch";
 import { api } from "../rpc";
 import type { TaskFolder } from "../types/tasks";
+import BrowserStepsEditorModal from "./BrowserStepsEditorModal";
 import TaskVersionHistoryModal from "./TaskVersionHistoryModal";
 import { useUIFeedback } from "./UIFeedback";
 
@@ -167,6 +168,7 @@ function TasksPanelRow({
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+  const [stepsEditorOpen, setStepsEditorOpen] = useState(false);
   const [dismissedAdopt, setDismissedAdopt] = useState(false);
 
   const menuRef = useRef<HTMLButtonElement>(null);
@@ -353,6 +355,18 @@ function TasksPanelRow({
                 Adopt task
               </button>
             )}
+            {form.task.engine === "native" && form.task.nativeTool === "browser-automation" && (
+              <button
+                onClick={() => {
+                  setStepsEditorOpen(true);
+                  setMenuOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-white hover:bg-white/10"
+              >
+                <Globe size={14} />
+                Edit steps
+              </button>
+            )}
             <button
               onClick={() => {
                 setVersionHistoryOpen(true);
@@ -375,6 +389,17 @@ function TasksPanelRow({
           onClose={() => setVersionHistoryOpen(false)}
           onRollback={async () => {
             await refreshForms();
+          }}
+        />
+      )}
+
+      {stepsEditorOpen && (
+        <BrowserStepsEditorModal
+          folder={form}
+          onClose={() => setStepsEditorOpen(false)}
+          onSave={() => {
+            setStepsEditorOpen(false);
+            void refreshForms();
           }}
         />
       )}

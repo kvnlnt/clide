@@ -1,7 +1,7 @@
 import { AlertTriangle, Check, RefreshCw, Search, Sparkles, Terminal, Wrench } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, on } from "../rpc";
-import type { ToolRegistryEntry } from "../types/tasks";
+import type { NativeTool, ToolRegistryEntry } from "../types/tasks";
 import InstallProgressModal from "./InstallProgressModal";
 import type { ServiceModelValue } from "./ServiceModelPicker";
 import ToolDropZone, { fileToBase64 } from "./ToolDropZone";
@@ -27,6 +27,8 @@ interface Props {
   serviceModel: ServiceModelValue;
   selected: ToolRegistryEntry | null;
   onSelect: (tool: ToolRegistryEntry | null) => void;
+  selectedNative: NativeTool | null;
+  onSelectNative: (tool: NativeTool | null) => void;
 }
 
 /** Loose goal→tool matching over the cached registry: any goal word appearing in the name or description. */
@@ -46,8 +48,10 @@ function matchesGoal(entry: ToolRegistryEntry, goal: string): boolean {
  * suggestions verified installed; inline consent-gated registration for
  * unknown ones; version-aware staleness on cached specs; search, manual
  * resolve, and drag-and-drop as the always-available manual paths.
+ * TICKET 99: native tools shown at the very top.
  */
-export default function ToolChooser({ goal, serviceModel, selected, onSelect }: Props) {
+export default function ToolChooser({ goal, serviceModel, selected, onSelect, selectedNative, onSelectNative }: Props) {
+  const [nativeTools, setNativeTools] = useState<NativeTool[]>([]);
   const [registry, setRegistry] = useState<ToolRegistryEntry[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [suggestBusy, setSuggestBusy] = useState(false);
@@ -72,6 +76,11 @@ export default function ToolChooser({ goal, serviceModel, selected, onSelect }: 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      // Load native tools (ticket 99)
+      const natives = await api.listNativeTools();
+      if (cancelled) return;
+      setNativeTools(natives);
+
       const tools = await api.listTools();
       if (cancelled) return;
       setRegistry(tools);
@@ -322,6 +331,51 @@ export default function ToolChooser({ goal, serviceModel, selected, onSelect }: 
 
   return (
     <ToolDropZone onFiles={(files) => void handleDrop(files)} className="flex flex-col gap-4">
+      {/* Native tools (ticket 99) — always at the top */}
+      {nativeTools.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5 text-[13px] font-medium text-white/70">
+            <Terminal size={13} className="text-white/70" />
+            Native
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {nativeTools.map((nt) => {
+              const isSelected = selectedNative?.id === nt.id;
+              return (
+                <button
+                  key={nt.id}
+                  onClick={() => onSelectNative(nt)}
+                  className={`flex items-start gap-2.5 rounded-lg border p-3 text-left transition-colors ${
+                    isSelected
+                      ? "border-white/30 bg-white/10"
+                      : "border-clide-border bg-clide-surface hover:border-white/20"
+                  }`}
+                >
+                  <span
+                    className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                      isSelected ? "bg-green-500/20 text-green-400" : "bg-white/5 text-white/20"
+                    }`}
+                  >
+                    {isSelected ? <Check size={12} /> : <Terminal size={11} />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-[14px] text-white">
+                        {nt.icon} {nt.name}
+                      </span>
+                      <span className="shrink-0 rounded-full bg-blue-400/10 px-1.5 py-0.5 text-[10px] uppercase text-blue-300/70">
+                        native
+                      </span>
+                    </span>
+                    <span className="block text-[12px] text-white/40">{nt.description}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Candidates */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-1.5 text-[13px] font-medium text-white/70">

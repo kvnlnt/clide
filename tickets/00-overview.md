@@ -152,7 +152,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 100 | App Profile Interview                 | AI interviews the user → app-level profile (roles, goals, frustrations); self-improving loop      | ⬜ Open       |
 | 101 | Project Profile Interview             | Per-project AI-interviewed profile stored in the project folder; reuses the 100 engine            | ⬜ Open       |
 | 102 | Virtual File System                   | Epic: track any file on any system (local/remote), browse/search/open, run artifacts w/ previews  | ⬜ Open       |
-| 103 | Package-Manager Tool Install          | Detect/register package managers; search their catalogs; consent-gated install → registry        | ✅ Done       |
+| 103 | Package-Manager Tool Install          | Detect/register package managers; search their catalogs; consent-gated install → registry         | ✅ Done       |
 | 104 | Duplicate Workflow                    | One-click deep copy of a workflow (triggers disabled) straight into the editor                    | ✅ Done       |
 | 105 | Task Adoption & Versioning            | Draft → adopt lifecycle; edits fork new versions; opt-in retroactive workflow upgrades            | ✅ Done³      |
 | 106 | Project Audit Page & RSI Loop         | Epic: audit log + dossier + Datalog theorem prover over run facts + AI-prescribed improvements    | ⬜ Open       |

@@ -684,6 +684,34 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
+      createNativeTask: async ({
+        project,
+        name,
+        description,
+        tags,
+        nativeTool,
+        fields,
+        outputType,
+        outputs,
+        browserConfig,
+      }) => {
+        try {
+          const resolvedProject = (await resolveProjectByName(project)) ?? (await addProject(project));
+          const { writeNativeTask } = await import("./tasks/writer");
+          const slug = await writeNativeTask(
+            resolvedProject.path,
+            { name, description, project: resolvedProject.name, tags, lifecycle: "draft", version: 1 },
+            { fields, outputType, outputs, engine: "native", nativeTool },
+            browserConfig ?? { steps: [] },
+          );
+          await pushProjectsChanged();
+          await pushTasksChanged();
+          return { ok: true, slug };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
       getRunOutputs: async ({ runId }) => {
         const run = getRun(runId);
         if (!run) return [];
@@ -1048,6 +1076,38 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           const { upgradeWorkflowTaskVersion } = await import("./workflows/store");
           await upgradeWorkflowTaskVersion(projectPath, workflowId, stepNames, newVersion);
           return { ok: true };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      // Native browser automation (ticket 99 slice 2) ------------------------
+      saveBrowserConfig: async ({ projectPath, slug, config }) => {
+        try {
+          const { saveBrowserConfig } = await import("./tasks/writer");
+          await saveBrowserConfig(projectPath, slug, config);
+          await pushTasksChanged();
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      runBrowserStep: async ({ projectPath, slug, stepId, inputs }) => {
+        try {
+          const projects = await listProjects();
+          const project = projects.find((p) => p.path === projectPath);
+          if (!project) return { ok: false, error: "Project not found" };
+          const folder = await loadTaskFolder(projectPath, slug, project.name);
+          if (!folder) return { ok: false, error: "Task not found" };
+          const config = folder.native?.browser;
+          if (!config) return { ok: false, error: "No browser configuration" };
+          const step = config.steps.find((s) => s.id === stepId);
+          if (!step) return { ok: false, error: "Step not found" };
+
+          const { runSingleBrowserStep } = await import("./runner/browserRun");
+          const trace = await runSingleBrowserStep(folder, inputs, step);
+          return { ok: true, trace };
         } catch (err) {
           return { ok: false, error: String(err) };
         }

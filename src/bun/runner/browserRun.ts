@@ -5,14 +5,9 @@
 
 import { BrowserWindow } from "electrobun/bun";
 import { join } from "node:path";
-import type {
-  BrowserStep,
-  OutputResult,
-  SelectorCandidate,
-  TaskFolder,
-} from "../../shared/types";
-import { evalExpressionString } from "../../shared/workflowExpr";
 import { maskSecrets } from "../../shared/secrets";
+import type { BrowserStep, OutputChunk, OutputResult, SelectorCandidate, TaskFolder } from "../../shared/types";
+import { evalExpressionString } from "../../shared/workflowExpr";
 import type { RunEmitters } from "./execute";
 import { OutputCapture } from "./outputCapture";
 
@@ -352,11 +347,7 @@ async function tryClick(browserWindow: BrowserWindow, candidate: SelectorCandida
 /**
  * Try to type into an element using one selector strategy.
  */
-async function tryType(
-  browserWindow: BrowserWindow,
-  candidate: SelectorCandidate,
-  value: string,
-): Promise<boolean> {
+async function tryType(browserWindow: BrowserWindow, candidate: SelectorCandidate, value: string): Promise<boolean> {
   const selector = buildSelector(candidate);
   if (!selector) return false;
 
@@ -378,11 +369,7 @@ async function tryType(
 /**
  * Try to select an option using one selector strategy.
  */
-async function trySelect(
-  browserWindow: BrowserWindow,
-  candidate: SelectorCandidate,
-  value: string,
-): Promise<boolean> {
+async function trySelect(browserWindow: BrowserWindow, candidate: SelectorCandidate, value: string): Promise<boolean> {
   const selector = buildSelector(candidate);
   if (!selector) return false;
 
@@ -491,4 +478,60 @@ async function pressKey(browserWindow: BrowserWindow, key: string): Promise<void
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Run a single browser step for authoring-time verification (ticket 99 slice 2).
+ * Does NOT create a RunRecord; returns collected trace lines instead.
+ */
+export async function runSingleBrowserStep(
+  folder: TaskFolder,
+  inputs: Record<string, unknown>,
+  step: BrowserStep,
+): Promise<string[]> {
+  // Wait for any prior browser run to complete.
+  await browserQueue;
+
+  return new Promise<string[]>((resolve, reject) => {
+    browserQueue = (async () => {
+      const trace: string[] = [];
+      let browserWindow: BrowserWindow | null = null;
+
+      try {
+        browserWindow = new BrowserWindow({
+          title: "CLIDE automation — step test",
+          frame: { x: 100, y: 100, width: 1200, height: 800 },
+          url: "about:blank",
+          titleBarStyle: "default",
+        });
+
+        const safeInputs = maskSecrets(inputs, folder.task.fields);
+        const context = { fields: safeInputs };
+        const outputs: OutputResult[] = [];
+
+        // Dummy emitter that collects trace lines
+        const dummyEmitter = {
+          emitChunk: (chunk: OutputChunk) => {
+            trace.push(chunk.data);
+          },
+          emitStatus: () => {},
+        };
+
+        trace.push(`▶ ${step.type} ${step.name ?? ""}\n`);
+        await executeStep(browserWindow, step, context, null as any, outputs, "test", dummyEmitter as any);
+        trace.push(`✓ Step completed\n`);
+
+        resolve(trace);
+      } catch (err) {
+        trace.push(`✗ ${err instanceof Error ? err.message : String(err)}\n`);
+        reject(new Error(trace.join("")));
+      } finally {
+        if (browserWindow) {
+          browserWindow.close();
+        }
+      }
+    })();
+
+    return browserQueue;
+  });
 }

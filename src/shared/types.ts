@@ -847,6 +847,20 @@ export type ClideRPC = {
         };
         response: { ok: boolean; slug?: string; error?: string };
       };
+      createNativeTask: {
+        params: {
+          project: string;
+          name: string;
+          description: string;
+          tags: string[];
+          nativeTool: string;
+          fields: TaskField[];
+          outputType: OutputType;
+          outputs: OutputDefinition[];
+          browserConfig?: BrowserAutomationConfig;
+        };
+        response: { ok: boolean; slug?: string; error?: string };
+      };
       /** Evaluated output-definition results persisted for a run (ticket 86). */
       getRunOutputs: {
         params: { runId: string };
@@ -983,6 +997,15 @@ export type ClideRPC = {
       upgradeWorkflowTaskVersion: {
         params: { projectPath: string; workflowId: string; stepNames: string[]; newVersion: number };
         response: { ok: boolean; error?: string };
+      };
+      // Native browser automation (ticket 99 slice 2) ------------------------
+      saveBrowserConfig: {
+        params: { projectPath: string; slug: string; config: BrowserAutomationConfig };
+        response: { ok: boolean; error?: string };
+      };
+      runBrowserStep: {
+        params: { projectPath: string; slug: string; stepId: string; inputs: Record<string, unknown> };
+        response: { ok: boolean; trace?: string[]; error?: string };
       };
     };
     messages: {

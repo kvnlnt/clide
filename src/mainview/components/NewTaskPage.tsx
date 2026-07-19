@@ -2,8 +2,16 @@ import { ArrowLeft, Loader, RefreshCw, Sparkles, Terminal, X } from "lucide-reac
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
-import type { OutputDefinition, OutputType, TaskField, ToolRegistryEntry } from "../types/tasks";
+import type {
+  BrowserAutomationConfig,
+  NativeTool,
+  OutputDefinition,
+  OutputType,
+  TaskField,
+  ToolRegistryEntry,
+} from "../types/tasks";
 import { buildCommand, formatCommandPreview } from "../types/tasks";
+import StepBuilder from "./browser/StepBuilder";
 import CommandFieldsEditor from "./CommandFieldsEditor";
 import { useEscapeToClose } from "./Modal";
 import OutputDefinitionsEditor from "./OutputDefinitionsEditor";
@@ -70,11 +78,14 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
 
   // Step 2
   const [tool, setTool] = useState<ToolRegistryEntry | null>(null);
+  const [nativeTool, setNativeTool] = useState<NativeTool | null>(null);
   const [actionName, setActionName] = useState("");
   const [baseArgsText, setBaseArgsText] = useState("");
 
   // Step 3
   const [fields, setFields] = useState<TaskField[]>([]);
+  // Step 3 (native tool: browser automation)
+  const [browserConfig, setBrowserConfig] = useState<BrowserAutomationConfig>({ steps: [] });
   const [draftBusy, setDraftBusy] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
   /** Which tool+action the current fields were drafted for — drives the "drafted for another tool" hint. */
@@ -114,6 +125,7 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
 
   const selectTool = (t: ToolRegistryEntry | null) => {
     setTool(t);
+    setNativeTool(null); // Clear native tool when selecting a CLI tool
     if (t) {
       setName((n) => n || t.name);
       // A different tool resets the scoped action; same tool re-picked keeps it.
@@ -121,6 +133,14 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
         setActionName("");
         setBaseArgsText("");
       }
+    }
+  };
+
+  const selectNativeTool = (t: NativeTool | null) => {
+    setNativeTool(t);
+    setTool(null); // Clear CLI tool when selecting a native tool
+    if (t) {
+      setName((n) => n || t.name);
     }
   };
 
@@ -160,20 +180,42 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
   }, [step, tool, actionName, serviceModel.serviceId, fields.length, draftBusy]);
 
   const create = async () => {
-    if (!tool || !name.trim() || !project.trim()) return;
+    if ((!tool && !nativeTool) || !name.trim() || !project.trim()) return;
     setCreating(true);
     setCreateError(null);
     const outputType: OutputType = outputs[0]?.kind ?? "text";
-    const res = await api.createCommandTask({
-      project: project.trim(),
-      name: name.trim(),
-      description: goal.trim(),
-      tags: [],
-      command: { tool: tool.execPath, baseArgs },
-      fields,
-      outputType,
-      outputs,
-    });
+
+    let res: { ok: boolean; slug?: string; error?: string };
+    if (nativeTool) {
+      // Create native task
+      res = await api.createNativeTask({
+        project: project.trim(),
+        name: name.trim(),
+        description: goal.trim(),
+        tags: [],
+        nativeTool: nativeTool.id,
+        fields,
+        outputType,
+        outputs,
+        browserConfig: nativeTool.id === "browser-automation" ? browserConfig : undefined,
+      });
+    } else if (tool) {
+      // Create command task
+      res = await api.createCommandTask({
+        project: project.trim(),
+        name: name.trim(),
+        description: goal.trim(),
+        tags: [],
+        command: { tool: tool.execPath, baseArgs },
+        fields,
+        outputType,
+        outputs,
+      });
+    } else {
+      setCreating(false);
+      return;
+    }
+
     setCreating(false);
     if (res.ok && res.slug) {
       addFormDraft(res.slug);
@@ -187,8 +229,8 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
   const reachable: Record<Step, boolean> = {
     1: true,
     2: goal.trim().length > 0,
-    3: tool !== null,
-    4: tool !== null,
+    3: tool !== null || nativeTool !== null,
+    4: tool !== null || nativeTool !== null,
   };
   const stepDefs = STEP_LABELS.map((label, i) => ({
     label,
@@ -291,7 +333,14 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
 
           {step === 2 && (
             <>
-              <ToolChooser goal={goal} serviceModel={serviceModel} selected={tool} onSelect={selectTool} />
+              <ToolChooser
+                goal={goal}
+                serviceModel={serviceModel}
+                selected={tool}
+                onSelect={selectTool}
+                selectedNative={nativeTool}
+                onSelectNative={selectNativeTool}
+              />
 
               {tool && (
                 <div className="flex flex-col gap-4 border-t border-clide-border pt-4">
@@ -338,6 +387,29 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
                   </div>
                 </div>
               )}
+            </>
+          )}
+
+          {step === 3 && nativeTool && nativeTool.id === "browser-automation" && (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[14px] font-bold text-white/70">Fields</label>
+                <span className="text-[12px] text-white/40">
+                  Define any fields this task needs (optional) — the browser steps can reference them with{" "}
+                  {"{{fields.x}}"}.
+                </span>
+                <CommandFieldsEditor
+                  fields={fields}
+                  onChange={setFields}
+                  toolSpec={undefined}
+                  openId={openFieldId}
+                  onOpenChange={setOpenFieldId}
+                />
+              </div>
+
+              <div className="border-t border-clide-border pt-4">
+                <StepBuilder projectPath="" slug="" config={browserConfig} onSave={setBrowserConfig} readOnly={false} />
+              </div>
             </>
           )}
 

@@ -576,6 +576,67 @@ export const api = {
     await request()?.removeCustomPackageManager({ id });
   },
 
+  // Native browser automation (ticket 99) ----------------------------------
+
+  async listNativeTools(): Promise<import("../shared/types").NativeTool[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.listNativeTools({});
+    } catch {
+      return [];
+    }
+  },
+
+  async createNativeTask(input: {
+    project: string;
+    name: string;
+    description: string;
+    tags: string[];
+    nativeTool: string;
+    fields: import("../shared/types").TaskField[];
+    outputType: import("../shared/types").OutputType;
+    outputs: import("../shared/types").OutputDefinition[];
+    browserConfig?: import("../shared/types").BrowserAutomationConfig;
+  }): Promise<{ ok: boolean; slug?: string; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.createNativeTask(input);
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async saveBrowserConfig(
+    projectPath: string,
+    slug: string,
+    config: import("../shared/types").BrowserAutomationConfig,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.saveBrowserConfig({ projectPath, slug, config });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async runBrowserStep(
+    projectPath: string,
+    slug: string,
+    stepId: string,
+    inputs: Record<string, unknown>,
+  ): Promise<{ ok: boolean; trace?: string[]; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.runBrowserStep({ projectPath, slug, stepId, inputs });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
   async savePackageManagers(list: any[]): Promise<{ ok: boolean; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
