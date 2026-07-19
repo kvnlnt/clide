@@ -148,7 +148,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 96  | Rename "Form" → "Task"                | Product-wide rename: UI copy, menus, docs, code identifiers & filenames; disk format unchanged    | ✅ Done       |
 | 97  | Unread Result Badges                  | Sidebar badge = unread finished results; decrements on view; per-project tracking toggle          | ✅ Done       |
 | 98  | AI One-Line Run Summaries             | Accordion header shows an AI status report of what happened, persisted per run, with fallback     | ✅ Done       |
-| 99  | Native Tools & Browser Automation     | Epic: native tool registry; browser task = fields + recordable/replayable step builder            | ⬜ Open       |
+| 99  | Native Tools & Browser Automation     | Epic: native tool registry; browser task = fields + recordable/replayable step builder            | ✅ Done⁴      |
 | 100 | App Profile Interview                 | AI interviews the user → app-level profile (roles, goals, frustrations); self-improving loop      | ⬜ Open       |
 | 101 | Project Profile Interview             | Per-project AI-interviewed profile stored in the project folder; reuses the 100 engine            | ⬜ Open       |
 | 102 | Virtual File System                   | Epic: track any file on any system (local/remote), browse/search/open, run artifacts w/ previews  | ⬜ Open       |
@@ -169,3 +169,10 @@ history + rollback all landed; the edit-as-new-version wizard flow and the
 save-time UpgradeWorkflowsModal are wired but unreachable until a
 task-definition editor exists (same pre-existing gap as footnote ¹) — the
 modal ships ready for that follow-up.
+⁴ Ticket 99: model, engine, step builder, wizard routing, recorder window,
+replay & coordinate fallback all landed. Electrobun's `executeJavascript`
+is fire-and-forget (no return channel), so extract/assert results and
+recorded-event retrieval are best-effort until a page→bun RPC bridge is
+added (documented in `src/bun/browser/recorder.ts` and `browserRun.ts`);
+window-resize enforcement for coordinate mode awaits an Electrobun resize
+API.
