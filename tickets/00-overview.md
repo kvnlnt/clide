@@ -151,7 +151,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 99  | Native Tools & Browser Automation     | Epic: native tool registry; browser task = fields + recordable/replayable step builder            | ✅ Done⁴      |
 | 100 | App Profile Interview                 | AI interviews the user → app-level profile (roles, goals, frustrations); self-improving loop      | ⬜ Open       |
 | 101 | Project Profile Interview             | Per-project AI-interviewed profile stored in the project folder; reuses the 100 engine            | ⬜ Open       |
-| 102 | Virtual File System                   | Epic: track any file on any system (local/remote), browse/search/open, run artifacts w/ previews  | ⬜ Open       |
+| 102 | Virtual File System                   | Epic: track any file on any system (local/remote), browse/search/open, run artifacts w/ previews  | ✅ Done⁵      |
 | 103 | Package-Manager Tool Install          | Detect/register package managers; search their catalogs; consent-gated install → registry         | ✅ Done       |
 | 104 | Duplicate Workflow                    | One-click deep copy of a workflow (triggers disabled) straight into the editor                    | ✅ Done       |
 | 105 | Task Adoption & Versioning            | Draft → adopt lifecycle; edits fork new versions; opt-in retroactive workflow upgrades            | ✅ Done³      |
@@ -176,3 +176,8 @@ recorded-event retrieval are best-effort until a page→bun RPC bridge is
 added (documented in `src/bun/browser/recorder.ts` and `browserRun.ts`);
 window-resize enforcement for coordinate mode awaits an Electrobun resize
 API.
+⁵ Ticket 102: local provider, path-containment security, locations
+registry (app + project scope), fileAssociations, declared+observed
+run artifacts, artifact strip + preview modal, and Files surfaces all
+landed. Dropbox/Google Drive are interface-conforming connect stubs per
+the ticket; full OAuth connectors are follow-up tickets.
