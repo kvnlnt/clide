@@ -35,7 +35,7 @@ export default function ProjectToolbar() {
         className={`${btnBase} ${projectSurface === "forms" ? btnActive : btnInactive}`}
       >
         <FileText size={13} />
-        Forms
+        Tasks
       </button>
       <button
         onClick={() => setProjectSurface(projectSurface === "calendar" ? "thread" : "calendar")}

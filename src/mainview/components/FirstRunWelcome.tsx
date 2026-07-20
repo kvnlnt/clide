@@ -17,7 +17,10 @@ export default function FirstRunWelcome() {
 
   return (
     <div className="clide-scroll flex flex-1 flex-col items-center justify-center overflow-y-auto p-8">
-      <span className="clide-rise text-[11px] font-semibold uppercase tracking-wider text-white/30" style={{ animationDelay: "0ms" }}>
+      <span
+        className="clide-rise text-[11px] font-semibold uppercase tracking-wider text-white/30"
+        style={{ animationDelay: "0ms" }}
+      >
         Step 1 of 2
       </span>
       <div className="clide-rise mt-2 flex flex-col items-center" style={{ animationDelay: "80ms" }}>
@@ -25,12 +28,6 @@ export default function FirstRunWelcome() {
       </div>
       <p className="clide-rise mt-1 text-[23px] italic text-white/30" style={{ animationDelay: "180ms" }}>
         Your Automation Workhorse
-      </p>
-      <p
-        className="clide-rise mt-4 max-w-[380px] text-center text-[14px] text-white/50"
-        style={{ animationDelay: "260ms" }}
-      >
-        Your command line, as friendly forms. Let's get your first project going.
       </p>
 
       <div

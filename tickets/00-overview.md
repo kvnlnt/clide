@@ -46,7 +46,7 @@ Each task belongs to exactly one **project**, recorded as a `project` field in `
 
 ## Ticket index
 
-Completed implementation tickets are archived in [`tickets/done/`](done/). Open tickets live at the top level of [`tickets/`](.).
+Completed implementation tickets are archived in [`tickets/done/`](done/). Open tickets live at the top level of [`tickets/`](.). On-hold tickets sit in [`tickets/hold/`](hold/); raw idea notes in [`tickets/ideas/`](ideas/).
 
 | #   | Ticket                                | Description                                                                                       | Status        |
 | --- | ------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------- |
@@ -155,7 +155,26 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 103 | Package-Manager Tool Install          | Detect/register package managers; search their catalogs; consent-gated install → registry         | ✅ Done       |
 | 104 | Duplicate Workflow                    | One-click deep copy of a workflow (triggers disabled) straight into the editor                    | ✅ Done       |
 | 105 | Task Adoption & Versioning            | Draft → adopt lifecycle; edits fork new versions; opt-in retroactive workflow upgrades            | ✅ Done³      |
-| 106 | Project Audit Page & RSI Loop         | Epic: audit log + dossier + Datalog theorem prover over run facts + AI-prescribed improvements    | ⬜ Open       |
+| 106 | Project Audit Page & RSI Loop         | Epic: audit log + dossier + Datalog theorem prover over run facts + AI-prescribed improvements    | ⏸ Hold        |
+| 107 | Interview Model Picker                | Choose the AI service + model powering a profile interview; remembers last choice per scope       | ⬜ Open       |
+| 108 | Interview Error Recovery & Cancel     | No dead ends: cancel always available, failed AI calls get retry states, RPC timeouts caught      | ⬜ Open       |
+| 109 | Interview Draft Review Scroll Fix     | The "Here's the draft" review step scrolls (min-h-0 chain repair per ticket 68 pattern)           | ⬜ Open       |
+| 110 | Interview Question Logic & Categories | Stop parroting the user's answers back; each question shows the category it belongs to            | ⬜ Open       |
+| 111 | Interview-First Onboarding            | First-run opens with an interview; detects AI/project state and tailors flow + starter checklist  | ⬜ Open       |
+| 112 | Task List Kebab → Edit Form           | Remove the misaligned row kebab; Adopt/Version History/Edit Steps move into the edit surface      | ⬜ Open       |
+| 113 | Task List Row Click Behavior          | Clicking a row manages the task instead of dropping a draft run card into the thread              | ⬜ Open       |
+| 114 | Finish Forms→Tasks Rename & Seeder    | Rename leftover `form` identifiers (AppContext etc.); fixes `dev:*` NOT NULL form_slug crash      | ⬜ Open       |
+| 115 | Auto-Delete Empty Views               | Filterless views are cleaned up automatically (grace period while active; named views kept)       | ⬜ Open       |
+| 116 | AI View Naming + Manual Override      | AI names/renames views; double-click tab or inline rename; explicit names stop auto-naming        | ⬜ Open       |
+| 117 | Calendar Schedules Workflows          | Day-click composer picks tasks or workflows; scheduled workflow runs on the grid + scheduler      | ⬜ Open       |
+| 118 | Files Surface Fix & Theming           | Make the VFS Files surface actually work and restyle it to the app's visual language              | ⬜ Open       |
+| 119 | Compact Density Pass                  | Tighten margins/padding across surfaces; compact presentation where a tight default isn't enough  | ⬜ Open       |
+| 120 | Full-Width Screens                    | App/project pages drop centered max-width columns and use the full window width                   | ⬜ Open       |
+| 121 | Loading States & Smooth Transitions   | No FOUC: branded launch loader, animated surface/tab transitions, skeletons for async content     | ⬜ Open       |
+| 122 | Signature Motion & UX Flair           | Motion identity: signature easing, elevated run/status/delight moments, motion-design note        | ⬜ Open       |
+| 123 | Speech Mode                           | Wave icon toggles voice mode: speak commands through the command surface, app speaks results      | ⬜ Open       |
+| 124 | Diagnostics Screen                    | App/machine/workload health: memory, CPU, disk, running work, scheduler/watcher status, copy      | ⬜ Open       |
+| 125 | Transparency Reveal                   | All collected user data in one folder with a generated manifest and a Reveal-in-Finder button     | ⬜ Open       |
 
 ¹ Ticket 54: create flow (all 4 steps) is complete; reopening the wizard to
 edit an existing command-backed form (section 5) is not wired — "Edit" on
