@@ -1137,6 +1137,16 @@ export const api = {
     }
   },
 
+  async prepareTransparencyReveal(): Promise<{ ok: boolean; path?: string }> {
+    const r = request();
+    if (!r) return { ok: false };
+    try {
+      return await r.prepareTransparencyReveal({});
+    } catch {
+      return { ok: false };
+    }
+  },
+
   // Workflows (tickets 88-95) -------------------------------------------------
 
   async listWorkflows(project: string): Promise<Workflow[]> {

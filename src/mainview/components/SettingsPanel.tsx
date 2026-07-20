@@ -1,4 +1,4 @@
-import { Activity, Check, ChevronDown, ChevronRight, Loader, Pencil, Plus, Star, Trash2, X } from "lucide-react";
+import { Activity, Check, ChevronDown, ChevronRight, FolderOpen, Loader, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
@@ -116,6 +116,29 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
               className="flex items-center gap-1.5 rounded-md border border-clide-border px-2.5 py-1.5 text-[12px] text-white/70 hover:bg-white/5 hover:text-white"
             >
               <Activity size={13} /> Open
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between border-b border-white/5 pb-4">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[12px] font-bold uppercase tracking-wider text-white/40">Transparency</span>
+              <span className="text-[12px] text-white/40">
+                Everything CLIDE has collected about you — your profile, registered projects, AI services, tools, and
+                each project's own run history — in one folder, with a plain-text manifest
+              </span>
+            </div>
+            <button
+              onClick={async () => {
+                const res = await api.prepareTransparencyReveal();
+                if (res.ok && res.path) {
+                  await api.openFolder(res.path);
+                } else {
+                  toast("Couldn't prepare the transparency folder", "error");
+                }
+              }}
+              className="flex items-center gap-1.5 rounded-md border border-clide-border px-2.5 py-1.5 text-[12px] text-white/70 hover:bg-white/5 hover:text-white"
+            >
+              <FolderOpen size={13} /> Reveal
             </button>
           </div>
 

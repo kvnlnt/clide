@@ -203,7 +203,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 122 | Signature Motion & UX Flair           | Motion identity: signature easing, elevated run/status/delight moments, motion-design note        | ✅ Done¹²     |
 | 123 | Speech Mode                           | Wave icon toggles voice mode: speak commands through the command surface, app speaks results      | ✅ Done¹³     |
 | 124 | Diagnostics Screen                    | App/machine/workload health: memory, CPU, disk, running work, scheduler/watcher status, copy      | ✅ Done¹⁴     |
-| 125 | Transparency Reveal                   | All collected user data in one folder with a generated manifest and a Reveal-in-Finder button     | ⬜ Open       |
+| 125 | Transparency Reveal                   | All collected user data in one folder with a generated manifest and a Reveal-in-Finder button     | ✅ Done¹⁵     |
 
 ¹ Ticket 54: create flow (all 4 steps) is complete; reopening the wizard to
 edit an existing command-backed form (section 5) is not wired — "Edit" on
@@ -305,3 +305,14 @@ button. Full-window takeover launched from Settings, 5s refresh only
 while open, Copy-diagnostics plain-text export. App verified booting
 error-free; the screen itself needs an active project to reach, so not
 eyes-on verified.
+¹⁵ Ticket 125: new `src/bun/transparency.ts` holds a code-level registry
+(`collectionEntries()`) of every place the app persists user data —
+app-scoped files under `appDataDir()`, the keychain for AI credentials,
+and one entry per registered project pointing at its own self-contained
+folder (ticket 17). `TRANSPARENCY.txt` is regenerated from that registry
+on every reveal rather than hand-written, so it can't drift from what's
+actually collected. Settings' new "Transparency" row calls
+`prepareTransparencyReveal` then reuses the existing `api.openFolder`
+RPC. Verified via `tsc --noEmit` and the Vite preview (clean boot, no
+console errors); the Reveal button itself needs an active project to
+reach, so not eyes-on click-tested.

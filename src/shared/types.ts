@@ -1160,6 +1160,9 @@ export type ClideRPC = {
       /** Point-in-time app/machine/workload snapshot (ticket 124) — gathered fresh on every call, nothing polls. */
       getDiagnostics: { params: Record<string, never>; response: DiagnosticsReport };
 
+      /** Regenerates the transparency manifest and returns the app data dir to reveal (ticket 125). */
+      prepareTransparencyReveal: { params: Record<string, never>; response: { ok: boolean; path?: string } };
+
       // Workflows (tickets 88-95) ---------------------------------------------
       listWorkflows: { params: { project: string }; response: Workflow[] };
       saveWorkflow: {

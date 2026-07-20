@@ -1165,6 +1165,16 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         return await gatherDiagnostics();
       },
 
+      prepareTransparencyReveal: async () => {
+        try {
+          const { prepareTransparencyReveal } = await import("./transparency");
+          const path = await prepareTransparencyReveal();
+          return { ok: true, path };
+        } catch {
+          return { ok: false };
+        }
+      },
+
       // Workflows (tickets 88-95) ---------------------------------------------
 
       listWorkflows: async ({ project }) => {
