@@ -1,18 +1,30 @@
 /**
- * Files page (ticket 102): browse, search, and manage VFS locations.
- * App-scoped locations in Settings; project-scoped on project toolbar.
+ * Files page (ticket 102, restyled/fixed ticket 118): browse, search, and
+ * manage VFS locations. App-scoped locations in Settings; project-scoped on
+ * the project toolbar.
  */
 
+import { ChevronUp, File, Folder, FolderOpen, FolderPlus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { VfsLocation, VfsStatResult } from "../../../shared/types";
+import { useApp } from "../../context/AppContext";
 import { api } from "../../rpc";
+import type { VfsLocation, VfsStatResult } from "../../types/tasks";
+import { useUIFeedback } from "../UIFeedback";
 
 interface FilesPageProps {
   projectName?: string;
   scope: "app" | "project";
 }
 
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function FilesPage({ projectName, scope }: FilesPageProps) {
+  const { projectMeta } = useApp();
+  const { confirm, toast } = useUIFeedback();
   const [locations, setLocations] = useState<VfsLocation[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<VfsLocation | null>(null);
   const [currentPath, setCurrentPath] = useState<string>("");
@@ -20,9 +32,15 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Ticket 118: project-scoped locations live under the project's real
+  // folder path, not its display name — the registry keys .vfs.json by path.
+  const projectPath = projectName ? projectMeta.find((p) => p.name === projectName)?.path : undefined;
 
   useEffect(() => {
-    loadLocations();
+    void loadLocations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectName, scope]);
 
   async function loadLocations() {
@@ -30,11 +48,12 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
     const filtered =
       scope === "app"
         ? locs.filter((loc) => loc.scope === "app")
-        : locs.filter((loc) => loc.scope === "project" && loc.project === projectName);
+        : locs.filter((loc) => loc.scope === "project" && loc.project === projectPath);
     setLocations(filtered);
   }
 
   async function handleAddLocation() {
+    if (scope === "project" && !projectPath) return;
     const folder = await api.chooseDirectory();
     if (!folder) return;
 
@@ -45,30 +64,37 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
       provider: "local",
       config: { root: folder },
       scope,
-      project: scope === "project" ? projectName : undefined,
+      project: scope === "project" ? projectPath : undefined,
       watch: false,
     };
 
     const result = await api.addVfsLocation(location);
     if (result.ok) {
+      toast(`Added "${name}"`);
       await loadLocations();
     } else {
-      alert(`Failed to add location: ${result.error}`);
+      toast(result.error ?? "Failed to add location", "error");
     }
   }
 
-  async function handleRemoveLocation(id: string) {
-    if (!confirm("Remove this location? Past runs' artifact records will be preserved.")) return;
+  async function handleRemoveLocation(location: VfsLocation) {
+    const res = await confirm({
+      title: `Remove "${location.name}"?`,
+      message: "Past runs' artifact records are preserved — only the location itself is removed.",
+      confirmLabel: "Remove",
+    });
+    if (!res.ok) return;
 
-    const result = await api.removeVfsLocation(id, projectName);
+    const result = await api.removeVfsLocation(location.id, projectName);
     if (result.ok) {
-      if (selectedLocation?.id === id) {
+      if (selectedLocation?.id === location.id) {
         setSelectedLocation(null);
         setEntries([]);
       }
+      toast("Location removed");
       await loadLocations();
     } else {
-      alert(`Failed to remove location: ${result.error}`);
+      toast(result.error ?? "Failed to remove location", "error");
     }
   }
 
@@ -77,16 +103,19 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
     setCurrentPath("");
     setSearchQuery("");
     setSearchResults([]);
+    setError(null);
     await loadEntries(location, "");
   }
 
   async function loadEntries(location: VfsLocation, path: string) {
     setLoading(true);
-    const result = await api.vfsList(location.id, path);
+    setError(null);
+    const result = await api.vfsList(location.id, path, projectName);
     setLoading(false);
 
     if (result.error) {
-      alert(`Failed to list directory: ${result.error}`);
+      setError(result.error);
+      setEntries([]);
       return;
     }
 
@@ -116,15 +145,18 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
     setSearchQuery(query);
     if (!selectedLocation || !query.trim()) {
       setSearchResults([]);
+      setError(null);
       return;
     }
 
     setLoading(true);
-    const result = await api.vfsSearch(selectedLocation.id, query);
+    setError(null);
+    const result = await api.vfsSearch(selectedLocation.id, query, projectName);
     setLoading(false);
 
     if (result.error) {
-      alert(`Search failed: ${result.error}`);
+      setError(result.error);
+      setSearchResults([]);
       return;
     }
 
@@ -135,174 +167,206 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
     if (!selectedLocation) return;
 
     const path = currentPath ? `${currentPath}/${entry.name}` : entry.name;
-    const result = await api.vfsOpen(selectedLocation.id, path, reveal);
+    const result = await api.vfsOpen(selectedLocation.id, path, reveal, projectName);
 
     if (!result.ok) {
-      alert(`Failed to open file: ${result.error}`);
+      toast(result.error ?? "Failed to open file", "error");
     }
   }
 
+  const rowClass = "flex items-center gap-3 px-4 py-2.5 text-[13px] hover:bg-white/5";
+
   return (
-    <div className="h-full flex flex-col bg-white">
-      {/* Locations sidebar */}
-      <div className="flex h-full">
-        <div className="w-64 border-r border-gray-200 flex flex-col">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold mb-3">{scope === "app" ? "App Locations" : "Project Locations"}</h2>
-            <button
-              onClick={handleAddLocation}
-              className="w-full px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
-            >
-              + Add Location
-            </button>
-          </div>
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex shrink-0 items-baseline gap-2 px-8 pb-4 pt-7">
+        <h1 className="text-[20px] font-bold text-white">Files</h1>
+        <span className="text-[13px] text-white/40">
+          {scope === "app" ? "App locations" : (projectName ?? "Project locations")}
+        </span>
+      </div>
 
-          <div className="flex-1 overflow-y-auto">
-            {locations.length === 0 && (
-              <div className="p-4 text-sm text-gray-500 text-center">
-                No locations yet.
-                <br />
-                CLIDE only watches where you point it.
-              </div>
-            )}
-            {locations.map((loc) => (
+      <div className="clide-scroll flex flex-1 overflow-hidden px-8 pb-8">
+        <div className="flex w-full overflow-hidden rounded-md border border-clide-border">
+          {/* Locations sidebar */}
+          <div className="flex w-64 shrink-0 flex-col border-r border-clide-border bg-clide-panel">
+            <div className="border-b border-clide-border p-3">
               <button
-                key={loc.id}
-                onClick={() => handleSelectLocation(loc)}
-                className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                  selectedLocation?.id === loc.id ? "bg-blue-50" : ""
-                }`}
+                disabled={scope === "project" && !projectPath}
+                onClick={() => void handleAddLocation()}
+                className="flex w-full items-center justify-center gap-1.5 rounded-md bg-white/10 px-3 py-2 text-[12px] font-medium text-white hover:bg-white/20 disabled:opacity-40"
               >
-                <div className="font-medium text-sm">{loc.name}</div>
-                <div className="text-xs text-gray-500 mt-1 truncate">{loc.config.root as string}</div>
+                <FolderPlus size={13} /> Add Location
               </button>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* File browser */}
-        <div className="flex-1 flex flex-col">
-          {selectedLocation ? (
-            <>
-              {/* Toolbar */}
-              <div className="p-4 border-b border-gray-200 flex items-center gap-3">
-                {currentPath && (
-                  <button
-                    onClick={handleGoUp}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
-                  >
-                    ↑ Up
-                  </button>
-                )}
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    placeholder="Search files..."
-                    className="w-full px-3 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <button
-                  onClick={() => handleRemoveLocation(selectedLocation.id)}
-                  className="px-3 py-1 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50"
-                >
-                  Remove
-                </button>
-              </div>
-
-              {/* Breadcrumb */}
-              {currentPath && (
-                <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-sm text-gray-600">
-                  {selectedLocation.name} / {currentPath}
+            <div className="clide-scroll flex-1 overflow-y-auto">
+              {locations.length === 0 && (
+                <div className="px-4 py-6 text-center text-[12px] text-white/30">
+                  No locations yet.
+                  <br />
+                  CLIDE only watches where you point it.
                 </div>
               )}
-
-              {/* File list or search results */}
-              <div className="flex-1 overflow-y-auto">
-                {loading && (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              {locations.map((loc) => (
+                <button
+                  key={loc.id}
+                  onClick={() => void handleSelectLocation(loc)}
+                  className={`group flex w-full items-center gap-2 border-b border-white/5 px-4 py-3 text-left ${
+                    selectedLocation?.id === loc.id ? "bg-white/10" : "hover:bg-white/5"
+                  }`}
+                >
+                  <Folder size={14} className="shrink-0 text-white/40" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13px] font-medium text-white">{loc.name}</div>
+                    <div className="truncate text-[11px] text-white/40">{loc.config.root as string}</div>
                   </div>
-                )}
-
-                {!loading && searchResults.length > 0 && (
-                  <div className="divide-y divide-gray-100">
-                    {searchResults.map((path, idx) => (
-                      <div key={idx} className="px-4 py-3 hover:bg-gray-50">
-                        <div className="text-sm">{path}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {!loading && searchQuery && searchResults.length === 0 && (
-                  <div className="p-4 text-sm text-gray-500 text-center">No results found.</div>
-                )}
-
-                {!loading && !searchQuery && entries.length === 0 && (
-                  <div className="p-4 text-sm text-gray-500 text-center">Empty directory.</div>
-                )}
-
-                {!loading && !searchQuery && entries.length > 0 && (
-                  <div className="divide-y divide-gray-100">
-                    {entries.map((entry, idx) => (
-                      <div
-                        key={idx}
-                        className="px-4 py-3 hover:bg-gray-50 flex items-center gap-3 cursor-pointer"
-                        onClick={() => (entry.isDirectory ? handleNavigate(entry) : undefined)}
-                      >
-                        <div className="flex-1">
-                          <div className="text-sm font-medium">
-                            {entry.isDirectory && "📁 "}
-                            {!entry.isDirectory && "📄 "}
-                            {entry.name}
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            {!entry.isDirectory && formatSize(entry.size)} · {new Date(entry.mtime).toLocaleString()}
-                          </div>
-                        </div>
-                        {!entry.isDirectory && (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenFile(entry, false);
-                              }}
-                              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100"
-                            >
-                              Open
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenFile(entry, true);
-                              }}
-                              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100"
-                            >
-                              Reveal
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
-              Select a location to browse files
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleRemoveLocation(loc);
+                    }}
+                    title="Remove location"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-white/0 group-hover:text-white/40 hover:!text-red-400"
+                  >
+                    <Trash2 size={12} />
+                  </span>
+                </button>
+              ))}
             </div>
-          )}
+          </div>
+
+          {/* File browser */}
+          <div className="flex flex-1 flex-col bg-clide-bg">
+            {selectedLocation ? (
+              <>
+                {/* Toolbar */}
+                <div className="flex shrink-0 items-center gap-2 border-b border-clide-border px-4 py-3">
+                  {currentPath && (
+                    <button
+                      onClick={() => void handleGoUp()}
+                      className="flex items-center gap-1 rounded-md border border-clide-border px-2.5 py-1.5 text-[12px] text-white/70 hover:bg-white/5 hover:text-white"
+                    >
+                      <ChevronUp size={13} /> Up
+                    </button>
+                  )}
+                  <div className="flex flex-1 items-center gap-2 rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5">
+                    <Search size={13} className="shrink-0 text-white/30" />
+                    <input
+                      value={searchQuery}
+                      onChange={(e) => void handleSearch(e.target.value)}
+                      placeholder="Search files…"
+                      className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/40"
+                    />
+                    {searchQuery && (
+                      <button onClick={() => void handleSearch("")} className="shrink-0 text-white/30 hover:text-white">
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Breadcrumb */}
+                {currentPath && !searchQuery && (
+                  <div className="shrink-0 border-b border-clide-border bg-clide-panel/60 px-4 py-2 text-[12px] text-white/50">
+                    {selectedLocation.name} / {currentPath}
+                  </div>
+                )}
+
+                {/* File list or search results */}
+                <div className="clide-scroll flex-1 overflow-y-auto">
+                  {error && (
+                    <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-md border border-red-400/30 bg-red-400/10 px-3 py-2 text-[12px] text-red-300">
+                      <span>{error}</span>
+                      <button
+                        onClick={() =>
+                          searchQuery ? void handleSearch(searchQuery) : void loadEntries(selectedLocation, currentPath)
+                        }
+                        className="shrink-0 rounded px-2 py-0.5 font-medium text-red-200 hover:bg-red-400/20"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+
+                  {loading && <div className="py-12 text-center text-[13px] text-white/30">Loading…</div>}
+
+                  {!loading && searchQuery && searchResults.length > 0 && (
+                    <div className="flex flex-col divide-y divide-white/5">
+                      {searchResults.map((path, idx) => (
+                        <div key={idx} className={rowClass}>
+                          <File size={14} className="shrink-0 text-white/30" />
+                          <span className="min-w-0 truncate text-white/80">{path}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!loading && !error && searchQuery && searchResults.length === 0 && (
+                    <div className="py-12 text-center text-[13px] italic text-white/30">No results found.</div>
+                  )}
+
+                  {!loading && !error && !searchQuery && entries.length === 0 && (
+                    <div className="py-12 text-center text-[13px] italic text-white/30">Empty directory.</div>
+                  )}
+
+                  {!loading && !searchQuery && entries.length > 0 && (
+                    <div className="flex flex-col divide-y divide-white/5">
+                      {entries.map((entry, idx) => (
+                        <div
+                          key={idx}
+                          className={`${rowClass} ${entry.isDirectory ? "cursor-pointer" : ""}`}
+                          onClick={() => (entry.isDirectory ? void handleNavigate(entry) : undefined)}
+                        >
+                          {entry.isDirectory ? (
+                            <Folder size={14} className="shrink-0 text-white/40" />
+                          ) : (
+                            <File size={14} className="shrink-0 text-white/30" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-white">{entry.name}</div>
+                            <div className="text-[11px] text-white/40">
+                              {!entry.isDirectory && `${formatSize(entry.size)} · `}
+                              {new Date(entry.mtime).toLocaleString()}
+                            </div>
+                          </div>
+                          {!entry.isDirectory && (
+                            <div className="flex shrink-0 gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleOpenFile(entry, false);
+                                }}
+                                title="Open"
+                                className="flex h-7 w-7 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
+                              >
+                                <File size={13} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleOpenFile(entry, true);
+                                }}
+                                title="Reveal in Finder"
+                                className="flex h-7 w-7 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
+                              >
+                                <FolderOpen size={13} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-[13px] italic text-white/30">
+                Select a location to browse files
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

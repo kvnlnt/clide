@@ -1076,25 +1076,44 @@ export type ClideRPC = {
         params: { id: string; project?: string };
         response: { ok: boolean; error?: string };
       };
+      /**
+       * `project` (ticket 118 fix): locations may be project-scoped, and
+       * `getLocation` can only find those when given the owning project's
+       * path — every call site below must pass the project it's browsing.
+       */
       vfsList: {
-        params: { locationId: string; path?: string };
+        params: { locationId: string; path?: string; project?: string };
         response: { entries: VfsStatResult[]; error?: string };
       };
       vfsStat: {
-        params: { locationId: string; path: string };
+        params: { locationId: string; path: string; project?: string };
         response: VfsStatResult | null;
       };
       vfsSearch: {
-        params: { locationId: string; query: string };
+        params: { locationId: string; query: string; project?: string };
         response: { paths: string[]; truncated?: boolean; error?: string };
       };
       vfsOpen: {
-        params: { locationId: string; path: string; reveal?: boolean };
+        params: { locationId: string; path: string; reveal?: boolean; project?: string };
         response: { ok: boolean; error?: string };
       };
       vfsReadPreview: {
-        params: { locationId: string; path: string; maxBytes?: number };
+        params: { locationId: string; path: string; maxBytes?: number; project?: string };
         response: { base64: string; mime: string; error?: string };
+      };
+      /**
+       * Read/open a fully-qualified VFS URI directly (ticket 118) — for run
+       * artifacts, which carry a self-contained URI (e.g. "local:///Users/…")
+       * that isn't tied to any registered location, so there's no locationId
+       * to resolve through the registry.
+       */
+      vfsReadByUri: {
+        params: { uri: string; maxBytes?: number };
+        response: { base64: string; mime: string; error?: string };
+      };
+      vfsOpenByUri: {
+        params: { uri: string; reveal?: boolean };
+        response: { ok: boolean; error?: string };
       };
       getRunArtifacts: {
         params: { runId: string };

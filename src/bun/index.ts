@@ -993,11 +993,12 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
-      vfsList: async ({ locationId, path }) => {
+      vfsList: async ({ locationId, path, project }) => {
         try {
           const { getLocation, getProvider } = await import("./vfs/registry");
           const { LocalProvider } = await import("./vfs/local");
-          const location = await getLocation(locationId);
+          const projectPath = project ? (await pathForProjectName(project))?.path : undefined;
+          const location = await getLocation(locationId, projectPath);
           if (!location) return { entries: [], error: "Location not found" };
           const provider = getProvider(location.provider);
           if (!provider) return { entries: [], error: "Provider not found" };
@@ -1017,11 +1018,12 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
-      vfsStat: async ({ locationId, path }) => {
+      vfsStat: async ({ locationId, path, project }) => {
         try {
           const { getLocation, getProvider } = await import("./vfs/registry");
           const { LocalProvider } = await import("./vfs/local");
-          const location = await getLocation(locationId);
+          const projectPath = project ? (await pathForProjectName(project))?.path : undefined;
+          const location = await getLocation(locationId, projectPath);
           if (!location) return null;
           const provider = getProvider(location.provider);
           if (!provider) return null;
@@ -1040,11 +1042,12 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
-      vfsSearch: async ({ locationId, query }) => {
+      vfsSearch: async ({ locationId, query, project }) => {
         try {
           const { getLocation, getProvider } = await import("./vfs/registry");
           const { LocalProvider } = await import("./vfs/local");
-          const location = await getLocation(locationId);
+          const projectPath = project ? (await pathForProjectName(project))?.path : undefined;
+          const location = await getLocation(locationId, projectPath);
           if (!location) return { paths: [], error: "Location not found" };
           const provider = getProvider(location.provider);
           if (!provider) return { paths: [], error: "Provider not found" };
@@ -1063,11 +1066,12 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
-      vfsOpen: async ({ locationId, path, reveal }) => {
+      vfsOpen: async ({ locationId, path, reveal, project }) => {
         try {
           const { getLocation, getProvider } = await import("./vfs/registry");
           const { LocalProvider } = await import("./vfs/local");
-          const location = await getLocation(locationId);
+          const projectPath = project ? (await pathForProjectName(project))?.path : undefined;
+          const location = await getLocation(locationId, projectPath);
           if (!location) return { ok: false, error: "Location not found" };
           const provider = getProvider(location.provider);
           if (!provider) return { ok: false, error: "Provider not found" };
@@ -1086,11 +1090,12 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
-      vfsReadPreview: async ({ locationId, path, maxBytes }) => {
+      vfsReadPreview: async ({ locationId, path, maxBytes, project }) => {
         try {
           const { getLocation, getProvider, resolveSafe } = await import("./vfs/registry");
           const { LocalProvider } = await import("./vfs/local");
-          const location = await getLocation(locationId);
+          const projectPath = project ? (await pathForProjectName(project))?.path : undefined;
+          const location = await getLocation(locationId, projectPath);
           if (!location) return { base64: "", mime: "", error: "Location not found" };
           const provider = getProvider(location.provider);
           if (!provider) return { base64: "", mime: "", error: "Provider not found" };
@@ -1118,6 +1123,35 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           };
         } catch (err) {
           return { base64: "", mime: "", error: String(err) };
+        }
+      },
+
+      // Ticket 118: run artifacts carry a self-contained URI (e.g.
+      // "local:///Users/…") that isn't tied to any registered location, so
+      // these dispatch straight to the provider by URI scheme.
+      vfsReadByUri: async ({ uri, maxBytes }) => {
+        try {
+          const { getProvider } = await import("./vfs/registry");
+          const scheme = uri.split("://")[0] ?? "";
+          const provider = getProvider(scheme);
+          if (!provider) return { base64: "", mime: "", error: `No provider for "${scheme}"` };
+          const result = await provider.read(uri, maxBytes);
+          if (result.error) return { base64: "", mime: "", error: result.error };
+          return { base64: Buffer.from(result.data).toString("base64"), mime: result.mime };
+        } catch (err) {
+          return { base64: "", mime: "", error: String(err) };
+        }
+      },
+
+      vfsOpenByUri: async ({ uri, reveal }) => {
+        try {
+          const { getProvider } = await import("./vfs/registry");
+          const scheme = uri.split("://")[0] ?? "";
+          const provider = getProvider(scheme);
+          if (!provider) return { ok: false, error: `No provider for "${scheme}"` };
+          return await provider.openNative(uri, reveal);
+        } catch (err) {
+          return { ok: false, error: String(err) };
         }
       },
 

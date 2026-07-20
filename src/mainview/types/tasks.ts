@@ -57,6 +57,8 @@ export type {
   ToolSpecSubcommand,
   UIState,
   UserProfile,
+  VfsLocation,
+  VfsStatResult,
   Workflow,
   WorkflowPlanEntry,
   WorkflowRun,

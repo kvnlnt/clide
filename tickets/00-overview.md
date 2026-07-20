@@ -167,7 +167,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 115 | Auto-Delete Empty Views               | Filterless views are cleaned up automatically (grace period while active; named views kept)       | ✅ Done       |
 | 116 | AI View Naming + Manual Override      | AI names/renames views; double-click tab or inline rename; explicit names stop auto-naming        | ✅ Done       |
 | 117 | Calendar Schedules Workflows          | Day-click composer picks tasks or workflows; scheduled workflow runs on the grid + scheduler      | ✅ Done       |
-| 118 | Files Surface Fix & Theming           | Make the VFS Files surface actually work and restyle it to the app's visual language              | ⬜ Open       |
+| 118 | Files Surface Fix & Theming           | Make the VFS Files surface actually work and restyle it to the app's visual language              | ✅ Done⁸      |
 | 119 | Compact Density Pass                  | Tighten margins/padding across surfaces; compact presentation where a tight default isn't enough  | ⬜ Open       |
 | 120 | Full-Width Screens                    | App/project pages drop centered max-width columns and use the full window width                   | ⬜ Open       |
 | 121 | Loading States & Smooth Transitions   | No FOUC: branded launch loader, animated surface/tab transitions, skeletons for async content     | ⬜ Open       |
@@ -221,3 +221,10 @@ the on-disk `forms/` directory, `form.json`, `meta.json`, the
 step discriminant (reused by `workflowDraft.ts` for the AI response
 parser) — all firewalled per the ticket-96 disk-format boundary and
 already documented as such in `history.ts`/`store.ts`/`loader.ts`.
+⁸ Ticket 118: confirmed and fixed three root causes — the VFS RPCs never
+threaded a `project` param so project-scoped locations could never be
+found; `FilesPage.tsx` stored a project's display name where the
+registry expects a path; `ArtifactModal.tsx`'s preview loading was dead
+code. Verified via `tsc` and code tracing only — not exercised in the
+running Electrobun app from this environment; worth a live pass with
+`bun run dev:regular` before fully trusting it.

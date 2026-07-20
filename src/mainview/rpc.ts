@@ -1028,21 +1028,26 @@ export const api = {
   async vfsList(
     locationId: string,
     path?: string,
+    project?: string,
   ): Promise<{ entries: import("../shared/types").VfsStatResult[]; error?: string }> {
     const r = request();
     if (!r) return { entries: [] };
     try {
-      return await r.vfsList({ locationId, path });
+      return await r.vfsList({ locationId, path, project });
     } catch (err) {
       return { entries: [], error: String(err) };
     }
   },
 
-  async vfsStat(locationId: string, path: string): Promise<import("../shared/types").VfsStatResult | null> {
+  async vfsStat(
+    locationId: string,
+    path: string,
+    project?: string,
+  ): Promise<import("../shared/types").VfsStatResult | null> {
     const r = request();
     if (!r) return null;
     try {
-      return await r.vfsStat({ locationId, path });
+      return await r.vfsStat({ locationId, path, project });
     } catch {
       return null;
     }
@@ -1051,21 +1056,27 @@ export const api = {
   async vfsSearch(
     locationId: string,
     query: string,
+    project?: string,
   ): Promise<{ paths: string[]; truncated?: boolean; error?: string }> {
     const r = request();
     if (!r) return { paths: [] };
     try {
-      return await r.vfsSearch({ locationId, query });
+      return await r.vfsSearch({ locationId, query, project });
     } catch (err) {
       return { paths: [], error: String(err) };
     }
   },
 
-  async vfsOpen(locationId: string, path: string, reveal?: boolean): Promise<{ ok: boolean; error?: string }> {
+  async vfsOpen(
+    locationId: string,
+    path: string,
+    reveal?: boolean,
+    project?: string,
+  ): Promise<{ ok: boolean; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
-      return await r.vfsOpen({ locationId, path, reveal });
+      return await r.vfsOpen({ locationId, path, reveal, project });
     } catch (err) {
       return { ok: false, error: String(err) };
     }
@@ -1075,13 +1086,34 @@ export const api = {
     locationId: string,
     path: string,
     maxBytes?: number,
+    project?: string,
   ): Promise<{ base64: string; mime: string; error?: string }> {
     const r = request();
     if (!r) return { base64: "", mime: "", error: "Bridge unavailable" };
     try {
-      return await r.vfsReadPreview({ locationId, path, maxBytes });
+      return await r.vfsReadPreview({ locationId, path, maxBytes, project });
     } catch (err) {
       return { base64: "", mime: "", error: String(err) };
+    }
+  },
+
+  async vfsReadByUri(uri: string, maxBytes?: number): Promise<{ base64: string; mime: string; error?: string }> {
+    const r = request();
+    if (!r) return { base64: "", mime: "", error: "Bridge unavailable" };
+    try {
+      return await r.vfsReadByUri({ uri, maxBytes });
+    } catch (err) {
+      return { base64: "", mime: "", error: String(err) };
+    }
+  },
+
+  async vfsOpenByUri(uri: string, reveal?: boolean): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.vfsOpenByUri({ uri, reveal });
+    } catch (err) {
+      return { ok: false, error: String(err) };
     }
   },
 
