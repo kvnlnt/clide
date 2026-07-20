@@ -56,6 +56,7 @@ function Workspace() {
     closeViewSettings,
     workflowEditor,
     closeWorkflowEditor,
+    onboardingActive,
     profileInterview,
     openProfileInterview,
     closeProfileInterview,
@@ -85,6 +86,7 @@ function Workspace() {
         newProjectOpen ||
         viewSettingsOpen ||
         aiWizardOpen ||
+        onboardingActive ||
         workflowEditor !== null ||
         profileInterview !== null;
       if (overlayOpen || !activeProject) return;
@@ -122,6 +124,7 @@ function Workspace() {
       newProjectOpen,
       viewSettingsOpen,
       aiWizardOpen,
+      onboardingActive,
       workflowEditor,
       profileInterview,
       activeProject,
@@ -146,6 +149,7 @@ function Workspace() {
         newProjectOpen ||
         viewSettingsOpen ||
         aiWizardOpen ||
+        onboardingActive ||
         workflowEditor !== null ||
         profileInterview !== null;
       if (overlayOpen || !activeProject) return;
@@ -193,6 +197,7 @@ function Workspace() {
     newProjectOpen,
     viewSettingsOpen,
     aiWizardOpen,
+    onboardingActive,
     workflowEditor,
     profileInterview,
     activeProject,
@@ -206,12 +211,10 @@ function Workspace() {
       </header>
       <div className="flex min-h-0 flex-1 text-white">
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-          {!activeProject ? (
-            projects.length === 0 ? (
-              <FirstRunWelcome />
-            ) : (
-              <WelcomeScreen />
-            )
+          {onboardingActive || (!activeProject && projects.length === 0) ? (
+            <FirstRunWelcome />
+          ) : !activeProject ? (
+            <WelcomeScreen />
           ) : activeView ? (
             <>
               <ViewToolbar view={activeView} />
@@ -241,7 +244,7 @@ function Workspace() {
           )}
           {runPickerOpen && activeProject && <RunPicker onClose={closeRunPicker} />}
         </div>
-        {sidebarOpen && activeProject !== null && <Sidebar />}
+        {sidebarOpen && activeProject !== null && !onboardingActive && <Sidebar />}
       </div>
 
       {/* Full-window overlay: covers the header/tab strip too, so a minimal

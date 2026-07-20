@@ -159,8 +159,8 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 107 | Interview Model Picker                | Choose the AI service + model powering a profile interview; remembers last choice per scope       | ⬜ Open       |
 | 108 | Interview Error Recovery & Cancel     | No dead ends: cancel always available, failed AI calls get retry states, RPC timeouts caught      | ⬜ Open       |
 | 109 | Interview Draft Review Scroll Fix     | The "Here's the draft" review step scrolls (min-h-0 chain repair per ticket 68 pattern)           | ⬜ Open       |
-| 110 | Interview Question Logic & Categories | Stop parroting the user's answers back; each question shows the category it belongs to            | ⬜ Open       |
-| 111 | Interview-First Onboarding            | First-run opens with an interview; detects AI/project state and tailors flow + starter checklist  | ⬜ Open       |
+| 110 | Interview Question Logic & Categories | Stop parroting the user's answers back; each question shows the category it belongs to            | ✅ Done       |
+| 111 | Interview-First Onboarding            | First-run opens with an interview; detects AI/project state and tailors flow + starter checklist  | ✅ Done⁶      |
 | 112 | Task List Kebab → Edit Form           | Remove the misaligned row kebab; Adopt/Version History/Edit Steps move into the edit surface      | ⬜ Open       |
 | 113 | Task List Row Click Behavior          | Clicking a row manages the task instead of dropping a draft run card into the thread              | ⬜ Open       |
 | 114 | Finish Forms→Tasks Rename & Seeder    | Rename leftover `form` identifiers (AppContext etc.); fixes `dev:*` NOT NULL form_slug crash      | ⬜ Open       |
@@ -200,3 +200,12 @@ registry (app + project scope), fileAssociations, declared+observed
 run artifacts, artifact strip + preview modal, and Files surfaces all
 landed. Dropbox/Google Drive are interface-conforming connect stubs per
 the ticket; full OAuth connectors are follow-up tickets.
+⁶ Ticket 111: the onboarding interview is scripted (fixed questions),
+not AI-generated — it necessarily runs before any AI service is
+configured, so the ticket-100 engine can't drive it. Answers land in
+the app profile; the deeper AI interview remains in Settings → Profile.
+AI is a requirement: the flow never offers a no-AI path and always ends
+in the AI wizard unless a service already exists. Starter relevance is
+copy-level (the checklist echoes the user's stated goal); AI-ranked
+starter selection would be a follow-up once a service exists at that
+point in the flow.

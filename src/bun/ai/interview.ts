@@ -75,7 +75,10 @@ function renderSections(sections: ProfileSection[]): string {
 function renderTranscript(transcript: InterviewTurn[]): string {
   if (transcript.length === 0) return "(no questions asked yet)";
   return transcript
-    .map((t, i) => `Q${i + 1}: ${t.question}\nA${i + 1}: ${t.answer.trim() || "(skipped)"}`)
+    .map((t, i) => {
+      const cat = t.category ? ` [${t.category}]` : "";
+      return `Q${i + 1}${cat}: ${t.question}\nA${i + 1}: ${t.answer.trim() || "(skipped)"}`;
+    })
     .join("\n");
 }
 
@@ -102,17 +105,20 @@ export async function nextInterviewQuestion(
   service: AIService,
   ctx: InterviewContext,
   transcript: InterviewTurn[],
-): Promise<{ question: string | null }> {
+): Promise<{ question: string | null; category?: string }> {
   if (transcript.length >= MAX_INTERVIEW_QUESTIONS) return { question: null };
 
+  const specs = specsFor(ctx.scope);
   const system = [
     "You are CLIDE's profile interviewer: a warm, curious colleague, not a form.",
     subjectLine(ctx),
-    'Respond ONLY with a single JSON object: { "question": string } to ask the next question, or { "done": true } to end the session.',
+    'Respond ONLY with a single JSON object: { "question": string, "section": string } to ask the next question, or { "done": true } to end the session.',
+    `"section" is the id of the profile section the question targets — one of: ${specs.map((s) => s.id).join(", ")}.`,
     "Rules:",
     "- One question at a time, conversational, plain language. No multi-part questions.",
     `- ${MIN_QUESTIONS_BEFORE_DONE}-${MAX_INTERVIEW_QUESTIONS} questions per session; end early once further questions won't earn much.`,
-    '- When an existing profile has content, ask delta questions ("Last time you said X — still true?") instead of restarting.',
+    "- Every question must seek NEW information — something not already in the session transcript, the existing profile, or the app profile.",
+    "- Never quote or restate the user's own words back just to ask whether they're still true. When revisiting a stored answer, ask what has changed or dig into a specific aspect of it instead.",
     "- Never re-ask what the existing profile or the app profile already answers.",
     ctx.scope === "project" && !ctx.appProfileBlock
       ? "- No app profile exists yet, so ask ONE compressed who-are-you question early, then focus on the project."
@@ -129,7 +135,9 @@ export async function nextInterviewQuestion(
   const raw = await complete(service, { system, user: commonContext(ctx, transcript) });
   const parsed = extractJson(raw);
   if (isObject(parsed) && typeof parsed.question === "string" && parsed.question.trim()) {
-    return { question: parsed.question.trim() };
+    // Category is best-effort: an unrecognized section id just means no label.
+    const spec = typeof parsed.section === "string" ? specs.find((s) => s.id === parsed.section) : undefined;
+    return { question: parsed.question.trim(), category: spec?.label };
   }
   return { question: null };
 }

@@ -28,6 +28,7 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
   const [phase, setPhase] = useState<Phase>("asking");
   const [transcript, setTranscript] = useState<InterviewTurn[]>([]);
   const [question, setQuestion] = useState<string | null>(null);
+  const [category, setCategory] = useState<string | undefined>(undefined);
   const [loadingQuestion, setLoadingQuestion] = useState(true);
   const [answer, setAnswer] = useState("");
   const [sections, setSections] = useState<ProfileSection[]>([]);
@@ -73,6 +74,7 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
         return;
       }
       setQuestion(res.question);
+      setCategory(res.category);
       answerRef.current?.focus();
     },
     [scope, projectPath, finish],
@@ -86,11 +88,12 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
 
   const submitAnswer = (skip: boolean) => {
     if (!question || loadingQuestion) return;
-    const turn: InterviewTurn = { question, answer: skip ? "" : answer.trim() };
+    const turn: InterviewTurn = { question, answer: skip ? "" : answer.trim(), category };
     const next = [...transcript, turn];
     setTranscript(next);
     setAnswer("");
     setQuestion(null);
+    setCategory(undefined);
     void fetchNext(next);
   };
 
@@ -161,7 +164,14 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
                 <div key={i} className="flex flex-col gap-1.5">
                   <div className="flex items-start gap-2 text-[13px] text-white/70">
                     <MessageCircleQuestion size={14} className="mt-0.5 shrink-0 text-white/30" />
-                    <span>{turn.question}</span>
+                    <span>
+                      {turn.category && (
+                        <span className="mr-2 text-[10px] font-medium uppercase tracking-wide text-white/30">
+                          {turn.category}
+                        </span>
+                      )}
+                      {turn.question}
+                    </span>
                   </div>
                   <div className="ml-6 rounded-md bg-white/[0.03] px-3 py-1.5 text-[13px] text-white/50">
                     {turn.answer || <span className="italic text-white/25">Skipped</span>}
@@ -179,6 +189,11 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
                 </div>
               ) : question ? (
                 <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-clide-panel/60 p-4">
+                  {category && (
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-amber-300/60">
+                      {category}
+                    </span>
+                  )}
                   <div className="flex items-start gap-2 text-[14px] text-white">
                     <MessageCircleQuestion size={15} className="mt-0.5 shrink-0 text-amber-300/70" />
                     <span>{question}</span>

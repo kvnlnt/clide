@@ -80,6 +80,7 @@ import {
   removeTool,
   saveTool,
 } from "./tools/registry";
+import { installStarterTasks, listStarterTasks } from "./tasks/seed";
 import { readUIState, writeUIState } from "./uiState";
 import {
   cancelWorkflowRun as engineCancelRun,
@@ -527,8 +528,8 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           const service = await getDefaultAIService();
           if (!service) return { ok: false, error: "No AI service configured — add one in Settings" };
           const ctx = await buildInterviewContext(scope, projectPath);
-          const { question } = await nextInterviewQuestion(service, ctx, transcript);
-          return question ? { ok: true, question } : { ok: true, done: true };
+          const { question, category } = await nextInterviewQuestion(service, ctx, transcript);
+          return question ? { ok: true, question, category } : { ok: true, done: true };
         } catch (err) {
           return { ok: false, error: String(err) };
         }
@@ -1272,6 +1273,10 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
       saveUIState: async (state) => {
         await writeUIState(state);
       },
+
+      listStarterTasks: async () => listStarterTasks(),
+
+      installStarterTasks: async ({ projectName, slugs }) => await installStarterTasks(projectName, slugs),
 
       chooseDirectory: async ({ startingFolder }) => {
         const paths = await Utils.openFileDialog({

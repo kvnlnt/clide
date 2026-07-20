@@ -63,6 +63,10 @@ interface AppState {
   /** True while the AI wizard is open *because* the first-project flow just chained into it. */
   aiWizardChained: boolean;
 
+  /** First-run onboarding takeover (ticket 111): true from a zero-project boot until the flow finishes. */
+  onboardingActive: boolean;
+  completeOnboarding: () => void;
+
   /** Quick-run form picker (⌘K/Ctrl+K or the toolbar Run button) — drops a draft into the current tab's thread. */
   runPickerOpen: boolean;
   openRunPicker: () => void;
@@ -206,6 +210,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [aiWizardChained, setAiWizardChained] = useState(false);
   /** Skipped for this launch — don't re-open until the app restarts. */
   const aiWizardSkippedRef = useRef(false);
+  const [onboardingActive, setOnboardingActive] = useState(false);
   const [profileInterview, setProfileInterview] = useState<ProfileInterviewTarget | null>(null);
   const [profileRevision, setProfileRevision] = useState(0);
   const [appProfileOffer, setAppProfileOffer] = useState(false);
@@ -392,11 +397,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       recentsRef.current = ui.recentProjects;
       setRecentProjects(ui.recentProjects);
       bootedRef.current = true;
-      // Existing users with projects but no AI service (ticket 76). A brand
-      // new install (zero projects too) is instead handled by the
-      // first-project flow (ticket 78), which chains into this wizard
-      // itself once project setup finishes — don't stack both takeovers.
-      if (projects.length > 0 && aiServices.length === 0) setAiWizardOpen(true);
+      // Zero projects = the onboarding flow (ticket 111) owns the whole
+      // first-run sequence, including AI setup, until it completes.
+      if (projects.length === 0) setOnboardingActive(true);
+      // Existing users with projects but no AI service (ticket 76).
+      else if (aiServices.length === 0) setAiWizardOpen(true);
     })();
     void refreshForms();
     void refreshRuns();
@@ -479,6 +484,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAiWizardChained(chained);
     setAiWizardOpen(true);
   }, []);
+  const completeOnboarding = useCallback(() => setOnboardingActive(false), []);
   const openRunPicker = useCallback(() => setRunPickerOpen(true), []);
   const closeRunPicker = useCallback(() => setRunPickerOpen(false), []);
   const openProfileInterview = useCallback((target: ProfileInterviewTarget) => setProfileInterview(target), []);
@@ -715,6 +721,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     notifyAIServiceAdded,
     openAIWizard,
     aiWizardChained,
+    onboardingActive,
+    completeOnboarding,
     runPickerOpen,
     openRunPicker,
     closeRunPicker,

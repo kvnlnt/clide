@@ -17,6 +17,7 @@ import type {
   RepeatInterval,
   RunRecord,
   RunStatusUpdate,
+  StarterTask,
   TaskField,
   TaskFolder,
   TaskMetaPatch,
@@ -343,7 +344,7 @@ export const api = {
     scope: ProfileScope,
     projectPath: string | undefined,
     transcript: InterviewTurn[],
-  ): Promise<{ ok: boolean; question?: string; done?: boolean; error?: string }> {
+  ): Promise<{ ok: boolean; question?: string; category?: string; done?: boolean; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
@@ -491,6 +492,26 @@ export const api = {
 
   async saveUIState(state: UIState): Promise<void> {
     await request()?.saveUIState(state);
+  },
+
+  async listStarterTasks(): Promise<StarterTask[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.listStarterTasks({});
+    } catch {
+      return [];
+    }
+  },
+
+  async installStarterTasks(projectName: string, slugs: string[]): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.installStarterTasks({ projectName, slugs });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
   },
 
   async chooseDirectory(startingFolder?: string): Promise<string | null> {

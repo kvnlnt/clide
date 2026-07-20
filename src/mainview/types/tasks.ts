@@ -39,6 +39,7 @@ export type {
   RunStatus,
   RunStatusUpdate,
   SelectorCandidate,
+  StarterTask,
   TaskDefinition,
   TaskField,
   TaskFolder,

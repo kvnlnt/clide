@@ -51,7 +51,7 @@ export default function FirstRunAIWizard({ onSkip, onDone, chained }: FirstRunAI
       <div className="flex w-full max-w-[520px] flex-1 flex-col items-center justify-center gap-8 py-10">
         <div className="flex flex-col items-center gap-2 text-center">
           {chained && (
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-white/30">Step 2 of 2</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-white/30">Last step</span>
           )}
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10">
             <Sparkles size={20} className="text-amber-300/80" />

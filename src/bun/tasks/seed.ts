@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { TaskDefinition, TaskMeta } from "../../shared/types";
+import type { StarterTask, TaskDefinition, TaskMeta } from "../../shared/types";
 import { addProject, loadProjects } from "../config";
 import { ensureDir, ensureProjectDirs, formDir } from "../paths";
 
@@ -135,6 +135,51 @@ EOF
   },
 ];
 
+/** Write one seed's task folder into a project. */
+async function writeSeed(projectPath: string, projectName: string, seed: Seed, now: string): Promise<void> {
+  const dir = formDir(projectPath, seed.meta.slug); // Disk directory still under "forms/"
+  ensureDir(dir);
+  const meta: TaskMeta = { ...seed.meta, project: projectName, createdAt: now, updatedAt: now };
+  const scriptFile = seed.task.scriptFile ?? "script.sh";
+  await Bun.write(join(dir, "meta.json"), JSON.stringify(meta, null, 2));
+  await Bun.write(join(dir, "form.json"), JSON.stringify(seed.task, null, 2)); // Disk file still "form.json"
+  await Bun.write(join(dir, scriptFile), seed.script);
+  try {
+    await Bun.spawn(["chmod", "+x", join(dir, scriptFile)]).exited;
+  } catch {
+    /* non-fatal */
+  }
+}
+
+/** The starter-task catalog offered during onboarding (ticket 111). */
+export function listStarterTasks(): StarterTask[] {
+  return SEEDS.map((s) => ({
+    slug: s.meta.slug,
+    name: s.meta.name,
+    description: s.meta.description,
+    tags: s.meta.tags,
+  }));
+}
+
+/** Install the chosen starter tasks into an existing project (ticket 111). */
+export async function installStarterTasks(
+  projectName: string,
+  slugs: string[],
+): Promise<{ ok: boolean; error?: string }> {
+  const project = (await loadProjects()).find((p) => p.name === projectName);
+  if (!project) return { ok: false, error: `Unknown project "${projectName}"` };
+  const chosen = SEEDS.filter((s) => slugs.includes(s.meta.slug));
+  if (chosen.length === 0) return { ok: true };
+  ensureProjectDirs(project.path);
+  const now = new Date().toISOString();
+  try {
+    for (const seed of chosen) await writeSeed(project.path, project.name, seed, now);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
+
 /**
  * On very first launch (no projects registered yet), create the example
  * projects and seed each with its demo tasks. Each project becomes a real
@@ -155,20 +200,7 @@ export async function seedExampleProjects(): Promise<void> {
   for (const [projectName, seeds] of byProject) {
     const project = await addProject(projectName);
     ensureProjectDirs(project.path);
-    for (const seed of seeds) {
-      const dir = formDir(project.path, seed.meta.slug); // Disk directory still under "forms/"
-      ensureDir(dir);
-      const meta: TaskMeta = { ...seed.meta, project: project.name, createdAt: now, updatedAt: now };
-      const scriptFile = seed.task.scriptFile ?? "script.sh";
-      await Bun.write(join(dir, "meta.json"), JSON.stringify(meta, null, 2));
-      await Bun.write(join(dir, "form.json"), JSON.stringify(seed.task, null, 2)); // Disk file still "form.json"
-      await Bun.write(join(dir, scriptFile), seed.script);
-      try {
-        await Bun.spawn(["chmod", "+x", join(dir, scriptFile)]).exited;
-      } catch {
-        /* non-fatal */
-      }
-    }
+    for (const seed of seeds) await writeSeed(project.path, project.name, seed, now);
   }
   console.log(`[tasks] Seeded ${byProject.size} example projects.`);
 }

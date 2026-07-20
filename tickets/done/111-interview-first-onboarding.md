@@ -23,15 +23,16 @@ tells them where they are in the process.
 
 - A lightweight opening interview (reuse the ticket 100 engine in
   [interview.ts](../src/bun/ai/interview.ts)) asks what they want to do
-  with the app, and whether they want to use AI at all.
+  with the app. (Amended: AI is a requirement, not a choice — the flow
+  never asks whether to use it.)
 - The flow communicates progress/position ("step X of Y" or equivalent
   language) so the user knows where they're at.
 
 ### 3. Tailored outcome
 
-- Answers drive what comes next: an AI-user path continues into the AI
-  wizard; a no-AI path skips it cleanly (the app must be usable without
-  it).
+- Answers drive what comes next; the flow always ends in the AI wizard
+  unless a service is already configured. (Amended: AI is a requirement —
+  there is no no-AI path.)
 - After setup, present a goal-relevant starting point — e.g. a checklist
   of ready-to-go workflows/tasks matched to what they said they want to
   do, seeded into their first project.

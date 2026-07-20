@@ -487,6 +487,8 @@ export interface ProjectProfile {
 export interface InterviewTurn {
   question: string;
   answer: string;
+  /** Label of the profile section the question targets (ticket 110), when known. */
+  category?: string;
 }
 
 /** One editable section of a profile draft, as shown on the review screen. */
@@ -600,6 +602,14 @@ export interface UIState {
   activeViewByProject: Record<string, string>;
   /** Project names by recency of activation, most recent first. */
   recentProjects: string[];
+}
+
+/** Catalog entry for a ready-to-go starter task offered during onboarding (ticket 111). */
+export interface StarterTask {
+  slug: string;
+  name: string;
+  description: string;
+  tags: string[];
 }
 
 // Workflows (tickets 88-95) ---------------------------------------------------
@@ -846,7 +856,7 @@ export type ClideRPC = {
       /** Next interview question given the transcript so far; done ends the session. */
       profileInterviewNext: {
         params: { scope: ProfileScope; projectPath?: string; transcript: InterviewTurn[] };
-        response: { ok: boolean; question?: string; done?: boolean; error?: string };
+        response: { ok: boolean; question?: string; category?: string; done?: boolean; error?: string };
       };
       /** Draft profile sections from the transcript + run the engine's self-critique (§4). */
       profileInterviewFinish: {
@@ -1140,6 +1150,12 @@ export type ClideRPC = {
       };
       getUIState: { params: Record<string, never>; response: UIState };
       saveUIState: { params: UIState; response: void };
+      /** Onboarding starter-task catalog + install-into-project (ticket 111). */
+      listStarterTasks: { params: Record<string, never>; response: StarterTask[] };
+      installStarterTasks: {
+        params: { projectName: string; slugs: string[] };
+        response: { ok: boolean; error?: string };
+      };
       chooseDirectory: {
         params: { startingFolder?: string };
         response: string | null;
