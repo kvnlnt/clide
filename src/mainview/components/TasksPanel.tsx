@@ -9,16 +9,16 @@ import TaskVersionHistoryModal from "./TaskVersionHistoryModal";
 import { useUIFeedback } from "./UIFeedback";
 
 /**
- * Unified forms CRUD surface for the active project (or all projects when no
- * project is active): fuzzy search, run, AI-powered create, metadata edit, and
- * delete — rendered as a full-width page. Opened via ⌘P or the project
- * toolbar's Forms button.
+ * Unified tasks management surface for the active project (or all projects
+ * when no project is active): fuzzy search, AI-powered create, metadata edit,
+ * and delete — rendered as a full-width page. Opened via ⌘P or the project
+ * toolbar's Tasks button. Managing only (ticket 113): running a task lives in
+ * the ⌘K picker and Quick-Run, never behind a row click here.
  */
 export default function TasksPanel() {
   const {
     forms,
     recentSlugs,
-    addFormDraft,
     openNewForm,
     setProjectSurface,
     activeProject,
@@ -43,13 +43,15 @@ export default function TasksPanel() {
     setActive(0);
   }, [query]);
 
+  // Selecting a row manages the task (opens its edit surface) — it must never
+  // create or run anything (ticket 113).
   const choose = (index: number) => {
     if (index === createIndex) {
       openNewForm();
       return;
     }
     const form = results[index];
-    if (form) addFormDraft(form.meta.slug);
+    if (form) setEditingSlug((cur) => (cur === form.meta.slug ? null : form.meta.slug));
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
