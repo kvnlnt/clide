@@ -604,6 +604,8 @@ export interface UIState {
   activeViewByProject: Record<string, string>;
   /** Project names by recency of activation, most recent first. */
   recentProjects: string[];
+  /** Denser spacing across the main surfaces (ticket 119). */
+  compactMode?: boolean;
 }
 
 /** Catalog entry for a ready-to-go starter task offered during onboarding (ticket 111). */

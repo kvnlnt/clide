@@ -75,7 +75,7 @@ export default function NewWorkflowWizard({ onClose }: { onClose: () => void }) 
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-4 px-8 pb-4 pt-7">
+      <div className="flex shrink-0 items-center gap-4 px-[var(--clide-page-x)] pb-4 pt-[var(--clide-page-top)]">
         <h1 className="shrink-0 text-[20px] font-bold text-white">New workflow</h1>
         <div className="flex-1" />
         <button

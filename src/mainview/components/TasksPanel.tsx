@@ -73,7 +73,7 @@ export default function TasksPanel() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-baseline gap-2 px-8 pb-4 pt-7 justify-between">
+      <div className="flex shrink-0 items-baseline gap-2 px-[var(--clide-page-x)] pb-4 pt-[var(--clide-page-top)] justify-between">
         <div className="flex flex-row items-baseline gap-3">
           <h1 className="text-[20px] font-bold text-white">Tasks</h1>
           <span className="text-[13px] text-white/40">{activeProject ?? "All projects"}</span>
@@ -92,7 +92,7 @@ export default function TasksPanel() {
         </div>
       </div>
 
-      <div className="px-8 pb-4">
+      <div className="px-[var(--clide-page-x)] pb-4">
         <input
           ref={inputRef}
           value={query}
@@ -103,7 +103,7 @@ export default function TasksPanel() {
         />
       </div>
 
-      <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">
+      <div className="clide-scroll flex-1 overflow-y-auto px-[var(--clide-page-x)] pb-[var(--clide-page-bottom)]">
         {results.length === 0 && query.trim() !== "" && (
           <div className="px-1 py-3 text-[13px] italic text-white/30">No tasks match "{query}"</div>
         )}
@@ -218,7 +218,7 @@ function TasksPanelRow({
 
   return (
     <div className={`group ${active ? "bg-[rgba(86,86,86,0.3)]" : "hover:bg-white/5"}`} onMouseEnter={onHover}>
-      <div className="flex w-full items-center gap-4 px-3 py-2.5">
+      <div className="flex w-full items-center gap-4 px-3 py-[var(--clide-row-y)]">
         <button onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-4 text-left">
           <div className="flex w-[220px] shrink-0 items-center gap-2">
             <span className="truncate text-[14px] text-white">{task.meta.name}</span>

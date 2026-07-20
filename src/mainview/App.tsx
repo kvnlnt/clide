@@ -29,6 +29,7 @@ import { on } from "./rpc";
 function Workspace() {
   const {
     sidebarOpen,
+    compactMode,
     newProjectOpen,
     newTaskOpen,
     activeProject,
@@ -205,7 +206,9 @@ function Workspace() {
   ]);
 
   return (
-    <div className="relative flex h-screen flex-col overflow-hidden rounded-[15px] border border-white/10 bg-clide-bg text-white p-2.5">
+    <div
+      className={`relative flex h-screen flex-col overflow-hidden rounded-[15px] border border-white/10 bg-clide-bg text-white p-2.5 ${compactMode ? "clide-compact" : ""}`}
+    >
       <header className="flex shrink-0 electrobun-webkit-app-region-drag">
         <WindowControls />
       </header>

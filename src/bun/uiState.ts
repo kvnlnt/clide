@@ -23,6 +23,7 @@ export async function readUIState(): Promise<UIState> {
       recentProjects: Array.isArray(parsed.recentProjects)
         ? parsed.recentProjects.filter((p): p is string => typeof p === "string")
         : [],
+      compactMode: parsed.compactMode === true,
     };
   } catch {
     return { ...EMPTY };

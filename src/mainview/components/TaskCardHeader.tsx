@@ -77,7 +77,7 @@ export default function TaskCardHeader({
 
   return (
     <div
-      className={`flex items-center gap-3 px-5 py-3 ${onToggle ? "cursor-pointer hover:bg-white/5" : ""}`}
+      className={`flex items-center gap-3 px-[var(--clide-card-x)] py-[var(--clide-card-y)] ${onToggle ? "cursor-pointer hover:bg-white/5" : ""}`}
       onClick={onToggle}
     >
       <span className="shrink-0 text-[12px] font-medium text-white">{meta.name}</span>

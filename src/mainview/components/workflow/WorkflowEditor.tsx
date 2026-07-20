@@ -724,7 +724,7 @@ export default function WorkflowEditor({ initial, onClose, draftNotes, focusName
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-4 px-8 pb-4 pt-7">
+      <div className="flex shrink-0 items-center gap-4 px-[var(--clide-page-x)] pb-4 pt-[var(--clide-page-top)]">
         <h1 className="shrink-0 text-[20px] font-bold text-white">{wf.name.trim() || "New workflow"}</h1>
         <label className="flex items-center gap-1.5 text-[12px] text-white/50">
           <input type="checkbox" checked={wf.enabled} onChange={(e) => setWf({ ...wf, enabled: e.target.checked })} />

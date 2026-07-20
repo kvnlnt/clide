@@ -69,12 +69,12 @@ export default function ProjectSettingsPage({ path, name, onDone }: ProjectSetti
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-baseline gap-2 px-8 pb-4 pt-7">
+      <div className="flex shrink-0 items-baseline gap-2 px-[var(--clide-page-x)] pb-4 pt-[var(--clide-page-top)]">
         <h1 className="text-[20px] font-bold text-white">Settings</h1>
         <span className="text-[13px] text-white/40">{name}</span>
       </div>
 
-      <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">
+      <div className="clide-scroll flex-1 overflow-y-auto px-[var(--clide-page-x)] pb-[var(--clide-page-bottom)]">
         <div className="flex w-full max-w-[560px] flex-col gap-6">
           <div className="flex flex-col gap-3">
             <span className="text-[12px] font-bold uppercase tracking-wider text-white/40">Project</span>

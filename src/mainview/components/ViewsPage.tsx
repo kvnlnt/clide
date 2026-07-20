@@ -62,12 +62,12 @@ export default function ViewsPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-baseline gap-2 px-8 pb-4 pt-7">
+      <div className="flex shrink-0 items-baseline gap-2 px-[var(--clide-page-x)] pb-4 pt-[var(--clide-page-top)]">
         <h1 className="text-[20px] font-bold text-white">Views</h1>
         <span className="text-[13px] text-white/40">{activeProject}</span>
       </div>
 
-      <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">
+      <div className="clide-scroll flex-1 overflow-y-auto px-[var(--clide-page-x)] pb-[var(--clide-page-bottom)]">
         {views.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10">
@@ -83,7 +83,7 @@ export default function ViewsPage() {
         ) : (
           <div className="flex flex-col divide-y divide-white/5 border-t border-white/5">
             {views.map((view) => (
-              <div key={view.id} className="flex items-center gap-3 py-3">
+              <div key={view.id} className="flex items-center gap-3 py-[var(--clide-row-y)]">
                 <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left">
                   {editingId === view.id ? (
                     <input

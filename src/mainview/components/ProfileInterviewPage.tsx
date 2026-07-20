@@ -255,7 +255,7 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
         </button>
       </div>
 
-      <div className="clide-scroll min-h-0 flex-1 overflow-y-auto px-8 pb-8">
+      <div className="clide-scroll min-h-0 flex-1 overflow-y-auto px-[var(--clide-page-x)] pb-[var(--clide-page-bottom)]">
         <div className="mx-auto flex w-full max-w-[640px] flex-col gap-4">
           {phase === "setup" && (
             <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-clide-panel/60 p-4">

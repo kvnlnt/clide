@@ -63,7 +63,7 @@ export default function TaskCardBody({
 }: TaskCardBodyProps) {
   if (taskDef.fields.length === 0) {
     return (
-      <div className="flex flex-col gap-3 px-5 py-3.5">
+      <div className="flex flex-col gap-3 px-[var(--clide-card-x)] py-[var(--clide-card-y)]">
         <div className="text-[13px] text-white/40">No inputs — press SEND to run.</div>
         <CommandPreview taskDef={taskDef} values={values} />
         <StartsWorkflows taskSlug={taskSlug} />
@@ -71,7 +71,7 @@ export default function TaskCardBody({
     );
   }
   return (
-    <div className="flex flex-col gap-4 px-5 py-3.5">
+    <div className="flex flex-col gap-4 px-[var(--clide-card-x)] py-[var(--clide-card-y)]">
       {fillFailed && (
         <div className="flex items-center gap-1.5 text-[11px] text-white/30">
           <Sparkles size={11} /> couldn't auto-fill — fill the fields manually

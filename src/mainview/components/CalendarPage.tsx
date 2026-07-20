@@ -129,7 +129,7 @@ export default function CalendarPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-3 px-8 pb-4 pt-7">
+      <div className="flex shrink-0 items-center gap-3 px-[var(--clide-page-x)] pb-4 pt-[var(--clide-page-top)]">
         <h1 className="text-[20px] font-bold text-white">Calendar</h1>
         <span className="text-[13px] text-white/40">{activeProject}</span>
         <div className="flex-1" />
@@ -156,7 +156,7 @@ export default function CalendarPage() {
         <MonthYearPicker value={month} onChange={setMonth} />
       </div>
 
-      <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">
+      <div className="clide-scroll flex-1 overflow-y-auto px-[var(--clide-page-x)] pb-[var(--clide-page-bottom)]">
         <div className="grid grid-cols-7 gap-px overflow-hidden rounded-md border border-clide-border bg-clide-border">
           {DAY_NAMES.map((d) => (
             <div key={d} className="bg-clide-panel px-2 py-1.5 text-center text-[11px] font-medium text-white/40">

@@ -147,7 +147,7 @@ export default function WorkflowsPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-baseline gap-2 px-8 pb-4 pt-7">
+      <div className="flex shrink-0 items-baseline gap-2 px-[var(--clide-page-x)] pb-4 pt-[var(--clide-page-top)]">
         <h1 className="text-[20px] font-bold text-white">Workflows</h1>
         <span className="text-[13px] text-white/40">{activeProject}</span>
         <div className="flex-1" />
@@ -159,7 +159,7 @@ export default function WorkflowsPage() {
         </button>
       </div>
 
-      <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">
+      <div className="clide-scroll flex-1 overflow-y-auto px-[var(--clide-page-x)] pb-[var(--clide-page-bottom)]">
         {view.kind === "run" && <WorkflowRunDetail runId={view.runId} onBack={() => setView(view.backTo)} />}
 
         {view.kind === "plan" && (

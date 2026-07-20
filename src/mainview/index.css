@@ -8,6 +8,30 @@
   --panel: #222121;
   --border: #3d3c3c;
   --muted: #575757;
+
+  /* Density scale (ticket 119): page/card/row spacing tokens used across the
+     main surfaces (Thread, Tasks, Views, Calendar, Settings) via arbitrary
+     Tailwind values, e.g. `px-[var(--clide-page-x)]`. .clide-compact
+     (Settings → Compact mode, persisted in UIState) overrides these for a
+     denser layout everywhere they're used — no per-component boolean prop
+     threading needed. */
+  --clide-page-x: 1.75rem;
+  --clide-page-top: 1.5rem;
+  --clide-page-bottom: 1.5rem;
+  --clide-card-x: 1.125rem;
+  --clide-card-y: 0.625rem;
+  --clide-row-y: 0.5rem;
+  --clide-row-gap: 0.625rem;
+}
+
+.clide-compact {
+  --clide-page-x: 1.25rem;
+  --clide-page-top: 1rem;
+  --clide-page-bottom: 1rem;
+  --clide-card-x: 0.875rem;
+  --clide-card-y: 0.375rem;
+  --clide-row-y: 0.3125rem;
+  --clide-row-gap: 0.375rem;
 }
 
 html,

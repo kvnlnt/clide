@@ -1,5 +1,6 @@
 import { Check, ChevronDown, ChevronRight, Loader, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
 import type { AIService, AIServiceKind } from "../types/tasks";
 import { AI_SERVICE_KIND_LABEL, AI_SERVICE_KIND_NEEDS_BASE_URL } from "../types/tasks";
@@ -21,6 +22,7 @@ function needsCredential(kind: AIServiceKind): boolean {
 }
 
 export default function SettingsPanel({ onClose }: SettingsPanelProps) {
+  const { compactMode, setCompactMode } = useApp();
   const { confirm, toast } = useUIFeedback();
   const [services, setServices] = useState<AIService[] | null>(null);
   const [savedKeys, setSavedKeys] = useState<Record<string, boolean>>({});
@@ -73,7 +75,7 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
     // scrolling once sections expanded (ticket 68).
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Page header — stays put while the body scrolls, keeping × reachable. */}
-      <div className="flex shrink-0 items-center justify-between px-8 pb-4 pt-7">
+      <div className="flex shrink-0 items-center justify-between px-[var(--clide-page-x)] pb-4 pt-[var(--clide-page-top)]">
         <h1 className="text-[20px] font-bold text-white">Settings</h1>
         <button
           onClick={handleClose}
@@ -84,8 +86,26 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
         </button>
       </div>
 
-      <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">
+      <div className="clide-scroll flex-1 overflow-y-auto px-[var(--clide-page-x)] pb-[var(--clide-page-bottom)]">
         <div className="mx-auto flex w-full max-w-[640px] flex-col gap-3">
+          <div className="flex flex-col gap-3 border-b border-white/5 pb-4">
+            <span className="text-[12px] font-bold uppercase tracking-wider text-white/40">Appearance</span>
+            <label className="flex cursor-pointer items-center gap-3">
+              <input
+                type="checkbox"
+                checked={compactMode}
+                onChange={(e) => setCompactMode(e.target.checked)}
+                className="h-4 w-4 rounded border-white/20 bg-clide-surface text-white focus:ring-0 focus:ring-offset-0"
+              />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[13px] font-medium text-white/80">Compact mode</span>
+                <span className="text-[12px] text-white/40">
+                  Tighter margins and denser rows across the thread, tasks, views, and calendar
+                </span>
+              </div>
+            </label>
+          </div>
+
           <div className="flex items-center justify-between">
             <span className="text-[12px] font-bold uppercase tracking-wider text-white/40">AI Services</span>
             {!creating && (

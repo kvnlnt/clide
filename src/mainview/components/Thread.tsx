@@ -62,7 +62,7 @@ export default function Thread() {
 
   return (
     <div className="clide-scroll min-h-0 flex-1 overflow-y-auto">
-      <div className="flex flex-col gap-3 pt-3 pl-1.5 pr-3">
+      <div className="flex flex-col gap-[var(--clide-row-gap)] pt-3 pl-1.5 pr-3">
         {isEmpty ? (
           <div className="h-[60vh]">
             <ThreadEmpty filtered={activeViewId !== null} />

@@ -168,7 +168,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 116 | AI View Naming + Manual Override      | AI names/renames views; double-click tab or inline rename; explicit names stop auto-naming        | ✅ Done       |
 | 117 | Calendar Schedules Workflows          | Day-click composer picks tasks or workflows; scheduled workflow runs on the grid + scheduler      | ✅ Done       |
 | 118 | Files Surface Fix & Theming           | Make the VFS Files surface actually work and restyle it to the app's visual language              | ✅ Done⁸      |
-| 119 | Compact Density Pass                  | Tighten margins/padding across surfaces; compact presentation where a tight default isn't enough  | ⬜ Open       |
+| 119 | Compact Density Pass                  | Tighten margins/padding across surfaces; compact presentation where a tight default isn't enough  | ✅ Done⁹      |
 | 120 | Full-Width Screens                    | App/project pages drop centered max-width columns and use the full window width                   | ⬜ Open       |
 | 121 | Loading States & Smooth Transitions   | No FOUC: branded launch loader, animated surface/tab transitions, skeletons for async content     | ⬜ Open       |
 | 122 | Signature Motion & UX Flair           | Motion identity: signature easing, elevated run/status/delight moments, motion-design note        | ⬜ Open       |
@@ -228,3 +228,10 @@ registry expects a path; `ArtifactModal.tsx`'s preview loading was dead
 code. Verified via `tsc` and code tracing only — not exercised in the
 running Electrobun app from this environment; worth a live pass with
 `bun run dev:regular` before fully trusting it.
+⁹ Ticket 119: a CSS-custom-property density scale (`index.css`) drives
+page/card/row spacing across Tasks/Views/Calendar/Settings/Thread via
+arbitrary Tailwind values, tightened ~15-20% at the root and further via
+a persisted Compact mode toggle (`UIState.compactMode`) — one systemic
+mechanism instead of a per-component boolean. No before/after
+screenshots produced (no way to drive the running app visually from
+this environment).

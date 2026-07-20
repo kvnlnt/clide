@@ -44,6 +44,9 @@ interface AppState {
   sidebarOpen: boolean;
   newProjectOpen: boolean;
   newTaskOpen: boolean;
+  /** Denser spacing across the main surfaces (ticket 119), persisted. */
+  compactMode: boolean;
+  setCompactMode: (next: boolean) => void;
 
   /** What the title tab's body shows (thread / Tasks / Views / Project Settings). */
   projectSurface: ProjectSurface;
@@ -259,6 +262,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeProject, setActiveProject] = useState<string | null>(null);
   const [recentProjects, setRecentProjects] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  /** Denser spacing across the main surfaces (ticket 119), persisted in UIState. */
+  const [compactMode, setCompactModeState] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newTaskOpen, setNewFormOpen] = useState(false);
   const [projectSurface, setProjectSurfaceState] = useState<ProjectSurface>("thread");
@@ -340,8 +345,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       activeProject,
       activeViewByProject: { ...viewByProjectRef.current },
       recentProjects: [...recentsRef.current],
+      compactMode,
     });
-  }, [activeProject, activeViewId]);
+  }, [activeProject, activeViewId, compactMode]);
+
+  const setCompactMode = useCallback((next: boolean) => setCompactModeState(next), []);
 
   const persistViews = useCallback(
     (next: ThreadView[]) => {
@@ -577,6 +585,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       viewByProjectRef.current = { ...ui.activeViewByProject };
       recentsRef.current = ui.recentProjects;
       setRecentProjects(ui.recentProjects);
+      setCompactModeState(ui.compactMode === true);
       bootedRef.current = true;
       // Zero projects = the onboarding flow (ticket 111) owns the whole
       // first-run sequence, including AI setup, until it completes.
@@ -941,6 +950,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     sidebarOpen,
     newProjectOpen,
     newTaskOpen,
+    compactMode,
+    setCompactMode,
     projectSurface,
     setProjectSurface,
     appSettingsOpen,

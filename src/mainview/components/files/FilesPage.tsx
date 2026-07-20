@@ -178,14 +178,14 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-baseline gap-2 px-8 pb-4 pt-7">
+      <div className="flex shrink-0 items-baseline gap-2 px-[var(--clide-page-x)] pb-4 pt-[var(--clide-page-top)]">
         <h1 className="text-[20px] font-bold text-white">Files</h1>
         <span className="text-[13px] text-white/40">
           {scope === "app" ? "App locations" : (projectName ?? "Project locations")}
         </span>
       </div>
 
-      <div className="clide-scroll flex flex-1 overflow-hidden px-8 pb-8">
+      <div className="clide-scroll flex flex-1 overflow-hidden px-[var(--clide-page-x)] pb-[var(--clide-page-bottom)]">
         <div className="flex w-full overflow-hidden rounded-md border border-clide-border">
           {/* Locations sidebar */}
           <div className="flex w-64 shrink-0 flex-col border-r border-clide-border bg-clide-panel">
