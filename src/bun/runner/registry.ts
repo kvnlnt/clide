@@ -19,6 +19,11 @@ export function get(runId: string): Subprocess | undefined {
   return runningProcesses.get(runId);
 }
 
+/** Count of currently-running task processes (ticket 124 diagnostics). */
+export function runningCount(): number {
+  return runningProcesses.size;
+}
+
 export function killAll(): void {
   for (const proc of runningProcesses.values()) {
     try {

@@ -1160,6 +1160,11 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         return getRunArtifacts(runId);
       },
 
+      getDiagnostics: async () => {
+        const { gatherDiagnostics } = await import("./diagnostics");
+        return await gatherDiagnostics();
+      },
+
       // Workflows (tickets 88-95) ---------------------------------------------
 
       listWorkflows: async ({ project }) => {

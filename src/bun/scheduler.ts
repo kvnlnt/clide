@@ -161,3 +161,8 @@ export function disposeScheduler(): void {
   for (const t of timers.values()) clearTimeout(t);
   timers.clear();
 }
+
+/** Count of armed task-schedule timers (ticket 124 diagnostics). */
+export function armedTimerCount(): number {
+  return timers.size;
+}

@@ -191,3 +191,8 @@ export function disposeWorkflowSchedules(): void {
   for (const t of timers.values()) clearTimeout(t);
   timers.clear();
 }
+
+/** Count of armed workflow-schedule timers (ticket 124 diagnostics). */
+export function armedWorkflowTimerCount(): number {
+  return timers.size;
+}

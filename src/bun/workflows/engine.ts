@@ -32,6 +32,11 @@ interface RunHandle {
 
 const activeRuns = new Map<string, RunHandle>();
 
+/** Count of currently-running workflow runs (ticket 124 diagnostics). */
+export function activeWorkflowRunCount(): number {
+  return activeRuns.size;
+}
+
 interface EngineCtx {
   projectPath: string;
   projectName: string;

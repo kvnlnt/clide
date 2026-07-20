@@ -1127,6 +1127,16 @@ export const api = {
     }
   },
 
+  async getDiagnostics(): Promise<import("../shared/types").DiagnosticsReport | null> {
+    const r = request();
+    if (!r) return null;
+    try {
+      return await r.getDiagnostics({});
+    } catch {
+      return null;
+    }
+  },
+
   // Workflows (tickets 88-95) -------------------------------------------------
 
   async listWorkflows(project: string): Promise<Workflow[]> {

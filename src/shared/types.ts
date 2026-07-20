@@ -435,6 +435,41 @@ export interface VfsStatResult {
 }
 
 export type RunArtifactKind = "created" | "modified" | "deleted";
+/** A point-in-time app/machine/workload health snapshot (ticket 124). */
+export interface DiagnosticsReport {
+  generatedAt: string;
+  app: {
+    pid: number;
+    rssBytes: number;
+    heapUsedBytes: number;
+    uptimeSec: number;
+    version: string;
+    dataDir: string;
+    dataDirBytes: number;
+    projectDbs: { name: string; bytes: number }[];
+  };
+  machine: {
+    platform: string;
+    osType: string;
+    osRelease: string;
+    cpuModel: string;
+    cpuCount: number;
+    /** 1/5/15-minute load averages. */
+    loadavg: number[];
+    totalMemBytes: number;
+    freeMemBytes: number;
+    /** null when `df` couldn't be read. */
+    freeDiskBytes: number | null;
+  };
+  workload: {
+    runningTasks: number;
+    activeWorkflowRuns: number;
+    armedTaskSchedules: number;
+    armedWorkflowSchedules: number;
+    projectCount: number;
+  };
+}
+
 export type RunArtifactSource = "declared" | "observed";
 
 /** A file touched by a run (ticket 102). */
@@ -1121,6 +1156,9 @@ export type ClideRPC = {
         params: { runId: string };
         response: RunArtifact[];
       };
+
+      /** Point-in-time app/machine/workload snapshot (ticket 124) — gathered fresh on every call, nothing polls. */
+      getDiagnostics: { params: Record<string, never>; response: DiagnosticsReport };
 
       // Workflows (tickets 88-95) ---------------------------------------------
       listWorkflows: { params: { project: string }; response: Workflow[] };

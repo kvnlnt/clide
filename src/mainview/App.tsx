@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import CalendarPage from "./components/CalendarPage";
+import DiagnosticsPage from "./components/DiagnosticsPage";
 import { FilesPage } from "./components/files/FilesPage";
 import FirstRunAIWizard from "./components/FirstRunAIWizard";
 import FirstRunWelcome from "./components/FirstRunWelcome";
@@ -44,6 +45,8 @@ function Workspace() {
     closeNewTask,
     appSettingsOpen,
     closeAppSettings,
+    diagnosticsOpen,
+    closeDiagnostics,
     aiWizardOpen,
     aiWizardChained,
     dismissAIWizard,
@@ -85,6 +88,7 @@ function Workspace() {
       const overlayOpen =
         newTaskOpen ||
         appSettingsOpen ||
+        diagnosticsOpen ||
         newProjectOpen ||
         viewSettingsOpen ||
         aiWizardOpen ||
@@ -123,6 +127,7 @@ function Workspace() {
     [
       newTaskOpen,
       appSettingsOpen,
+      diagnosticsOpen,
       newProjectOpen,
       viewSettingsOpen,
       aiWizardOpen,
@@ -148,6 +153,7 @@ function Workspace() {
       const overlayOpen =
         newTaskOpen ||
         appSettingsOpen ||
+        diagnosticsOpen ||
         newProjectOpen ||
         viewSettingsOpen ||
         aiWizardOpen ||
@@ -196,6 +202,7 @@ function Workspace() {
     dispatchViewAction,
     newTaskOpen,
     appSettingsOpen,
+    diagnosticsOpen,
     newProjectOpen,
     viewSettingsOpen,
     aiWizardOpen,
@@ -331,6 +338,17 @@ function Workspace() {
             projectName={profileInterview.projectName}
             onClose={closeProfileInterview}
           />
+        </div>
+      )}
+
+      {/* Diagnostics (ticket 124) — same z-60 tier as the profile interview:
+          launched from inside Settings and must cover it. */}
+      {diagnosticsOpen && (
+        <div className="absolute inset-0 z-[60] flex flex-col bg-clide-bg clide-takeover-transition">
+          <div className="flex electrobun-webkit-app-region-drag">
+            <TrafficLights />
+          </div>
+          <DiagnosticsPage onClose={closeDiagnostics} />
         </div>
       )}
 

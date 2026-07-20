@@ -59,6 +59,11 @@ interface AppState {
   openAppSettings: () => void;
   closeAppSettings: () => void;
 
+  /** Diagnostics takeover (ticket 124), launched from Settings — stacks above it. */
+  diagnosticsOpen: boolean;
+  openDiagnostics: () => void;
+  closeDiagnostics: () => void;
+
   /** First-run AI service wizard (ticket 76) — full-window takeover shown when zero AI services are registered. */
   aiWizardOpen: boolean;
   /** Quietly dismiss for this launch only; re-evaluated on next boot. */
@@ -282,6 +287,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [newTaskOpen, setNewFormOpen] = useState(false);
   const [projectSurface, setProjectSurfaceState] = useState<ProjectSurface>("thread");
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
+  /** Full-window Diagnostics takeover (ticket 124), launched from Settings — stacks above it. */
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [runPickerOpen, setRunPickerOpen] = useState(false);
   // Speech mode (ticket 123) — never persisted across restarts, always off on boot.
   const [speechModeActive, setSpeechModeActive] = useState(false);
@@ -683,6 +690,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
   const openAppSettings = useCallback(() => setAppSettingsOpen(true), []);
   const closeAppSettings = useCallback(() => setAppSettingsOpen(false), []);
+  const openDiagnostics = useCallback(() => setDiagnosticsOpen(true), []);
+  const closeDiagnostics = useCallback(() => setDiagnosticsOpen(false), []);
   const dismissAIWizard = useCallback(() => {
     aiWizardSkippedRef.current = true;
     setAiWizardOpen(false);
@@ -1040,6 +1049,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     appSettingsOpen,
     openAppSettings,
     closeAppSettings,
+    diagnosticsOpen,
+    openDiagnostics,
+    closeDiagnostics,
     aiWizardOpen,
     dismissAIWizard,
     notifyAIServiceAdded,

@@ -202,7 +202,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 121 | Loading States & Smooth Transitions   | No FOUC: branded launch loader, animated surface/tab transitions, skeletons for async content     | ✅ Done¹¹     |
 | 122 | Signature Motion & UX Flair           | Motion identity: signature easing, elevated run/status/delight moments, motion-design note        | ✅ Done¹²     |
 | 123 | Speech Mode                           | Wave icon toggles voice mode: speak commands through the command surface, app speaks results      | ✅ Done¹³     |
-| 124 | Diagnostics Screen                    | App/machine/workload health: memory, CPU, disk, running work, scheduler/watcher status, copy      | ⬜ Open       |
+| 124 | Diagnostics Screen                    | App/machine/workload health: memory, CPU, disk, running work, scheduler/watcher status, copy      | ✅ Done¹⁴     |
 | 125 | Transparency Reveal                   | All collected user data in one folder with a generated manifest and a Reveal-in-Finder button     | ⬜ Open       |
 
 ¹ Ticket 54: create flow (all 4 steps) is complete; reopening the wizard to
@@ -295,3 +295,13 @@ separate code path; voice out speaks ticket-98 run summaries as they
 arrive. Never persisted — always off on boot. Verified booting
 error-free via Vite preview; the wave icon needs an active project to
 render, so not eyes-on in the real Electrobun/WebKit target.
+¹⁴ Ticket 124: `getDiagnostics` RPC gathers everything fresh per call —
+`node:os` + `process` for machine/app stats, `df -k` for free disk (no
+portable API), small counter exports added to `runner/registry.ts`/
+`workflows/engine.ts`/`scheduler.ts`/`workflows/schedules.ts` for
+workload counts (reusing their existing in-memory state rather than
+re-deriving it), AI services pinged on-demand via a per-service Test
+button. Full-window takeover launched from Settings, 5s refresh only
+while open, Copy-diagnostics plain-text export. App verified booting
+error-free; the screen itself needs an active project to reach, so not
+eyes-on verified.

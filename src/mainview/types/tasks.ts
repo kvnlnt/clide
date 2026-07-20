@@ -10,6 +10,7 @@ export type {
   BrowserStep,
   CommandSpec,
   DecisionStep,
+  DiagnosticsReport,
   Extraction,
   ExtractionSelector,
   ExtractionSource,

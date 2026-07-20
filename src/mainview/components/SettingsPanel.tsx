@@ -1,4 +1,4 @@
-import { Check, ChevronDown, ChevronRight, Loader, Pencil, Plus, Star, Trash2, X } from "lucide-react";
+import { Activity, Check, ChevronDown, ChevronRight, Loader, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
@@ -22,7 +22,7 @@ function needsCredential(kind: AIServiceKind): boolean {
 }
 
 export default function SettingsPanel({ onClose }: SettingsPanelProps) {
-  const { compactMode, setCompactMode } = useApp();
+  const { compactMode, setCompactMode, openDiagnostics } = useApp();
   const { confirm, toast } = useUIFeedback();
   const [services, setServices] = useState<AIService[] | null>(null);
   const [savedKeys, setSavedKeys] = useState<Record<string, boolean>>({});
@@ -104,6 +104,19 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                 </span>
               </div>
             </label>
+          </div>
+
+          <div className="flex items-center justify-between border-b border-white/5 pb-4">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[12px] font-bold uppercase tracking-wider text-white/40">Diagnostics</span>
+              <span className="text-[12px] text-white/40">App/machine health, resource usage, AI service reachability</span>
+            </div>
+            <button
+              onClick={openDiagnostics}
+              className="flex items-center gap-1.5 rounded-md border border-clide-border px-2.5 py-1.5 text-[12px] text-white/70 hover:bg-white/5 hover:text-white"
+            >
+              <Activity size={13} /> Open
+            </button>
           </div>
 
           <div className="flex items-center justify-between">
