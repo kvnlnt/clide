@@ -23,7 +23,7 @@ function filterSummary(filters: ThreadViewFilters): string {
  * popover on the project toolbar — unhiding lives here now.
  */
 export default function ViewsPage() {
-  const { activeProject, views, setActiveView, updateView, deleteView } = useApp();
+  const { activeProject, views, viewsLoading, setActiveView, updateView, deleteView } = useApp();
   const { confirm, toast } = useUIFeedback();
   // Ticket 116: inline rename — click the name to edit it in place.
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -68,7 +68,18 @@ export default function ViewsPage() {
       </div>
 
       <div className="clide-scroll flex-1 overflow-y-auto px-[var(--clide-page-x)] pb-[var(--clide-page-bottom)]">
-        {views.length === 0 ? (
+        {viewsLoading ? (
+          // Ticket 121: a skeleton instead of flashing "No saved views yet"
+          // while the fetch for a freshly switched-to project is in flight.
+          <div className="flex flex-col divide-y divide-white/5 border-t border-white/5">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex animate-pulse items-center gap-3 py-[var(--clide-row-y)]">
+                <div className="h-3.5 w-40 rounded bg-white/10" />
+                <div className="h-3 w-24 rounded bg-white/5" />
+              </div>
+            ))}
+          </div>
+        ) : views.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10">
               <Layers size={20} className="text-white/40" />

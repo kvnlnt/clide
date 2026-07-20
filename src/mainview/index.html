@@ -4,9 +4,67 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CLIDE</title>
+    <!--
+      Ticket 121: inline critical CSS + a static boot shell so the very first
+      paint — before Vite's JS bundle parses or index.css is injected — is
+      already on-theme instead of a flash of the browser's default white.
+      React's hydrate/mount call replaces #root's children wholesale, so
+      this markup just disappears the instant the app is ready; no explicit
+      handoff logic needed for the first-run staggered entrance underneath.
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #151212;
+      }
+      #root {
+        height: 100%;
+      }
+      .clide-boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #151212;
+      }
+      .clide-boot__mark {
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #fff;
+        opacity: 0.35;
+        animation: clide-boot-pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes clide-boot-pulse {
+        0%,
+        100% {
+          opacity: 0.25;
+        }
+        50% {
+          opacity: 0.6;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .clide-boot__mark {
+          animation: none;
+          opacity: 0.4;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="clide-boot"><span class="clide-boot__mark">CLIDE</span></div>
+    </div>
     <script type="module" src="/main.tsx"></script>
   </body>
 </html>

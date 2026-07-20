@@ -94,6 +94,8 @@ interface AppState {
 
   /** Saved thread views for the active project. "All" is implicit (activeViewId === null). */
   views: ThreadView[];
+  /** True while the active project's views are being fetched (ticket 121). */
+  viewsLoading: boolean;
   activeViewId: string | null;
   setActiveView: (id: string | null) => void;
   updateView: (view: ThreadView) => void;
@@ -289,6 +291,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [scheduledWorkflows, setScheduledWorkflows] = useState<ScheduledWorkflowRun[]>([]);
 
   const [views, setViews] = useState<ThreadView[]>([]);
+  /** True while the active project's views are being fetched (ticket 121) — ViewsPage shows a skeleton, not an empty flash. */
+  const [viewsLoading, setViewsLoading] = useState(false);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
 
   const draftSeq = useRef(0);
@@ -309,12 +313,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProjectSurfaceState("thread");
     if (!activeProject) {
       setViews([]);
+      setViewsLoading(false);
       restoringRef.current = false;
       return;
     }
+    // Ticket 121: ViewsPage shows a skeleton instead of flashing "No saved
+    // views yet" while this is in flight.
+    setViewsLoading(true);
     let cancelled = false;
     void api.getViews(activeProject).then((loaded) => {
       if (cancelled) return;
+      setViewsLoading(false);
       const normalized = loaded.map(normalizeView);
       const want = viewByProjectRef.current[activeProject];
       // Stale empty views (ticket 115) never accumulate across restarts —
@@ -976,6 +985,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     projectProfileOffer,
     dismissProjectProfileOffer,
     views,
+    viewsLoading,
     activeViewId,
     setActiveView,
     updateView,

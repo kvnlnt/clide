@@ -11,6 +11,7 @@ import ProjectToolbar from "./components/ProjectToolbar";
 import RunPicker from "./components/RunPicker";
 import SettingsPanel from "./components/SettingsPanel";
 import Sidebar from "./components/Sidebar";
+import SurfaceTransition from "./components/SurfaceTransition";
 import TasksPanel from "./components/TasksPanel";
 import Thread from "./components/Thread";
 import TrafficLights from "./components/TrafficLights";
@@ -219,30 +220,36 @@ function Workspace() {
           ) : !activeProject ? (
             <WelcomeScreen />
           ) : activeView ? (
-            <>
+            // Ticket 121: view-tab switches fade in — toolbar + thread
+            // together, since a different view is a genuinely different page.
+            <SurfaceTransition transitionKey={`view:${activeView.id}`} className="flex min-h-0 flex-1 flex-col">
               <ViewToolbar view={activeView} />
               <Thread />
-            </>
+            </SurfaceTransition>
           ) : (
             <>
               <ProjectToolbar />
-              {projectSurface === "tasks" && <TasksPanel />}
-              {projectSurface === "views" && <ViewsPage />}
-              {projectSurface === "workflows" && <WorkflowsPage />}
-              {projectSurface === "calendar" && <CalendarPage />}
-              {projectSurface === "files" && (
-                <div className="flex-1 overflow-hidden">
-                  <FilesPage projectName={activeProject} scope="project" />
-                </div>
-              )}
-              {projectSurface === "project-settings" && activeProjectMeta && (
-                <ProjectSettingsPage
-                  path={activeProjectMeta.path}
-                  name={activeProjectMeta.name}
-                  onDone={() => setProjectSurface("thread")}
-                />
-              )}
-              {projectSurface === "thread" && <Thread />}
+              {/* Ticket 121: only the swapped body fades — the toolbar above
+                  is persistent chrome and shouldn't re-animate on every click. */}
+              <SurfaceTransition transitionKey={`surface:${projectSurface}`} className="flex min-h-0 flex-1 flex-col">
+                {projectSurface === "tasks" && <TasksPanel />}
+                {projectSurface === "views" && <ViewsPage />}
+                {projectSurface === "workflows" && <WorkflowsPage />}
+                {projectSurface === "calendar" && <CalendarPage />}
+                {projectSurface === "files" && (
+                  <div className="flex-1 overflow-hidden">
+                    <FilesPage projectName={activeProject} scope="project" />
+                  </div>
+                )}
+                {projectSurface === "project-settings" && activeProjectMeta && (
+                  <ProjectSettingsPage
+                    path={activeProjectMeta.path}
+                    name={activeProjectMeta.name}
+                    onDone={() => setProjectSurface("thread")}
+                  />
+                )}
+                {projectSurface === "thread" && <Thread />}
+              </SurfaceTransition>
             </>
           )}
           {runPickerOpen && activeProject && <RunPicker onClose={closeRunPicker} />}
@@ -254,7 +261,7 @@ function Workspace() {
           drag region + traffic lights are re-rendered here to keep the
           window movable/closable while Settings is open. */}
       {appSettingsOpen && (
-        <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg">
+        <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg clide-takeover-transition">
           <div className="flex electrobun-webkit-app-region-drag">
             <TrafficLights />
           </div>
@@ -265,7 +272,7 @@ function Workspace() {
       {/* First-run AI service setup (ticket 76) — same full-window takeover
           mechanic as Settings above, shown whenever zero AI services are registered. */}
       {aiWizardOpen && (
-        <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg">
+        <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg clide-takeover-transition">
           <div className="flex electrobun-webkit-app-region-drag">
             <TrafficLights />
           </div>
@@ -278,7 +285,7 @@ function Workspace() {
           the same overlay mechanic as Settings above. The workspace stays
           mounted underneath, untouched on close/create. */}
       {newTaskOpen && (
-        <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg">
+        <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg clide-takeover-transition">
           <div className="flex electrobun-webkit-app-region-drag">
             <TrafficLights />
           </div>
@@ -294,7 +301,7 @@ function Workspace() {
       {/* Workflow creation/editing takes over the whole window like the task
           wizard (tickets 91/92) — same overlay mechanic. */}
       {workflowEditor && (
-        <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg">
+        <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg clide-takeover-transition">
           <div className="flex electrobun-webkit-app-region-drag">
             <TrafficLights />
           </div>
@@ -314,7 +321,7 @@ function Workspace() {
       {/* AI profile interview (tickets 100/101) — same takeover mechanic, but
           z-60: it can be launched from inside Settings and must cover it. */}
       {profileInterview && (
-        <div className="absolute inset-0 z-[60] flex flex-col bg-clide-bg">
+        <div className="absolute inset-0 z-[60] flex flex-col bg-clide-bg clide-takeover-transition">
           <div className="flex electrobun-webkit-app-region-drag">
             <TrafficLights />
           </div>

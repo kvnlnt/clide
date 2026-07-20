@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "clide-vite",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "hmr"],
+      "port": 5173
+    }
+  ]
+}

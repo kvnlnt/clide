@@ -113,9 +113,44 @@ body {
   animation: clide-glow 4.5s ease-in-out infinite;
 }
 
+/* Surface switches (ticket 121): thread ⇄ tasks ⇄ views ⇄ calendar ⇄
+   files ⇄ settings, and view-tab switches. Keyed remount on the consuming
+   side re-triggers this on every switch — one shared timing everywhere. */
+@keyframes clide-surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.clide-surface-transition {
+  animation: clide-surface-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Full-window takeovers (Settings, wizards, editors) — fade + slight rise,
+   distinct timing from the lighter surface switch above. */
+@keyframes clide-takeover-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.clide-takeover-transition {
+  animation: clide-takeover-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .clide-rise,
-  .clide-glow {
+  .clide-glow,
+  .clide-surface-transition,
+  .clide-takeover-transition {
     animation: none;
   }
 }
