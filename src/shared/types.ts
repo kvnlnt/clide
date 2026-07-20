@@ -707,6 +707,23 @@ export interface WorkflowRunTriggerInfo {
   params?: Record<string, string>;
 }
 
+/**
+ * A workflow scheduled to run at a future time from the calendar (ticket
+ * 117) — distinct from `WorkflowRun` (an actual invocation, running or
+ * finished) the same way a scheduled `RunRecord` differs from a completed
+ * one. Persisted per project alongside workflow definitions.
+ */
+export interface ScheduledWorkflowRun {
+  id: string;
+  workflowId: string;
+  /** Denormalized so the calendar/detail UI never needs a workflow lookup that might fail if it's since been deleted. */
+  workflowName: string;
+  /** Named text values matching the workflow's `params` at schedule time. */
+  params: Record<string, string>;
+  scheduledAt: string;
+  repeatInterval: RepeatInterval;
+}
+
 export interface WorkflowRun {
   runId: string;
   workflowId: string;
@@ -1124,6 +1141,35 @@ export type ClideRPC = {
       duplicateWorkflow: {
         params: { project: string; id: string };
         response: { ok: boolean; workflow?: Workflow; error?: string };
+      };
+
+      /** Calendar workflow scheduling (ticket 117) — mirrors the task schedule RPCs below. */
+      getScheduledWorkflows: {
+        params: { project: string };
+        response: ScheduledWorkflowRun[];
+      };
+      scheduleWorkflowRun: {
+        params: {
+          project: string;
+          workflowId: string;
+          workflowName: string;
+          params: Record<string, string>;
+          scheduledAt: string;
+          repeatInterval: RepeatInterval;
+        };
+        response: { ok: boolean; id?: string; error?: string };
+      };
+      rescheduleWorkflowRun: {
+        params: { project: string; id: string; scheduledAt: string; repeatInterval: RepeatInterval };
+        response: { ok: boolean };
+      };
+      cancelScheduledWorkflowRun: {
+        params: { project: string; id: string };
+        response: void;
+      };
+      runScheduledWorkflowRunNow: {
+        params: { project: string; id: string };
+        response: { ok: boolean };
       };
 
       setPinned: {

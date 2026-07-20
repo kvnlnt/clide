@@ -1,11 +1,11 @@
-import { ChevronLeft, ChevronRight, Play, Plus, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, Plus, Trash2, Workflow as WorkflowIcon, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import CalendarComposer from "./CalendarComposer";
 import Modal from "./Modal";
 import MonthYearPicker from "./MonthYearPicker";
 import { useUIFeedback } from "./UIFeedback";
-import type { RepeatInterval, RunRecord } from "../types/tasks";
+import type { RepeatInterval, RunRecord, ScheduledWorkflowRun } from "../types/tasks";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MAX_CHIPS_PER_DAY = 4;
@@ -35,19 +35,16 @@ function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-interface Chip {
-  key: string;
-  date: Date;
-  run: RunRecord;
-  /** A computed future occurrence of a recurring run, not a persisted row — not editable. */
-  projected: boolean;
-}
+/** One calendar chip — a task run or a scheduled workflow (ticket 117), visually distinguished. */
+type Chip =
+  | { key: string; date: Date; projected: boolean; kind: "task"; item: RunRecord }
+  | { key: string; date: Date; projected: boolean; kind: "workflow"; item: ScheduledWorkflowRun };
 
-/** Computes visual-only future occurrences of a recurring scheduled run within a date range. */
-function projectOccurrences(run: RunRecord, rangeStart: Date, rangeEnd: Date): Date[] {
-  if (!run.scheduledAt || !run.repeatInterval || run.repeatInterval === "none") return [];
-  const stepDays = run.repeatInterval === "daily" ? 1 : 7;
-  let current = addDays(new Date(run.scheduledAt), stepDays);
+/** Computes visual-only future occurrences of a recurring schedule within a date range. */
+function projectOccurrences(scheduledAt: string, repeatInterval: RepeatInterval, rangeStart: Date, rangeEnd: Date): Date[] {
+  if (!repeatInterval || repeatInterval === "none") return [];
+  const stepDays = repeatInterval === "daily" ? 1 : 7;
+  let current = addDays(new Date(scheduledAt), stepDays);
   const occurrences: Date[] = [];
   let guard = 0;
   while (current < rangeStart && guard < 1000) {
@@ -63,24 +60,37 @@ function projectOccurrences(run: RunRecord, rangeStart: Date, rangeEnd: Date): D
 }
 
 export default function CalendarPage() {
-  const { activeProject, runs, tasksBySlug, updateScheduledRun, runScheduledNow, deleteRun } = useApp();
+  const {
+    activeProject,
+    runs,
+    tasksBySlug,
+    updateScheduledRun,
+    runScheduledNow,
+    deleteRun,
+    scheduledWorkflows,
+    rescheduleWorkflowRun,
+    runScheduledWorkflowRunNow,
+    cancelScheduledWorkflowRun,
+  } = useApp();
   const { confirm, toast } = useUIFeedback();
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<
+    { kind: "task"; id: string } | { kind: "workflow"; id: string } | null
+  >(null);
   /** Day being composed for (ticket 69). Composer and ScheduleDetail are mutually exclusive. */
   const [composeDate, setComposeDate] = useState<Date | null>(null);
 
   const openComposer = (day: Date) => {
-    setSelectedId(null);
+    setSelected(null);
     setComposeDate(day);
   };
 
-  const openDetail = (runId: string) => {
+  const openDetail = (chip: Chip) => {
     setComposeDate(null);
-    setSelectedId(runId);
+    setSelected(chip.kind === "task" ? { kind: "task", id: chip.item.id } : { kind: "workflow", id: chip.item.id });
   };
 
-  const scheduled = useMemo(
+  const scheduledTasks = useMemo(
     () => runs.filter((r) => r.status === "scheduled" && tasksBySlug.get(r.taskSlug)?.meta.project === activeProject),
     [runs, tasksBySlug, activeProject],
   );
@@ -97,17 +107,25 @@ export default function CalendarPage() {
       list.push(chip);
       map.set(key, list);
     };
-    for (const run of scheduled) {
+    for (const run of scheduledTasks) {
       if (!run.scheduledAt) continue;
-      push({ key: `${run.id}-real`, date: new Date(run.scheduledAt), run, projected: false });
-      for (const occ of projectOccurrences(run, gridStart, rangeEnd)) {
-        push({ key: `${run.id}-${occ.getTime()}`, date: occ, run, projected: true });
+      push({ key: `${run.id}-real`, date: new Date(run.scheduledAt), projected: false, kind: "task", item: run });
+      for (const occ of projectOccurrences(run.scheduledAt, run.repeatInterval ?? "none", gridStart, rangeEnd)) {
+        push({ key: `${run.id}-${occ.getTime()}`, date: occ, projected: true, kind: "task", item: run });
+      }
+    }
+    for (const sw of scheduledWorkflows) {
+      push({ key: `${sw.id}-real`, date: new Date(sw.scheduledAt), projected: false, kind: "workflow", item: sw });
+      for (const occ of projectOccurrences(sw.scheduledAt, sw.repeatInterval, gridStart, rangeEnd)) {
+        push({ key: `${sw.id}-${occ.getTime()}`, date: occ, projected: true, kind: "workflow", item: sw });
       }
     }
     return map;
-  }, [scheduled, gridStart, rangeEnd]);
+  }, [scheduledTasks, scheduledWorkflows, gridStart, rangeEnd]);
 
-  const selected = selectedId ? scheduled.find((r) => r.id === selectedId) : undefined;
+  const selectedTask = selected?.kind === "task" ? scheduledTasks.find((r) => r.id === selected.id) : undefined;
+  const selectedWorkflow =
+    selected?.kind === "workflow" ? scheduledWorkflows.find((s) => s.id === selected.id) : undefined;
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -162,33 +180,44 @@ export default function CalendarPage() {
                   >
                     {day.getDate()}
                   </span>
-                  {/* Hover affordance (ticket 69): schedule a task for this day. */}
+                  {/* Hover affordance (ticket 69): schedule a task or workflow for this day. */}
                   <span
-                    title="Schedule a task for this day"
+                    title="Schedule a task or workflow for this day"
                     className="flex h-4 w-4 items-center justify-center rounded text-white/40 opacity-0 transition-opacity group-hover:opacity-100"
                   >
                     <Plus size={11} />
                   </span>
                 </span>
-                {visible.map((chip) => (
-                  <button
-                    key={chip.key}
-                    disabled={chip.projected}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openDetail(chip.run.id);
-                    }}
-                    title={`${tasksBySlug.get(chip.run.taskSlug)?.meta.name ?? chip.run.taskSlug} — ${chip.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
-                    className={`truncate rounded px-1.5 py-0.5 text-left text-[11px] ${
-                      chip.projected
-                        ? "border border-dashed border-white/10 text-white/30"
-                        : `text-white/80 hover:bg-white/10 ${selectedId === chip.run.id ? "bg-white/15" : "bg-white/5"}`
-                    }`}
-                  >
-                    {chip.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{" "}
-                    {tasksBySlug.get(chip.run.taskSlug)?.meta.name ?? chip.run.taskSlug}
-                  </button>
-                ))}
+                {visible.map((chip) => {
+                  const name =
+                    chip.kind === "task"
+                      ? tasksBySlug.get(chip.item.taskSlug)?.meta.name ?? chip.item.taskSlug
+                      : chip.item.workflowName;
+                  const isSelected = selected?.kind === chip.kind && selected.id === chip.item.id;
+                  return (
+                    <button
+                      key={chip.key}
+                      disabled={chip.projected}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDetail(chip);
+                      }}
+                      title={`${name} — ${chip.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+                      className={`flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-left text-[11px] ${
+                        chip.projected
+                          ? "border border-dashed border-white/10 text-white/30"
+                          : chip.kind === "workflow"
+                            ? `text-orange-200/90 hover:bg-orange-400/20 ${isSelected ? "bg-orange-400/25" : "bg-orange-400/10"}`
+                            : `text-white/80 hover:bg-white/10 ${isSelected ? "bg-white/15" : "bg-white/5"}`
+                      }`}
+                    >
+                      {chip.kind === "workflow" && <WorkflowIcon size={10} className="shrink-0" />}
+                      <span className="truncate">
+                        {chip.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} {name}
+                      </span>
+                    </button>
+                  );
+                })}
                 {overflow > 0 && <span className="text-[10px] text-white/30">+{overflow} more</span>}
               </div>
             );
@@ -197,40 +226,72 @@ export default function CalendarPage() {
 
         {composeDate && <CalendarComposer date={composeDate} onClose={() => setComposeDate(null)} />}
 
-        {selected && (
+        {selectedTask && (
           <ScheduleDetail
-            run={selected}
-            formName={tasksBySlug.get(selected.taskSlug)?.meta.name ?? selected.taskSlug}
-            onClose={() => setSelectedId(null)}
+            label={tasksBySlug.get(selectedTask.taskSlug)?.meta.name ?? selectedTask.taskSlug}
+            scheduledAt={selectedTask.scheduledAt ?? new Date().toISOString()}
+            repeatInterval={selectedTask.repeatInterval ?? "none"}
+            onClose={() => setSelected(null)}
             onSave={async (scheduledAt, repeat) => {
-              await updateScheduledRun(selected.id, scheduledAt, repeat);
+              await updateScheduledRun(selectedTask.id, scheduledAt, repeat);
               toast("Schedule updated");
-              setSelectedId(null);
+              setSelected(null);
             }}
             onRunNow={async () => {
-              await runScheduledNow(selected.id);
+              await runScheduledNow(selectedTask.id);
               toast("Run started");
-              setSelectedId(null);
+              setSelected(null);
             }}
             onCancel={async () => {
-              const name = tasksBySlug.get(selected.taskSlug)?.meta.name ?? selected.taskSlug;
+              const name = tasksBySlug.get(selectedTask.taskSlug)?.meta.name ?? selectedTask.taskSlug;
               const res = await confirm({
                 title: "Cancel this scheduled run?",
-                message: `"${name}" will no longer run${selected.repeatInterval && selected.repeatInterval !== "none" ? ", including future repeats" : ""}.`,
+                message: `"${name}" will no longer run${selectedTask.repeatInterval && selectedTask.repeatInterval !== "none" ? ", including future repeats" : ""}.`,
                 confirmLabel: "Cancel run",
                 cancelLabel: "Keep it",
               });
               if (!res.ok) return;
-              await deleteRun(selected.id);
+              await deleteRun(selectedTask.id);
               toast("Schedule cancelled");
-              setSelectedId(null);
+              setSelected(null);
             }}
           />
         )}
 
-        {scheduled.length === 0 && !composeDate && (
+        {selectedWorkflow && (
+          <ScheduleDetail
+            label={selectedWorkflow.workflowName}
+            scheduledAt={selectedWorkflow.scheduledAt}
+            repeatInterval={selectedWorkflow.repeatInterval}
+            onClose={() => setSelected(null)}
+            onSave={async (scheduledAt, repeat) => {
+              await rescheduleWorkflowRun(selectedWorkflow.id, scheduledAt, repeat);
+              toast("Schedule updated");
+              setSelected(null);
+            }}
+            onRunNow={async () => {
+              await runScheduledWorkflowRunNow(selectedWorkflow.id);
+              toast("Workflow run started");
+              setSelected(null);
+            }}
+            onCancel={async () => {
+              const res = await confirm({
+                title: "Cancel this scheduled run?",
+                message: `"${selectedWorkflow.workflowName}" will no longer run${selectedWorkflow.repeatInterval !== "none" ? ", including future repeats" : ""}.`,
+                confirmLabel: "Cancel run",
+                cancelLabel: "Keep it",
+              });
+              if (!res.ok) return;
+              await cancelScheduledWorkflowRun(selectedWorkflow.id);
+              toast("Schedule cancelled");
+              setSelected(null);
+            }}
+          />
+        )}
+
+        {scheduledTasks.length === 0 && scheduledWorkflows.length === 0 && !composeDate && (
           <div className="mt-6 text-center text-[13px] text-white/30">
-            Nothing scheduled. Click a day to schedule a task, or use a task's ⋯ menu.
+            Nothing scheduled. Click a day to schedule a task or workflow, or use a task's ⋯ menu.
           </div>
         )}
       </div>
@@ -239,21 +300,22 @@ export default function CalendarPage() {
 }
 
 interface ScheduleDetailProps {
-  run: RunRecord;
-  formName: string;
+  label: string;
+  scheduledAt: string;
+  repeatInterval: RepeatInterval;
   onClose: () => void;
   onSave: (scheduledAt: string, repeat: RepeatInterval) => Promise<void>;
   onRunNow: () => Promise<void>;
   onCancel: () => Promise<void>;
 }
 
-function ScheduleDetail({ run, formName, onClose, onSave, onRunNow, onCancel }: ScheduleDetailProps) {
-  const scheduledDate = run.scheduledAt ? new Date(run.scheduledAt) : new Date();
+function ScheduleDetail({ label, scheduledAt, repeatInterval, onClose, onSave, onRunNow, onCancel }: ScheduleDetailProps) {
+  const scheduledDate = new Date(scheduledAt);
   const [date, setDate] = useState(isoDate(scheduledDate));
   const [time, setTime] = useState(
     `${String(scheduledDate.getHours()).padStart(2, "0")}:${String(scheduledDate.getMinutes()).padStart(2, "0")}`,
   );
-  const [repeat, setRepeat] = useState<RepeatInterval>(run.repeatInterval ?? "none");
+  const [repeat, setRepeat] = useState<RepeatInterval>(repeatInterval);
   const [saving, setSaving] = useState(false);
 
   const inputClass =
@@ -276,7 +338,7 @@ function ScheduleDetail({ run, formName, onClose, onSave, onRunNow, onCancel }: 
       panelClassName="clide-scroll flex max-h-[85%] flex-col gap-3 overflow-y-auto p-5"
     >
       <div className="flex items-center justify-between">
-        <span className="text-[14px] font-bold text-white">{formName}</span>
+        <span className="text-[14px] font-bold text-white">{label}</span>
         <button onClick={onClose} className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white">
           <X size={14} />
         </button>

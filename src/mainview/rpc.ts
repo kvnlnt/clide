@@ -17,6 +17,7 @@ import type {
   RepeatInterval,
   RunRecord,
   RunStatusUpdate,
+  ScheduledWorkflowRun,
   StarterTask,
   TaskField,
   TaskFolder,
@@ -1209,6 +1210,64 @@ export const api = {
       return await r.duplicateWorkflow({ project, id });
     } catch (err) {
       return { ok: false, error: String(err) };
+    }
+  },
+
+  // Calendar workflow scheduling (ticket 117) ----------------------------------
+
+  async getScheduledWorkflows(project: string): Promise<ScheduledWorkflowRun[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.getScheduledWorkflows({ project });
+    } catch {
+      return [];
+    }
+  },
+
+  async scheduleWorkflowRun(
+    project: string,
+    workflowId: string,
+    workflowName: string,
+    params: Record<string, string>,
+    scheduledAt: string,
+    repeatInterval: RepeatInterval,
+  ): Promise<{ ok: boolean; id?: string; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.scheduleWorkflowRun({ project, workflowId, workflowName, params, scheduledAt, repeatInterval });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async rescheduleWorkflowRun(
+    project: string,
+    id: string,
+    scheduledAt: string,
+    repeatInterval: RepeatInterval,
+  ): Promise<{ ok: boolean }> {
+    const r = request();
+    if (!r) return { ok: false };
+    try {
+      return await r.rescheduleWorkflowRun({ project, id, scheduledAt, repeatInterval });
+    } catch {
+      return { ok: false };
+    }
+  },
+
+  async cancelScheduledWorkflowRun(project: string, id: string): Promise<void> {
+    await request()?.cancelScheduledWorkflowRun({ project, id });
+  },
+
+  async runScheduledWorkflowRunNow(project: string, id: string): Promise<{ ok: boolean }> {
+    const r = request();
+    if (!r) return { ok: false };
+    try {
+      return await r.runScheduledWorkflowRunNow({ project, id });
+    } catch {
+      return { ok: false };
     }
   },
 

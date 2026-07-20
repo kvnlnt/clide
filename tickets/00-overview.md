@@ -166,7 +166,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 114 | Finish Forms→Tasks Rename & Seeder    | Rename leftover `form` identifiers (AppContext etc.); fixes `dev:*` NOT NULL form_slug crash      | ✅ Done⁷      |
 | 115 | Auto-Delete Empty Views               | Filterless views are cleaned up automatically (grace period while active; named views kept)       | ✅ Done       |
 | 116 | AI View Naming + Manual Override      | AI names/renames views; double-click tab or inline rename; explicit names stop auto-naming        | ✅ Done       |
-| 117 | Calendar Schedules Workflows          | Day-click composer picks tasks or workflows; scheduled workflow runs on the grid + scheduler      | ⬜ Open       |
+| 117 | Calendar Schedules Workflows          | Day-click composer picks tasks or workflows; scheduled workflow runs on the grid + scheduler      | ✅ Done       |
 | 118 | Files Surface Fix & Theming           | Make the VFS Files surface actually work and restyle it to the app's visual language              | ⬜ Open       |
 | 119 | Compact Density Pass                  | Tighten margins/padding across surfaces; compact presentation where a tight default isn't enough  | ⬜ Open       |
 | 120 | Full-Width Screens                    | App/project pages drop centered max-width columns and use the full window width                   | ⬜ Open       |

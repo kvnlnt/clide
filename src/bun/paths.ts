@@ -133,6 +133,11 @@ export function workflowRunPath(projectPath: string, runId: string): string {
   return join(projectWorkflowRunsDir(projectPath), `${runId}.json`);
 }
 
+/** Calendar-scheduled workflow runs (ticket 117): one JSON array file per project, mirrors views.ts. */
+export function projectScheduledWorkflowsPath(projectPath: string): string {
+  return join(projectWorkflowsDir(projectPath), ".schedules.json");
+}
+
 export function runDir(projectPath: string, runId: string): string {
   return join(projectRunsDir(projectPath), runId);
 }

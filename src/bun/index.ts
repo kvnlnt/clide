@@ -96,6 +96,15 @@ import {
   listRuns as listWorkflowRunFiles,
 } from "./workflows/runStore";
 import {
+  cancelScheduledWorkflowRun,
+  disposeWorkflowSchedules,
+  getScheduledWorkflows,
+  initWorkflowSchedules,
+  rescheduleWorkflowRun as rescheduleWorkflowRunSchedule,
+  runScheduledWorkflowRunNow,
+  scheduleWorkflowRun,
+} from "./workflows/schedules";
+import {
   getWorkflow,
   deleteWorkflow as storeDeleteWorkflow,
   duplicateWorkflow as storeDuplicateWorkflow,
@@ -1223,6 +1232,51 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
+      getScheduledWorkflows: async ({ project }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return [];
+        return await getScheduledWorkflows(resolved.path);
+      },
+
+      scheduleWorkflowRun: async ({ project, workflowId, workflowName, params, scheduledAt, repeatInterval }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return { ok: false, error: "Project not found" };
+        try {
+          const id = await scheduleWorkflowRun(
+            resolved.path,
+            resolved.name,
+            workflowId,
+            workflowName,
+            params,
+            scheduledAt,
+            repeatInterval,
+          );
+          return { ok: true, id };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      rescheduleWorkflowRun: async ({ project, id, scheduledAt, repeatInterval }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return { ok: false };
+        const ok = await rescheduleWorkflowRunSchedule(resolved.path, resolved.name, id, scheduledAt, repeatInterval);
+        return { ok };
+      },
+
+      cancelScheduledWorkflowRun: async ({ project, id }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return;
+        await cancelScheduledWorkflowRun(resolved.path, id);
+      },
+
+      runScheduledWorkflowRunNow: async ({ project, id }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return { ok: false };
+        const ok = await runScheduledWorkflowRunNow(resolved.path, resolved.name, id);
+        return { ok };
+      },
+
       setPinned: ({ runId, pinned }) => {
         setPinned(runId, pinned);
       },
@@ -1575,6 +1629,16 @@ await initScheduler((projectPath, runId, taskSlug, inputs) => {
   })();
 });
 
+// Calendar-scheduled workflow runs (ticket 117) — same launch-time arming as
+// the task scheduler above, firing through the workflow engine instead.
+await initWorkflowSchedules(await listProjects(), (projectPath, projectName, workflowId, trigger) => {
+  void (async () => {
+    const workflow = await getWorkflow(projectPath, workflowId);
+    if (!workflow || !workflow.enabled) return;
+    startWorkflow({ path: projectPath, name: projectName }, workflow, trigger, { params: trigger.params ?? {} });
+  })();
+});
+
 // ---------------------------------------------------------------------------
 // Window.
 // ---------------------------------------------------------------------------
@@ -1666,6 +1730,7 @@ mainWindow.on("close", () => {
   stopWatching();
   disposeScheduler();
   disposeWorkflowTriggers();
+  disposeWorkflowSchedules();
 });
 
 console.log("CLIDE started.");

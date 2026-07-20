@@ -38,6 +38,7 @@ export type {
   RunRecord,
   RunStatus,
   RunStatusUpdate,
+  ScheduledWorkflowRun,
   SelectorCandidate,
   StarterTask,
   TaskDefinition,

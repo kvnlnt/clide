@@ -7,6 +7,7 @@ import type {
   Project,
   RepeatInterval,
   RunRecord,
+  ScheduledWorkflowRun,
   TaskFolder,
   TaskMetaPatch,
   ThreadView,
@@ -118,6 +119,19 @@ interface AppState {
   workflowEditor: { mode: "new" } | { mode: "edit"; workflow: Workflow; focusName?: boolean } | null;
   openWorkflowEditor: (workflow?: Workflow, focusName?: boolean) => void;
   closeWorkflowEditor: () => void;
+
+  /** Calendar-scheduled workflow runs for the active project (ticket 117). */
+  scheduledWorkflows: ScheduledWorkflowRun[];
+  scheduleWorkflowRun: (
+    workflowId: string,
+    workflowName: string,
+    params: Record<string, string>,
+    scheduledAt: string,
+    repeat: RepeatInterval,
+  ) => Promise<{ ok: boolean; id?: string; error?: string }>;
+  rescheduleWorkflowRun: (id: string, scheduledAt: string, repeat: RepeatInterval) => Promise<void>;
+  cancelScheduledWorkflowRun: (id: string) => Promise<void>;
+  runScheduledWorkflowRunNow: (id: string) => Promise<void>;
 
   setActiveProject: (p: string | null) => void;
   toggleSidebar: () => void;
@@ -266,6 +280,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [workflowEditor, setWorkflowEditor] = useState<
     { mode: "new" } | { mode: "edit"; workflow: Workflow; focusName?: boolean } | null
   >(null);
+  /** Calendar-scheduled workflow runs for the active project (ticket 117). */
+  const [scheduledWorkflows, setScheduledWorkflows] = useState<ScheduledWorkflowRun[]>([]);
 
   const [views, setViews] = useState<ThreadView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
@@ -692,6 +708,61 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshWorkflows();
   }, [refreshWorkflows]);
+
+  const refreshScheduledWorkflows = useCallback(async () => {
+    if (!activeProject) {
+      setScheduledWorkflows([]);
+      return;
+    }
+    setScheduledWorkflows(await api.getScheduledWorkflows(activeProject));
+  }, [activeProject]);
+
+  useEffect(() => {
+    void refreshScheduledWorkflows();
+  }, [refreshScheduledWorkflows]);
+
+  const scheduleWorkflowRun = useCallback(
+    async (
+      workflowId: string,
+      workflowName: string,
+      params: Record<string, string>,
+      scheduledAt: string,
+      repeat: RepeatInterval,
+    ) => {
+      if (!activeProject) return { ok: false, error: "No active project" };
+      const res = await api.scheduleWorkflowRun(activeProject, workflowId, workflowName, params, scheduledAt, repeat);
+      if (res.ok) await refreshScheduledWorkflows();
+      return res;
+    },
+    [activeProject, refreshScheduledWorkflows],
+  );
+
+  const rescheduleWorkflowRun = useCallback(
+    async (id: string, scheduledAt: string, repeat: RepeatInterval) => {
+      if (!activeProject) return;
+      await api.rescheduleWorkflowRun(activeProject, id, scheduledAt, repeat);
+      await refreshScheduledWorkflows();
+    },
+    [activeProject, refreshScheduledWorkflows],
+  );
+
+  const cancelScheduledWorkflowRun = useCallback(
+    async (id: string) => {
+      if (!activeProject) return;
+      await api.cancelScheduledWorkflowRun(activeProject, id);
+      await refreshScheduledWorkflows();
+    },
+    [activeProject, refreshScheduledWorkflows],
+  );
+
+  const runScheduledWorkflowRunNow = useCallback(
+    async (id: string) => {
+      if (!activeProject) return;
+      await api.runScheduledWorkflowRunNow(activeProject, id);
+      await refreshScheduledWorkflows();
+    },
+    [activeProject, refreshScheduledWorkflows],
+  );
   const openNewProject = useCallback(() => setNewProjectOpen(true), []);
   const closeNewProject = useCallback(() => setNewProjectOpen(false), []);
   const openNewTask = useCallback(() => {
@@ -912,6 +983,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     workflowEditor,
     openWorkflowEditor,
     closeWorkflowEditor,
+    scheduledWorkflows,
+    scheduleWorkflowRun,
+    rescheduleWorkflowRun,
+    cancelScheduledWorkflowRun,
+    runScheduledWorkflowRunNow,
     setActiveProject,
     toggleSidebar,
     openNewProject,
