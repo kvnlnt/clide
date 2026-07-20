@@ -201,7 +201,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 120 | Full-Width Screens                    | App/project pages drop centered max-width columns and use the full window width                   | ✅ Done¹⁰     |
 | 121 | Loading States & Smooth Transitions   | No FOUC: branded launch loader, animated surface/tab transitions, skeletons for async content     | ✅ Done¹¹     |
 | 122 | Signature Motion & UX Flair           | Motion identity: signature easing, elevated run/status/delight moments, motion-design note        | ✅ Done¹²     |
-| 123 | Speech Mode                           | Wave icon toggles voice mode: speak commands through the command surface, app speaks results      | ⬜ Open       |
+| 123 | Speech Mode                           | Wave icon toggles voice mode: speak commands through the command surface, app speaks results      | ✅ Done¹³     |
 | 124 | Diagnostics Screen                    | App/machine/workload health: memory, CPU, disk, running work, scheduler/watcher status, copy      | ⬜ Open       |
 | 125 | Transparency Reveal                   | All collected user data in one folder with a generated manifest and a Reveal-in-Finder button     | ⬜ Open       |
 
@@ -286,3 +286,12 @@ found along the way (`FormCardFooter`/`FormCardMenu`/`FormPreview`).
 App verified booting error-free via the Vite preview; the animations
 themselves need a real run in the thread (native bridge) to see, so
 not eyes-on verified.
+¹³ Ticket 123: browser Web Speech API — `speechSynthesis` for voice out
+(universal, no permission), `SpeechRecognition` for voice in, feature-
+detected since WebKit (Electrobun's webview) generally lacks it, exactly
+the "must degrade clearly" case the ticket anticipated. Recognized
+commands open the existing ⌘K `RunPicker` pre-filled rather than a
+separate code path; voice out speaks ticket-98 run summaries as they
+arrive. Never persisted — always off on boot. Verified booting
+error-free via Vite preview; the wave icon needs an active project to
+render, so not eyes-on in the real Electrobun/WebKit target.

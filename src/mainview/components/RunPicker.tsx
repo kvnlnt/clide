@@ -31,6 +31,8 @@ export default function RunPicker({ onClose }: RunPickerProps) {
     openWorkflowEditor,
     workflows,
     setProjectSurface,
+    pendingSpeechQuery,
+    consumePendingSpeechQuery,
   } = useApp();
   const { toast } = useUIFeedback();
   const scopedTasks = activeProject ? tasks.filter((f) => f.meta.project === activeProject) : tasks;
@@ -59,6 +61,17 @@ export default function RunPicker({ onClose }: RunPickerProps) {
 
   useEffect(() => {
     inputRef.current?.focus();
+  }, []);
+
+  // Ticket 123: a recognized voice command seeds the search — read once on
+  // mount (the picker is remounted fresh each time it opens) then cleared,
+  // so it never reappears on a later manual open.
+  useEffect(() => {
+    if (pendingSpeechQuery) {
+      setQuery(pendingSpeechQuery);
+      consumePendingSpeechQuery();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, on } from "../rpc";
 import { matchesView } from "../../shared/viewFilters";
+import { isSpeechRecognitionSupported, speak, startListening, stopSpeaking } from "../speech";
 import type {
   FilterEntry,
   OutputChunk,
@@ -77,6 +78,17 @@ interface AppState {
   runPickerOpen: boolean;
   openRunPicker: () => void;
   closeRunPicker: () => void;
+
+  /** Speech mode (ticket 123) — never persisted, always off on boot. */
+  speechModeActive: boolean;
+  toggleSpeechMode: () => void;
+  /** True while a voice-command recognition session is actively listening. */
+  speechListening: boolean;
+  /** Last speech error (unsupported env, mic denied, recognition failure) — cleared on the next attempt. */
+  speechError: string | null;
+  /** Set once a voice command is recognized; RunPicker reads and clears it. */
+  pendingSpeechQuery: string | null;
+  consumePendingSpeechQuery: () => void;
 
   /** Full-window AI profile interview takeover (tickets 100/101). */
   profileInterview: ProfileInterviewTarget | null;
@@ -271,6 +283,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [projectSurface, setProjectSurfaceState] = useState<ProjectSurface>("thread");
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const [runPickerOpen, setRunPickerOpen] = useState(false);
+  // Speech mode (ticket 123) — never persisted across restarts, always off on boot.
+  const [speechModeActive, setSpeechModeActive] = useState(false);
+  const [speechListening, setSpeechListening] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  /** Set once a voice command is recognized; RunPicker reads and clears it on mount. */
+  const [pendingSpeechQuery, setPendingSpeechQuery] = useState<string | null>(null);
+  const speechHandleRef = useRef<{ stop: () => void } | null>(null);
+  /** Mirrors speechModeActive for the mount-only push-event subscription below. */
+  const speechModeActiveRef = useRef(false);
+  useEffect(() => {
+    speechModeActiveRef.current = speechModeActive;
+  }, [speechModeActive]);
   const [viewSettingsOpen, setViewSettingsOpen] = useState(false);
   const [aiWizardOpen, setAiWizardOpen] = useState(false);
   const [aiWizardChained, setAiWizardChained] = useState(false);
@@ -630,6 +654,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
             : r,
         ),
       );
+      // Voice out (ticket 123): speak the ticket-98 run summary as it streams
+      // in, while speech mode is on. Read the live ref, not the closed-over
+      // state — this subscription is set up once on mount.
+      if (speechModeActiveRef.current && update.summary) speak(update.summary);
     });
     return () => {
       offProjects();
@@ -680,6 +708,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const completeOnboarding = useCallback(() => setOnboardingActive(false), []);
   const openRunPicker = useCallback(() => setRunPickerOpen(true), []);
   const closeRunPicker = useCallback(() => setRunPickerOpen(false), []);
+
+  /** One listen-for-a-command session — result opens the ⌘K picker pre-filled (ticket 123). */
+  const listenOnce = useCallback(() => {
+    if (!isSpeechRecognitionSupported()) return;
+    setSpeechError(null);
+    setSpeechListening(true);
+    speechHandleRef.current = startListening(
+      (transcript) => {
+        setPendingSpeechQuery(transcript);
+        setRunPickerOpen(true);
+      },
+      (message) => setSpeechError(message),
+      () => {
+        setSpeechListening(false);
+        speechHandleRef.current = null;
+      },
+    );
+  }, []);
+
+  const toggleSpeechMode = useCallback(() => {
+    setSpeechModeActive((active) => {
+      const next = !active;
+      if (!next) {
+        // Turning off: stop mid-listen and cut voice out immediately.
+        speechHandleRef.current?.stop();
+        stopSpeaking();
+        setSpeechListening(false);
+        setSpeechError(null);
+      } else {
+        listenOnce();
+      }
+      return next;
+    });
+  }, [listenOnce]);
+
+  const consumePendingSpeechQuery = useCallback(() => {
+    setPendingSpeechQuery(null);
+  }, []);
+
+  // Ticket 123: stop everything on unmount — never leave the mic hot.
+  useEffect(() => {
+    return () => {
+      speechHandleRef.current?.stop();
+      stopSpeaking();
+    };
+  }, []);
   const openProfileInterview = useCallback((target: ProfileInterviewTarget) => setProfileInterview(target), []);
   const closeProfileInterview = useCallback((saved: boolean) => {
     setProfileInterview(null);
@@ -976,6 +1050,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     runPickerOpen,
     openRunPicker,
     closeRunPicker,
+    speechModeActive,
+    toggleSpeechMode,
+    speechListening,
+    speechError,
+    pendingSpeechQuery,
+    consumePendingSpeechQuery,
     profileInterview,
     openProfileInterview,
     closeProfileInterview,
