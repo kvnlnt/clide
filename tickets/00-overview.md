@@ -157,8 +157,8 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 105 | Task Adoption & Versioning            | Draft → adopt lifecycle; edits fork new versions; opt-in retroactive workflow upgrades            | ✅ Done³      |
 | 106 | Project Audit Page & RSI Loop         | Epic: audit log + dossier + Datalog theorem prover over run facts + AI-prescribed improvements    | ⏸ Hold        |
 | 107 | Interview Model Picker                | Choose the AI service + model powering a profile interview; remembers last choice per scope       | ✅ Done       |
-| 108 | Interview Error Recovery & Cancel     | No dead ends: cancel always available, failed AI calls get retry states, RPC timeouts caught      | ⬜ Open       |
-| 109 | Interview Draft Review Scroll Fix     | The "Here's the draft" review step scrolls (min-h-0 chain repair per ticket 68 pattern)           | ⬜ Open       |
+| 108 | Interview Error Recovery & Cancel     | No dead ends: cancel always available, failed AI calls get retry states, RPC timeouts caught      | ✅ Done       |
+| 109 | Interview Draft Review Scroll Fix     | Review step scrolls again — auto-grow textareas stop swallowing the wheel (not a min-h-0 bug)     | ✅ Done       |
 | 110 | Interview Question Logic & Categories | Stop parroting the user's answers back; each question shows the category it belongs to            | ✅ Done       |
 | 111 | Interview-First Onboarding            | First-run opens with an interview; detects AI/project state and tailors flow + starter checklist  | ✅ Done⁶      |
 | 112 | Task List Kebab → Edit Form           | Remove the misaligned row kebab; Adopt/Version History/Edit Steps move into the edit surface      | ✅ Done       |

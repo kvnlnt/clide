@@ -42,7 +42,7 @@ type Phase = "setup" | "asking" | "drafting" | "review" | "saving";
  * the profile untouched.
  */
 export default function ProfileInterviewPage({ scope, projectPath, projectName, onClose }: ProfileInterviewPageProps) {
-  const { toast } = useUIFeedback();
+  const { toast, confirm } = useUIFeedback();
   const [phase, setPhase] = useState<Phase>("setup");
   const [transcript, setTranscript] = useState<InterviewTurn[]>([]);
   const [question, setQuestion] = useState<string | null>(null);
@@ -53,6 +53,9 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
   const [selfNotes, setSelfNotes] = useState("");
   const [suggestApp, setSuggestApp] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Ticket 108: a failed AI call is never a dead end — it renders as a card
+  // with Retry (re-issues just that call, transcript intact) and Cancel.
+  const [failure, setFailure] = useState<{ op: "question" | "draft"; message: string } | null>(null);
   // Ticket 107: the service+model powering this session. Resolved before the
   // picker renders (stored choice validated against live services) so the
   // default is preselected and one click starts the interview.
@@ -66,10 +69,10 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
   const finish = useCallback(
     async (t: InterviewTurn[]) => {
       setPhase("drafting");
-      setError(null);
+      setFailure(null);
       const res = await api.profileInterviewFinish(scope, projectPath, t, ai.serviceId ? ai : undefined);
       if (!res.ok || !res.sections) {
-        setError(res.error ?? "Couldn't draft the profile.");
+        setFailure({ op: "draft", message: res.error ?? "Couldn't draft the profile." });
         setPhase("asking");
         return;
       }
@@ -84,17 +87,17 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
   const fetchNext = useCallback(
     async (t: InterviewTurn[]) => {
       setLoadingQuestion(true);
-      setError(null);
+      setFailure(null);
       const res = await api.profileInterviewNext(scope, projectPath, t, ai.serviceId ? ai : undefined);
       setLoadingQuestion(false);
       if (!res.ok) {
-        setError(res.error ?? "Couldn't generate a question.");
+        setFailure({ op: "question", message: res.error ?? "Couldn't generate a question." });
         return;
       }
       if (res.done || !res.question) {
         // The engine ended the session on its own — draft from what was gathered.
         if (t.length > 0) void finish(t);
-        else setError("The interview couldn't get started — try again later.");
+        else setFailure({ op: "question", message: "The interview couldn't get started — try again later." });
         return;
       }
       setQuestion(res.question);
@@ -103,6 +106,42 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
     },
     [scope, projectPath, ai, finish],
   );
+
+  // Ticket 108: closing is always possible (X or Escape, any phase). Answers
+  // already given get a confirm; an untouched session just closes. The ref
+  // stops Escape from stacking a second confirm on top of an open one.
+  const confirmingRef = useRef(false);
+  const requestClose = useCallback(async () => {
+    if (phase === "saving" || confirmingRef.current) return;
+    if (transcript.length > 0) {
+      confirmingRef.current = true;
+      const res = await confirm({
+        title: "Discard this interview?",
+        message: "Answers from this session won't be saved.",
+        confirmLabel: "Discard",
+      });
+      confirmingRef.current = false;
+      if (!res.ok) return;
+    }
+    onClose(false);
+  }, [phase, transcript, confirm, onClose]);
+
+  const retryFailed = useCallback(() => {
+    if (!failure) return;
+    if (failure.op === "draft") void finish(transcript);
+    else void fetchNext(transcript);
+  }, [failure, transcript, finish, fetchNext]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        void requestClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [requestClose]);
 
   // Resolve the session's AI before showing the picker: last-used choice for
   // this scope when its service still exists, the default service otherwise.
@@ -181,6 +220,16 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
     );
   };
 
+  // Ticket 109: review textareas grow to fit their content instead of
+  // scrolling internally. A textarea with overflow captures the wheel even
+  // when it has nothing to scroll (WebKit), and the review screen is a wall
+  // of them — the page scroll felt dead. The page is the only scroller now.
+  const autoGrow = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + 2}px`;
+  };
+
   const empty = isProfileContentEmpty(sections);
 
   return (
@@ -198,7 +247,7 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
           </div>
         </div>
         <button
-          onClick={() => onClose(false)}
+          onClick={() => void requestClose()}
           title="Close (discards this session)"
           className="flex h-8 w-8 items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
         >
@@ -206,7 +255,7 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
         </button>
       </div>
 
-      <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">
+      <div className="clide-scroll min-h-0 flex-1 overflow-y-auto px-8 pb-8">
         <div className="mx-auto flex w-full max-w-[640px] flex-col gap-4">
           {phase === "setup" && (
             <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-clide-panel/60 p-4">
@@ -324,6 +373,30 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
                   </div>
                 </div>
               ) : null}
+
+              {failure && (
+                <div className="flex flex-col gap-2.5 rounded-lg border border-red-400/20 bg-red-400/5 p-4">
+                  <span className="text-[13px] leading-relaxed text-red-300">{failure.message}</span>
+                  <span className="text-[12px] text-white/40">
+                    Your answers are safe — retry {failure.op === "draft" ? "drafting" : "the question"} or cancel the
+                    interview.
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={retryFailed}
+                      className="rounded-md bg-white/10 px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-white/20"
+                    >
+                      Try again
+                    </button>
+                    <button
+                      onClick={() => void requestClose()}
+                      className="rounded-md px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/5 hover:text-white"
+                    >
+                      Cancel interview
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -345,10 +418,14 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
                     {s.kind === "list" && <span className="ml-1.5 text-white/30">one per line</span>}
                   </label>
                   <textarea
+                    ref={autoGrow}
                     rows={s.kind === "list" ? 3 : 2}
                     value={Array.isArray(s.value) ? s.value.join("\n") : s.value}
-                    onChange={(e) => updateSection(s.id, e.target.value)}
-                    className="clide-scroll w-full resize-y rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30"
+                    onChange={(e) => {
+                      updateSection(s.id, e.target.value);
+                      autoGrow(e.currentTarget);
+                    }}
+                    className="w-full resize-none overflow-hidden rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30"
                   />
                 </div>
               ))}
@@ -366,7 +443,7 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
                   {phase === "saving" ? "Saving…" : "Save profile"}
                 </button>
                 <button
-                  onClick={() => onClose(false)}
+                  onClick={() => void requestClose()}
                   disabled={phase === "saving"}
                   className="rounded-md px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/5 hover:text-white disabled:opacity-40"
                 >

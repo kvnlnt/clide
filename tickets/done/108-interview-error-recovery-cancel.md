@@ -39,6 +39,14 @@ While here, sweep the other AI-driven takeovers (first-run wizard, task
 wizard drafting) for the same trap: any awaited AI call whose failure
 leaves the UI stuck. Fix instances found or note them for follow-up.
 
+**Sweep result (done):** NewTaskPage (draft fields), NewWorkflowWizard
+(draft workflow), and FirstRunAIWizard (test connection) all set inline
+error state on a failed call, leaving their action buttons usable as the
+retry path — no stuck spinners found. They rely on provider-level
+failures resolving rather than a client-side timeout; if hung-bridge
+reports ever surface there, lift `interviewTimeout` from rpc.ts into a
+shared helper.
+
 ## Files to modify
 
 - `src/mainview/components/ProfileInterviewPage.tsx`, `src/mainview/rpc.ts`

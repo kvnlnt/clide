@@ -93,6 +93,32 @@ try {
   console.warn("[rpc] Electroview unavailable (running outside Electrobun?)", err);
 }
 
+/**
+ * Client-side cap on interview RPCs (ticket 108): a hung bridge or provider
+ * must land in the page's error/retry state, never an infinitely pending
+ * promise. Generous — drafting a whole profile is the slowest AI call here.
+ */
+const INTERVIEW_TIMEOUT_MS = 90_000;
+
+function interviewTimeout<T>(p: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("The AI request timed out — the service may be slow or unreachable.")),
+      INTERVIEW_TIMEOUT_MS,
+    );
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 function request(): typeof rpcDef.request | null {
   return electroview?.rpc?.request ?? null;
 }
@@ -349,7 +375,7 @@ export const api = {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
-      return await r.profileInterviewNext({ scope, projectPath, transcript, ...ai });
+      return await interviewTimeout(r.profileInterviewNext({ scope, projectPath, transcript, ...ai }));
     } catch (err) {
       return { ok: false, error: String(err) };
     }
@@ -370,7 +396,7 @@ export const api = {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
-      return await r.profileInterviewFinish({ scope, projectPath, transcript, ...ai });
+      return await interviewTimeout(r.profileInterviewFinish({ scope, projectPath, transcript, ...ai }));
     } catch (err) {
       return { ok: false, error: String(err) };
     }
