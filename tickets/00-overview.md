@@ -161,7 +161,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 109 | Interview Draft Review Scroll Fix     | The "Here's the draft" review step scrolls (min-h-0 chain repair per ticket 68 pattern)           | ⬜ Open       |
 | 110 | Interview Question Logic & Categories | Stop parroting the user's answers back; each question shows the category it belongs to            | ✅ Done       |
 | 111 | Interview-First Onboarding            | First-run opens with an interview; detects AI/project state and tailors flow + starter checklist  | ✅ Done⁶      |
-| 112 | Task List Kebab → Edit Form           | Remove the misaligned row kebab; Adopt/Version History/Edit Steps move into the edit surface      | ⬜ Open       |
+| 112 | Task List Kebab → Edit Form           | Remove the misaligned row kebab; Adopt/Version History/Edit Steps move into the edit surface      | ✅ Done       |
 | 113 | Task List Row Click Behavior          | Clicking a row manages the task instead of dropping a draft run card into the thread              | ⬜ Open       |
 | 114 | Finish Forms→Tasks Rename & Seeder    | Rename leftover `form` identifiers (AppContext etc.); fixes `dev:*` NOT NULL form_slug crash      | ⬜ Open       |
 | 115 | Auto-Delete Empty Views               | Filterless views are cleaned up automatically (grace period while active; named views kept)       | ⬜ Open       |

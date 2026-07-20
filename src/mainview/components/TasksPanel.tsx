@@ -1,4 +1,4 @@
-import { CheckCircle, FolderOpen, Globe, History, Lock, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { CheckCircle, FolderOpen, Globe, History, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useTaskSearch } from "../hooks/useTaskSearch";
@@ -166,12 +166,9 @@ function TasksPanelRow({
   const { workflows, runs, refreshForms } = useApp();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [stepsEditorOpen, setStepsEditorOpen] = useState(false);
   const [dismissedAdopt, setDismissedAdopt] = useState(false);
-
-  const menuRef = useRef<HTMLButtonElement>(null);
 
   // "Starts workflows" (ticket 90): visible wherever the form is managed.
   const startsWorkflows = workflows.filter(
@@ -193,7 +190,6 @@ function TasksPanelRow({
     } else {
       setError(res.error ?? "Adoption failed");
     }
-    setMenuOpen(false);
   };
 
   const remove = async () => {
@@ -254,18 +250,6 @@ function TasksPanelRow({
             className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
           >
             <Pencil size={13} />
-          </button>
-          <button
-            ref={menuRef}
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setMenuOpen(!menuOpen);
-            }}
-            title="More actions"
-            className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
-          >
-            <MoreVertical size={13} />
           </button>
           <button
             type="button"
@@ -332,53 +316,38 @@ function TasksPanelRow({
             }
           }}
           onCancel={onCloseEditors}
+          // Task-level actions live in the edit form, not a row menu (ticket 112).
+          actions={
+            <>
+              {form.meta.lifecycle === "draft" && hasSuccessfulRun && (
+                <button
+                  onClick={() => void adopt()}
+                  disabled={busy}
+                  className="flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-[11px] text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-40"
+                >
+                  <CheckCircle size={12} />
+                  Adopt task
+                </button>
+              )}
+              {form.task.engine === "native" && form.task.nativeTool === "browser-automation" && (
+                <button
+                  onClick={() => setStepsEditorOpen(true)}
+                  className="flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-[11px] text-white/70 hover:bg-white/10 hover:text-white"
+                >
+                  <Globe size={12} />
+                  Edit steps
+                </button>
+              )}
+              <button
+                onClick={() => setVersionHistoryOpen(true)}
+                className="flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-[11px] text-white/70 hover:bg-white/10 hover:text-white"
+              >
+                <History size={12} />
+                Version history
+              </button>
+            </>
+          }
         />
-      )}
-
-      {menuOpen && (
-        <div
-          className="absolute z-50"
-          style={{
-            left: menuRef.current?.getBoundingClientRect().right,
-            top: menuRef.current?.getBoundingClientRect().bottom,
-          }}
-        >
-          <div className="fixed inset-0" onClick={() => setMenuOpen(false)} />
-          <div className="relative mt-1 w-48 overflow-hidden rounded-md border border-clide-border bg-clide-panel py-1 shadow-xl">
-            {form.meta.lifecycle === "draft" && hasSuccessfulRun && (
-              <button
-                onClick={() => void adopt()}
-                disabled={busy}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-white hover:bg-white/10 disabled:opacity-40"
-              >
-                <CheckCircle size={14} />
-                Adopt task
-              </button>
-            )}
-            {form.task.engine === "native" && form.task.nativeTool === "browser-automation" && (
-              <button
-                onClick={() => {
-                  setStepsEditorOpen(true);
-                  setMenuOpen(false);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-white hover:bg-white/10"
-              >
-                <Globe size={14} />
-                Edit steps
-              </button>
-            )}
-            <button
-              onClick={() => {
-                setVersionHistoryOpen(true);
-                setMenuOpen(false);
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-white hover:bg-white/10"
-            >
-              <History size={14} />
-              Version history
-            </button>
-          </div>
-        </div>
       )}
 
       {versionHistoryOpen && (
@@ -412,9 +381,11 @@ interface TaskMetaEditorProps {
   busy: boolean;
   onSave: (patch: { name?: string; description?: string; tags?: string[] }) => Promise<void>;
   onCancel: () => void;
+  /** Task-level actions (adopt, version history, edit steps) rendered as part of the form (ticket 112). */
+  actions?: React.ReactNode;
 }
 
-function TaskMetaEditor({ form, busy, onSave, onCancel }: TaskMetaEditorProps) {
+function TaskMetaEditor({ form, busy, onSave, onCancel, actions }: TaskMetaEditorProps) {
   const [name, setName] = useState(form.meta.name);
   const [description, setDescription] = useState(form.meta.description);
   const [tags, setTags] = useState(form.meta.tags.join(", "));
@@ -462,6 +433,7 @@ function TaskMetaEditor({ form, busy, onSave, onCancel }: TaskMetaEditorProps) {
       <span className="text-[11px] text-white/30">
         Fields and the script are edited on disk — use “Reveal folder in Finder”.
       </span>
+      {actions && <div className="flex flex-wrap gap-1.5 border-t border-white/5 pt-2">{actions}</div>}
       {error && <span className="text-[11px] text-red-400">{error}</span>}
       <div className="flex gap-1.5">
         <button
