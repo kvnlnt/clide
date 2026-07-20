@@ -853,14 +853,27 @@ export type ClideRPC = {
         response: { ok: boolean; error?: string };
       };
       deleteProjectProfile: { params: { projectPath: string }; response: void };
-      /** Next interview question given the transcript so far; done ends the session. */
+      /** Next interview question given the transcript so far; done ends the session.
+       *  serviceId/model (ticket 107) pick the AI powering the session; default service otherwise. */
       profileInterviewNext: {
-        params: { scope: ProfileScope; projectPath?: string; transcript: InterviewTurn[] };
+        params: {
+          scope: ProfileScope;
+          projectPath?: string;
+          transcript: InterviewTurn[];
+          serviceId?: string;
+          model?: string;
+        };
         response: { ok: boolean; question?: string; category?: string; done?: boolean; error?: string };
       };
       /** Draft profile sections from the transcript + run the engine's self-critique (§4). */
       profileInterviewFinish: {
-        params: { scope: ProfileScope; projectPath?: string; transcript: InterviewTurn[] };
+        params: {
+          scope: ProfileScope;
+          projectPath?: string;
+          transcript: InterviewTurn[];
+          serviceId?: string;
+          model?: string;
+        };
         response: {
           ok: boolean;
           sections?: ProfileSection[];

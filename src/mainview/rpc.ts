@@ -344,11 +344,12 @@ export const api = {
     scope: ProfileScope,
     projectPath: string | undefined,
     transcript: InterviewTurn[],
+    ai?: { serviceId: string; model: string },
   ): Promise<{ ok: boolean; question?: string; category?: string; done?: boolean; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
-      return await r.profileInterviewNext({ scope, projectPath, transcript });
+      return await r.profileInterviewNext({ scope, projectPath, transcript, ...ai });
     } catch (err) {
       return { ok: false, error: String(err) };
     }
@@ -358,6 +359,7 @@ export const api = {
     scope: ProfileScope,
     projectPath: string | undefined,
     transcript: InterviewTurn[],
+    ai?: { serviceId: string; model: string },
   ): Promise<{
     ok: boolean;
     sections?: ProfileSection[];
@@ -368,7 +370,7 @@ export const api = {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
-      return await r.profileInterviewFinish({ scope, projectPath, transcript });
+      return await r.profileInterviewFinish({ scope, projectPath, transcript, ...ai });
     } catch (err) {
       return { ok: false, error: String(err) };
     }

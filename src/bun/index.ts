@@ -2,6 +2,7 @@ import { ApplicationMenu, BrowserView, BrowserWindow, Updater, Utils } from "ele
 import { rmSync, statSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
 import type {
+  AIService,
   ClideRPC,
   OutputChunk,
   ProfileScope,
@@ -300,6 +301,21 @@ async function resolveOrCreateEntry(
 // Profile interview helpers (tickets 100/101).
 // ---------------------------------------------------------------------------
 
+/**
+ * Resolve the service powering an interview session (ticket 107): the caller's
+ * chosen service (with optional model override), falling back to the default
+ * service when the id is absent or no longer exists.
+ */
+async function interviewAIService(serviceId?: string, model?: string): Promise<AIService | undefined> {
+  const services = await listAIServices();
+  const base =
+    (serviceId ? services.find((s) => s.id === serviceId) : undefined) ??
+    services.find((s) => s.isDefault) ??
+    services[0];
+  if (!base) return undefined;
+  return model?.trim() ? { ...base, model: model.trim() } : base;
+}
+
 /** Assemble the scope-specific engine context: schema sections, existing profile, selfNotes, app context. */
 async function buildInterviewContext(scope: ProfileScope, projectPath?: string): Promise<InterviewContext> {
   if (scope === "project") {
@@ -523,9 +539,9 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         deleteProjectProfileFile(projectPath);
       },
 
-      profileInterviewNext: async ({ scope, projectPath, transcript }) => {
+      profileInterviewNext: async ({ scope, projectPath, transcript, serviceId, model }) => {
         try {
-          const service = await getDefaultAIService();
+          const service = await interviewAIService(serviceId, model);
           if (!service) return { ok: false, error: "No AI service configured — add one in Settings" };
           const ctx = await buildInterviewContext(scope, projectPath);
           const { question, category } = await nextInterviewQuestion(service, ctx, transcript);
@@ -535,9 +551,9 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
-      profileInterviewFinish: async ({ scope, projectPath, transcript }) => {
+      profileInterviewFinish: async ({ scope, projectPath, transcript, serviceId, model }) => {
         try {
-          const service = await getDefaultAIService();
+          const service = await interviewAIService(serviceId, model);
           if (!service) return { ok: false, error: "No AI service configured — add one in Settings" };
           const ctx = await buildInterviewContext(scope, projectPath);
           const sections = await draftProfileSections(service, ctx, transcript);

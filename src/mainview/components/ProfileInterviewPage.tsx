@@ -2,8 +2,25 @@ import { Loader, MessageCircleQuestion, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../rpc";
 import type { InterviewTurn, ProfileScope, ProfileSection } from "../types/tasks";
-import { isProfileContentEmpty, sectionsToProjectProfile, sectionsToUserProfile } from "../types/tasks";
+import { DEFAULT_MODEL_FOR_KIND, isProfileContentEmpty, sectionsToProjectProfile, sectionsToUserProfile } from "../types/tasks";
+import ServiceModelPicker, { type ServiceModelValue } from "./ServiceModelPicker";
 import { useUIFeedback } from "./UIFeedback";
+
+/** Last-used interview service+model per scope (ticket 107) — a local UI preference. */
+const aiChoiceKey = (scope: ProfileScope) => `clide.interview-ai.${scope}`;
+
+function loadAIChoice(scope: ProfileScope): ServiceModelValue | null {
+  try {
+    const raw = localStorage.getItem(aiChoiceKey(scope));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ServiceModelValue>;
+    return typeof parsed.serviceId === "string" && typeof parsed.model === "string"
+      ? { serviceId: parsed.serviceId, model: parsed.model }
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 interface ProfileInterviewPageProps {
   scope: ProfileScope;
@@ -14,27 +31,34 @@ interface ProfileInterviewPageProps {
   onClose: (saved: boolean) => void;
 }
 
-type Phase = "asking" | "drafting" | "review" | "saving";
+type Phase = "setup" | "asking" | "drafting" | "review" | "saving";
 
 /**
  * Full-window AI profile interview (tickets 100/101), same takeover mechanic
- * as Settings/the first-run wizard: chat transcript, one active question, a
- * text answer box with Skip / Finish controls, ending on an editable review
- * screen with an explicit Save. Closing mid-interview discards the transcript
- * and leaves the profile untouched.
+ * as Settings/the first-run wizard: pick the AI powering the session
+ * (ticket 107), then chat transcript, one active question, a text answer box
+ * with Skip / Finish controls, ending on an editable review screen with an
+ * explicit Save. Closing mid-interview discards the transcript and leaves
+ * the profile untouched.
  */
 export default function ProfileInterviewPage({ scope, projectPath, projectName, onClose }: ProfileInterviewPageProps) {
   const { toast } = useUIFeedback();
-  const [phase, setPhase] = useState<Phase>("asking");
+  const [phase, setPhase] = useState<Phase>("setup");
   const [transcript, setTranscript] = useState<InterviewTurn[]>([]);
   const [question, setQuestion] = useState<string | null>(null);
   const [category, setCategory] = useState<string | undefined>(undefined);
-  const [loadingQuestion, setLoadingQuestion] = useState(true);
+  const [loadingQuestion, setLoadingQuestion] = useState(false);
   const [answer, setAnswer] = useState("");
   const [sections, setSections] = useState<ProfileSection[]>([]);
   const [selfNotes, setSelfNotes] = useState("");
   const [suggestApp, setSuggestApp] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Ticket 107: the service+model powering this session. Resolved before the
+  // picker renders (stored choice validated against live services) so the
+  // default is preselected and one click starts the interview.
+  const [ai, setAi] = useState<ServiceModelValue>({ serviceId: "", model: "" });
+  const [aiReady, setAiReady] = useState(false);
+  const [noServices, setNoServices] = useState(false);
   const answerRef = useRef<HTMLTextAreaElement | null>(null);
 
   const title = scope === "app" ? "Getting to know you" : `About "${projectName ?? "this project"}"`;
@@ -43,7 +67,7 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
     async (t: InterviewTurn[]) => {
       setPhase("drafting");
       setError(null);
-      const res = await api.profileInterviewFinish(scope, projectPath, t);
+      const res = await api.profileInterviewFinish(scope, projectPath, t, ai.serviceId ? ai : undefined);
       if (!res.ok || !res.sections) {
         setError(res.error ?? "Couldn't draft the profile.");
         setPhase("asking");
@@ -54,14 +78,14 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
       setSuggestApp(res.suggestAppInterview === true);
       setPhase("review");
     },
-    [scope, projectPath],
+    [scope, projectPath, ai],
   );
 
   const fetchNext = useCallback(
     async (t: InterviewTurn[]) => {
       setLoadingQuestion(true);
       setError(null);
-      const res = await api.profileInterviewNext(scope, projectPath, t);
+      const res = await api.profileInterviewNext(scope, projectPath, t, ai.serviceId ? ai : undefined);
       setLoadingQuestion(false);
       if (!res.ok) {
         setError(res.error ?? "Couldn't generate a question.");
@@ -77,14 +101,40 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
       setCategory(res.category);
       answerRef.current?.focus();
     },
-    [scope, projectPath, finish],
+    [scope, projectPath, ai, finish],
   );
 
+  // Resolve the session's AI before showing the picker: last-used choice for
+  // this scope when its service still exists, the default service otherwise.
   useEffect(() => {
-    void fetchNext([]);
+    void api.listAIServices().then((services) => {
+      if (services.length === 0) {
+        setNoServices(true);
+        setAiReady(true);
+        return;
+      }
+      const stored = loadAIChoice(scope);
+      if (stored && services.some((s) => s.id === stored.serviceId)) {
+        setAi(stored);
+      } else {
+        const preferred = services.find((s) => s.isDefault) ?? services[0]!;
+        setAi({ serviceId: preferred.id, model: preferred.model?.trim() || DEFAULT_MODEL_FOR_KIND[preferred.kind] });
+      }
+      setAiReady(true);
+    });
     // Mount-only: the interview restarts only with a fresh page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const startInterview = () => {
+    try {
+      localStorage.setItem(aiChoiceKey(scope), JSON.stringify(ai));
+    } catch {
+      /* remembering the choice is best-effort */
+    }
+    setPhase("asking");
+    void fetchNext([]);
+  };
 
   const submitAnswer = (skip: boolean) => {
     if (!question || loadingQuestion) return;
@@ -158,6 +208,40 @@ export default function ProfileInterviewPage({ scope, projectPath, projectName, 
 
       <div className="clide-scroll flex-1 overflow-y-auto px-8 pb-8">
         <div className="mx-auto flex w-full max-w-[640px] flex-col gap-4">
+          {phase === "setup" && (
+            <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-clide-panel/60 p-4">
+              {!aiReady ? (
+                <div className="flex items-center gap-2 text-[13px] text-white/50">
+                  <Loader size={14} className="animate-spin" /> Loading AI services…
+                </div>
+              ) : noServices ? (
+                <p className="text-[13px] text-white/60">
+                  No AI service is configured — the interview needs one. Add a service in Settings, then come back.
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[14px] font-medium text-white">Pick the AI for this interview</span>
+                    <span className="text-[12px] text-white/40">
+                      It asks the questions and drafts your profile. Your last choice is remembered.
+                    </span>
+                  </div>
+                  <ServiceModelPicker value={ai} onChange={setAi} />
+                  <div className="flex justify-end pt-1">
+                    <button
+                      autoFocus
+                      onClick={startInterview}
+                      disabled={!ai.serviceId}
+                      className="rounded-md bg-white/10 px-4 py-1.5 text-[13px] font-medium text-white hover:bg-white/20 disabled:opacity-40"
+                    >
+                      Start interview
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {(phase === "asking" || phase === "drafting") && (
             <>
               {transcript.map((turn, i) => (

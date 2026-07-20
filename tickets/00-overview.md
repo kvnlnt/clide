@@ -156,7 +156,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 104 | Duplicate Workflow                    | One-click deep copy of a workflow (triggers disabled) straight into the editor                    | ✅ Done       |
 | 105 | Task Adoption & Versioning            | Draft → adopt lifecycle; edits fork new versions; opt-in retroactive workflow upgrades            | ✅ Done³      |
 | 106 | Project Audit Page & RSI Loop         | Epic: audit log + dossier + Datalog theorem prover over run facts + AI-prescribed improvements    | ⏸ Hold        |
-| 107 | Interview Model Picker                | Choose the AI service + model powering a profile interview; remembers last choice per scope       | ⬜ Open       |
+| 107 | Interview Model Picker                | Choose the AI service + model powering a profile interview; remembers last choice per scope       | ✅ Done       |
 | 108 | Interview Error Recovery & Cancel     | No dead ends: cancel always available, failed AI calls get retry states, RPC timeouts caught      | ⬜ Open       |
 | 109 | Interview Draft Review Scroll Fix     | The "Here's the draft" review step scrolls (min-h-0 chain repair per ticket 68 pattern)           | ⬜ Open       |
 | 110 | Interview Question Logic & Categories | Stop parroting the user's answers back; each question shows the category it belongs to            | ✅ Done       |
