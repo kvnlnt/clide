@@ -593,6 +593,8 @@ export interface ThreadView {
   filters: ThreadViewFilters;
   /** Hidden views stay saved but don't render in the tab strip. */
   hidden?: boolean;
+  /** User explicitly named/renamed this view (ticket 116) — AI auto-naming never touches it again. */
+  namedByUser?: boolean;
 }
 
 /** Globally persisted UI state — restores where the user was after a restart. */

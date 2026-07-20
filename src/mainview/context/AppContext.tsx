@@ -181,6 +181,11 @@ function normalizeView(view: ThreadView): ThreadView {
   return { ...view, filters: entries.length > 0 ? { entries } : {} };
 }
 
+/** True when a view has no filter criteria and no explicit user-set name (ticket 115) — nothing to lose deleting it. */
+function isViewEmpty(view: ThreadView): boolean {
+  return !view.namedByUser && (view.filters.entries?.length ?? 0) === 0;
+}
+
 const AppContext = createContext<AppState | null>(null);
 
 export function useApp(): AppState {
@@ -249,9 +254,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     void api.getViews(activeProject).then((loaded) => {
       if (cancelled) return;
-      const v = loaded.map(normalizeView);
-      setViews(v);
+      const normalized = loaded.map(normalizeView);
       const want = viewByProjectRef.current[activeProject];
+      // Stale empty views (ticket 115) never accumulate across restarts —
+      // except the one about to become active, which gets its usual grace.
+      const v = normalized.filter((view) => view.id === want || !isViewEmpty(view));
+      setViews(v);
+      if (v.length !== normalized.length) void api.saveViews(activeProject, v);
       if (want && v.some((view) => view.id === want && !view.hidden)) {
         setActiveViewId(want);
       }
@@ -286,25 +295,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [activeProject],
   );
 
+  /** Ticket 115: a filterless, unnamed view has nothing to lose — drop it once left. */
+  const cleanupIfEmpty = useCallback(
+    (id: string) => {
+      const view = views.find((v) => v.id === id);
+      if (!view || !isViewEmpty(view)) return;
+      const next = views.filter((v) => v.id !== id);
+      setViews(next);
+      if (activeProject) void api.saveViews(activeProject, next);
+    },
+    [views, activeProject],
+  );
+
   // Activating a view tab (or returning to the title tab via null) always
   // lands on that tab's thread — surfaces are a title-tab-only concept.
-  const setActiveView = useCallback((id: string | null) => {
-    setActiveViewId(id);
-    setProjectSurfaceState("thread");
-    setViewSettingsOpen(false);
-  }, []);
+  // Leaving an empty tab behind cleans it up (ticket 115) — never while it's
+  // still the one being activated (id === activeViewId is a no-op re-click).
+  const setActiveView = useCallback(
+    (id: string | null) => {
+      if (activeViewId !== null && activeViewId !== id) cleanupIfEmpty(activeViewId);
+      setActiveViewId(id);
+      setProjectSurfaceState("thread");
+      setViewSettingsOpen(false);
+    },
+    [activeViewId, cleanupIfEmpty],
+  );
 
   const createView = useCallback(() => {
     if (!activeProject) return;
+    // Ticket 115: opening a new tab abandons the current one — drop it first
+    // if it's empty and unnamed, rather than leaving it behind for later.
+    const base =
+      activeViewId !== null ? views.filter((v) => !(v.id === activeViewId && isViewEmpty(v))) : views;
     const view: ThreadView = {
       id: crypto.randomUUID(),
-      name: `View ${views.length + 1}`,
+      name: `View ${base.length + 1}`,
       filters: {},
     };
-    persistViews([...views, view]);
+    persistViews([...base, view]);
     setActiveViewId(view.id);
     setProjectSurfaceState("thread");
-  }, [activeProject, views, persistViews]);
+  }, [activeProject, views, activeViewId, persistViews]);
 
   const updateView = useCallback(
     (view: ThreadView) => {
@@ -363,9 +394,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const view = views.find((v) => v.id === activeViewId);
     if (!view) return;
     const prev = previousVisibleTab(activeViewId);
-    updateView({ ...view, hidden: true });
-    setActiveView(prev);
-  }, [activeViewId, views, updateView, setActiveView, previousVisibleTab]);
+    // Ticket 115: a filterless, unnamed view has nothing worth hiding —
+    // delete outright instead of leaving a phantom hidden entry behind.
+    if (isViewEmpty(view)) {
+      persistViews(views.filter((v) => v.id !== activeViewId));
+    } else {
+      updateView({ ...view, hidden: true });
+    }
+    setActiveViewId(prev);
+    setProjectSurfaceState("thread");
+    setViewSettingsOpen(false);
+  }, [activeViewId, views, updateView, persistViews, previousVisibleTab]);
 
   const refreshTasks = useCallback(async () => {
     const f = await api.listTasks();
