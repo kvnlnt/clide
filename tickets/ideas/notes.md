@@ -1,3 +1,12 @@
+- No clear button for "new" badge. Also, badge maybe shouldn't be colored because it should jsut be the total "new" count. Also, the "new" badges on the result list should be in bold if unread, or at least should be something different than the normal badge once it's been read.
+- There's no workflow examples in the Seeds. Need to add some for all the profiles.
+- The Calendar view needs to see a list of all tasks/workflows that are recurring, else it's difficult to know what is going on. Also, the calendar should be able to pick/schedule a task or workflow.
+- Deleting the occurrence of a task that is part of a recurring series should not automatically delete the entire series, but have an option to delete the series if desired. This is a common pattern in calendar apps and should be implemented here as well.
+- When adding a file location, I'm unable to create a new folder which makes it cumbersome to add a new location. It would be nice to have a "create new folder" option in the file picker.
+- The package managers are correctly detected. But there's no way to disable them or pick the preferred one. It would be nice to have a way to disable the ones you don't want to use, or pick the preferred one. Also, the sorting buttons on the right of the list is weird. I'd prefer it to be drag and drop.
+- The files in the main apps settings don't show the project files. I'd like to see all files from this view. However I'd also like to keep the project files separate from the app files, so maybe a toggle to show/hide project files would be nice. Also, I want to make the app level files available to tasks and workflows in case a user wants to I/O outside of a project.
+- I'd like compact mode to apply to the the project view tabs and toolbars as well as the toolbar tools (maybe only show their icon but provide a tooltip on hover). Also, the project view tabs should be full width and not have a max width.
+
 AI Profile Interviews (ProfileInterviewPage, app + project scope)
 Model picker — Let the user choose which model powers the interview.
 Error recovery & cancel — An "Error: RPC request timed out." during an interview is a dead end with no retry, no cancel, and no way out short of force-quitting. Interviews need a cancel action and error states need recovery paths.
