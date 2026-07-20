@@ -1163,6 +1163,11 @@ export type ClideRPC = {
         params: { project: string; views: ThreadView[] };
         response: void;
       };
+      /** AI-suggested short view name from its filters + a sample of matching runs (ticket 116). */
+      suggestViewName: {
+        params: { filterSummary: string; sampleRuns: string[] };
+        response: { ok: boolean; name?: string; error?: string };
+      };
       getUIState: { params: Record<string, never>; response: UIState };
       saveUIState: { params: UIState; response: void };
       /** Onboarding starter-task catalog + install-into-project (ticket 111). */

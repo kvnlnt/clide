@@ -34,6 +34,7 @@ import {
 import { fillMagicFields } from "./ai/magicFill";
 import { renderUserProfileBlock } from "./ai/profileContext";
 import { distillToolSpec, suggestTools } from "./ai/toolSpec";
+import { generateViewName } from "./ai/viewNaming";
 import { draftWorkflow } from "./ai/workflowDraft";
 import {
   addProject,
@@ -1282,6 +1283,15 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         const resolved = await pathForProjectName(project);
         if (!resolved) return;
         await writeViews(resolved.path, views);
+      },
+
+      suggestViewName: async ({ filterSummary, sampleRuns }) => {
+        try {
+          const name = await generateViewName(filterSummary, sampleRuns);
+          return name ? { ok: true, name } : { ok: false };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
       },
 
       getUIState: async () => await readUIState(),

@@ -1,4 +1,5 @@
-import { Eye, EyeOff, Layers, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Layers, Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import type { RunStatus, ThreadView, ThreadViewFilters } from "../types/tasks";
 import { useUIFeedback } from "./UIFeedback";
@@ -24,6 +25,9 @@ function filterSummary(filters: ThreadViewFilters): string {
 export default function ViewsPage() {
   const { activeProject, views, setActiveView, updateView, deleteView } = useApp();
   const { confirm, toast } = useUIFeedback();
+  // Ticket 116: inline rename — click the name to edit it in place.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
 
   const open = (view: ThreadView) => {
     if (view.hidden) updateView({ ...view, hidden: false });
@@ -31,6 +35,19 @@ export default function ViewsPage() {
   };
 
   const toggleHidden = (view: ThreadView) => updateView({ ...view, hidden: !view.hidden });
+
+  const startRename = (view: ThreadView) => {
+    setEditingId(view.id);
+    setEditingName(view.name);
+  };
+
+  const commitRename = (view: ThreadView) => {
+    const trimmed = editingName.trim();
+    setEditingId(null);
+    if (!trimmed || trimmed === view.name) return;
+    // An actual edit opts the view out of AI auto-naming for good.
+    updateView({ ...view, name: trimmed, namedByUser: true });
+  };
 
   const remove = async (view: ThreadView) => {
     const res = await confirm({
@@ -67,16 +84,39 @@ export default function ViewsPage() {
           <div className="flex flex-col divide-y divide-white/5 border-t border-white/5">
             {views.map((view) => (
               <div key={view.id} className="flex items-center gap-3 py-3">
-                <button
-                  onClick={() => open(view)}
-                  className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left"
-                >
-                  <span className={`truncate text-[14px] ${view.hidden ? "text-white/40" : "text-white"}`}>
-                    {view.name}
-                    {view.hidden && <span className="ml-2 text-[11px] font-normal text-white/30">Hidden</span>}
-                  </span>
-                  <span className="truncate text-[12px] text-white/40">{filterSummary(view.filters)}</span>
-                </button>
+                <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left">
+                  {editingId === view.id ? (
+                    <input
+                      autoFocus
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onBlur={() => commitRename(view)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitRename(view);
+                        else if (e.key === "Escape") setEditingId(null);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full min-w-0 rounded border border-clide-border bg-clide-bg px-1.5 py-0.5 text-[14px] text-white outline-none focus:border-white/30"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => open(view)}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        startRename(view);
+                      }}
+                      title="Double-click to rename"
+                      className={`w-full min-w-0 truncate text-left text-[14px] ${view.hidden ? "text-white/40" : "text-white"}`}
+                    >
+                      {view.name}
+                      {view.hidden && <span className="ml-2 text-[11px] font-normal text-white/30">Hidden</span>}
+                    </button>
+                  )}
+                  <button onClick={() => open(view)} className="w-full min-w-0 text-left">
+                    <span className="truncate text-[12px] text-white/40">{filterSummary(view.filters)}</span>
+                  </button>
+                </div>
 
                 <div className="flex shrink-0 items-center gap-1">
                   <button
@@ -84,6 +124,13 @@ export default function ViewsPage() {
                     className="rounded-md px-2.5 py-1 text-[12px] font-medium text-white/70 hover:bg-white/5 hover:text-white"
                   >
                     Open
+                  </button>
+                  <button
+                    onClick={() => startRename(view)}
+                    title="Rename"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
+                  >
+                    <Pencil size={13} />
                   </button>
                   <button
                     onClick={() => toggleHidden(view)}

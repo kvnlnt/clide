@@ -12,7 +12,16 @@ import { useApp } from "../context/AppContext";
  * activates it immediately.
  */
 export default function ViewTabs() {
-  const { activeProject, setActiveProject, views, activeViewId, setActiveView, reorderView, createView } = useApp();
+  const {
+    activeProject,
+    setActiveProject,
+    views,
+    activeViewId,
+    setActiveView,
+    reorderView,
+    createView,
+    openViewSettings,
+  } = useApp();
   const dragIdRef = useRef<string | null>(null);
 
   const visibleViews = views.filter((v) => !v.hidden);
@@ -75,7 +84,13 @@ export default function ViewTabs() {
           >
             <button
               onClick={() => setActiveView(view.id)}
-              title={view.name}
+              onDoubleClick={() => {
+                // Ticket 116: double-click renames — activate first so the
+                // settings modal (which only renders for the active view) opens.
+                if (!isActive) setActiveView(view.id);
+                openViewSettings();
+              }}
+              title={`${view.name} (double-click to rename)`}
               className="min-w-0 max-w-[120px] truncate text-left group-hover:text-white"
             >
               {view.name}

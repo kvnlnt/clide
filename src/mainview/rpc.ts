@@ -508,6 +508,16 @@ export const api = {
     await request()?.saveViews({ project, views });
   },
 
+  async suggestViewName(filterSummary: string, sampleRuns: string[]): Promise<{ ok: boolean; name?: string }> {
+    const r = request();
+    if (!r) return { ok: false };
+    try {
+      return await r.suggestViewName({ filterSummary, sampleRuns });
+    } catch {
+      return { ok: false };
+    }
+  },
+
   async getUIState(): Promise<UIState> {
     const r = request();
     if (!r) return { activeProject: null, activeViewByProject: {}, recentProjects: [] };

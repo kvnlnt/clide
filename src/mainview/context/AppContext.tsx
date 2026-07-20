@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, on } from "../rpc";
+import { matchesView } from "../../shared/viewFilters";
 import type {
   FilterEntry,
   OutputChunk,
@@ -9,6 +10,7 @@ import type {
   TaskFolder,
   TaskMetaPatch,
   ThreadView,
+  ThreadViewFilters,
   Workflow,
 } from "../types/tasks";
 
@@ -160,10 +162,17 @@ interface AppState {
  * shapes (`formSlugs`/`statuses`/`keywords`+`keywordMode`, or the older single
  * `query` string) into the additive `entries` chip list. Lossless: each old
  * field becomes one or more entries, so nothing is silently dropped.
+ *
+ * Also migrates `namedByUser` (ticket 116): a view predating that field has
+ * `undefined` on disk, which is treated as "already named by a person" so
+ * upgrading the app never starts silently AI-renaming someone's tabs — every
+ * view created going forward writes `namedByUser` explicitly (true or false),
+ * so `undefined` can only mean "from before this ticket."
  */
 function normalizeView(view: ThreadView): ThreadView {
+  const named = view.namedByUser ?? true;
   const f = view.filters;
-  if (f.entries) return view;
+  if (f.entries) return { ...view, namedByUser: named };
 
   const entries: FilterEntry[] = [];
   if (f.taskSlugs?.length) entries.push({ id: crypto.randomUUID(), type: "task", values: f.taskSlugs });
@@ -178,7 +187,38 @@ function normalizeView(view: ThreadView): ThreadView {
     entries.push({ id: crypto.randomUUID(), type: "keyword", values: [f.query] });
   }
 
-  return { ...view, filters: entries.length > 0 ? { entries } : {} };
+  return { ...view, filters: entries.length > 0 ? { entries } : {}, namedByUser: named };
+}
+
+/** Deterministic view name from its filters (ticket 116) — the fallback when AI is unavailable or hasn't answered yet. */
+function deterministicViewName(filters: ThreadViewFilters, tasksBySlug: Map<string, TaskFolder>): string {
+  const entries = filters.entries ?? [];
+  if (entries.length === 0) return "New view";
+  const parts = entries.map((e) => {
+    if (e.type === "task") {
+      const names = e.values.map((slug) => tasksBySlug.get(slug)?.meta.name ?? slug);
+      return names.length > 2 ? `${names.slice(0, 2).join(", ")} +${names.length - 2}` : names.join(", ");
+    }
+    if (e.type === "status") return e.values.join("/");
+    return e.values.slice(0, 2).join(" ");
+  });
+  return parts.join(" · ").slice(0, 40);
+}
+
+/** Plain-language filter description for the AI naming prompt (ticket 116). */
+function summarizeFiltersForPrompt(filters: ThreadViewFilters, tasksBySlug: Map<string, TaskFolder>): string {
+  const entries = filters.entries ?? [];
+  if (entries.length === 0) return "No filters.";
+  return entries
+    .map((e) => {
+      if (e.type === "task") {
+        const names = e.values.map((slug) => tasksBySlug.get(slug)?.meta.name ?? slug);
+        return `Tasks: ${names.join(", ")}`;
+      }
+      if (e.type === "status") return `Status: ${e.values.join(", ")}`;
+      return `Keywords: ${e.values.join(", ")}`;
+    })
+    .join("; ");
 }
 
 /** True when a view has no filter criteria and no explicit user-set name (ticket 115) — nothing to lose deleting it. */
@@ -295,6 +335,83 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [activeProject],
   );
 
+  const tasksBySlug = useMemo(() => {
+    const m = new Map<string, TaskFolder>();
+    for (const f of tasks) m.set(f.meta.slug, f);
+    return m;
+  }, [tasks]);
+
+  // Ticket 116: fresh reads inside the debounce timer below, which fires
+  // well after the render that scheduled it — state captured in that
+  // render's closure would otherwise be stale by the time it runs.
+  const viewsRef = useRef<ThreadView[]>([]);
+  useEffect(() => {
+    viewsRef.current = views;
+  }, [views]);
+  const runsRef = useRef<RunRecord[]>([]);
+  useEffect(() => {
+    runsRef.current = runs;
+  }, [runs]);
+  const namingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  useEffect(() => {
+    const timers = namingTimersRef.current;
+    return () => {
+      for (const t of timers.values()) clearTimeout(t);
+      timers.clear();
+    };
+  }, []);
+
+  /**
+   * Ticket 116: refresh an auto-named view's name from its current filters.
+   * AI-assisted when a service is configured, deterministic otherwise —
+   * either way there's always a name. Re-checks at write time that the view
+   * still exists, is still un-named-by-user, and its filters didn't change
+   * again while the AI call was in flight (a newer edit always wins).
+   */
+  const runAutoName = useCallback(
+    async (viewId: string) => {
+      const view = viewsRef.current.find((v) => v.id === viewId);
+      if (!view || view.namedByUser) return;
+      const filters = view.filters;
+      let name = deterministicViewName(filters, tasksBySlug);
+      const sampleRuns = runsRef.current
+        .filter((r) => (activeProject ? tasksBySlug.get(r.taskSlug)?.meta.project === activeProject : true))
+        .filter((r) => matchesView(r, filters, tasksBySlug))
+        .slice(0, 8)
+        .map((r) => `${tasksBySlug.get(r.taskSlug)?.meta.name ?? r.taskSlug} — ${r.status}`);
+      try {
+        const res = await api.suggestViewName(summarizeFiltersForPrompt(filters, tasksBySlug), sampleRuns);
+        if (res.ok && res.name) name = res.name;
+      } catch {
+        /* deterministic name already set */
+      }
+      const current = viewsRef.current.find((v) => v.id === viewId);
+      if (!current || current.namedByUser) return;
+      if (JSON.stringify(current.filters) !== JSON.stringify(filters)) return; // superseded by a newer edit
+      if (current.name === name) return;
+      const next = viewsRef.current.map((v) => (v.id === viewId ? { ...v, name } : v));
+      setViews(next);
+      if (activeProject) void api.saveViews(activeProject, next);
+    },
+    [tasksBySlug, activeProject],
+  );
+
+  const scheduleAutoName = useCallback(
+    (viewId: string) => {
+      const timers = namingTimersRef.current;
+      const existing = timers.get(viewId);
+      if (existing) clearTimeout(existing);
+      timers.set(
+        viewId,
+        setTimeout(() => {
+          timers.delete(viewId);
+          void runAutoName(viewId);
+        }, 900),
+      );
+    },
+    [runAutoName],
+  );
+
   /** Ticket 115: a filterless, unnamed view has nothing to lose — drop it once left. */
   const cleanupIfEmpty = useCallback(
     (id: string) => {
@@ -327,10 +444,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // if it's empty and unnamed, rather than leaving it behind for later.
     const base =
       activeViewId !== null ? views.filter((v) => !(v.id === activeViewId && isViewEmpty(v))) : views;
+    // namedByUser: false is explicit (ticket 116) — eligible for auto-naming
+    // the moment filters are added, and distinguishes it from a legacy view
+    // (undefined) that predates the feature and stays untouched forever.
     const view: ThreadView = {
       id: crypto.randomUUID(),
-      name: `View ${base.length + 1}`,
+      name: "New view",
       filters: {},
+      namedByUser: false,
     };
     persistViews([...base, view]);
     setActiveViewId(view.id);
@@ -339,9 +460,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateView = useCallback(
     (view: ThreadView) => {
+      const prev = views.find((v) => v.id === view.id);
       persistViews(views.map((v) => (v.id === view.id ? view : v)));
+      // Ticket 116: filters changed on an auto-named view → refresh its name.
+      if (prev && !view.namedByUser && JSON.stringify(prev.filters) !== JSON.stringify(view.filters)) {
+        scheduleAutoName(view.id);
+      }
     },
-    [views, persistViews],
+    [views, persistViews, scheduleAutoName],
   );
 
   /** The visible tab immediately left of `id` (browser-style), or null (title tab) if `id` is leftmost/not visible. */
@@ -478,12 +604,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       offStatus();
     };
   }, []);
-
-  const tasksBySlug = useMemo(() => {
-    const m = new Map<string, TaskFolder>();
-    for (const f of tasks) m.set(f.meta.slug, f);
-    return m;
-  }, [tasks]);
 
   const projects = useMemo(() => {
     const set = new Set<string>(projectList.map((p) => p.name));

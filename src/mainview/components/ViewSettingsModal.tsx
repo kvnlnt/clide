@@ -26,7 +26,8 @@ export default function ViewSettingsModal({ view, onClose }: Props) {
       setName(view.name);
       return;
     }
-    updateView({ ...view, name: trimmed });
+    // Ticket 116: an actual edit opts the view out of AI auto-naming for good.
+    updateView({ ...view, name: trimmed, namedByUser: true });
   };
 
   const hide = () => {
