@@ -87,7 +87,7 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
       </div>
 
       <div className="clide-scroll flex-1 overflow-y-auto px-[var(--clide-page-x)] pb-[var(--clide-page-bottom)]">
-        <div className="mx-auto flex w-full max-w-[640px] flex-col gap-3">
+        <div className="flex w-full max-w-[820px] flex-col gap-3">
           <div className="flex flex-col gap-3 border-b border-white/5 pb-4">
             <span className="text-[12px] font-bold uppercase tracking-wider text-white/40">Appearance</span>
             <label className="flex cursor-pointer items-center gap-3">

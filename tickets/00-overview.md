@@ -169,7 +169,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 117 | Calendar Schedules Workflows          | Day-click composer picks tasks or workflows; scheduled workflow runs on the grid + scheduler      | ✅ Done       |
 | 118 | Files Surface Fix & Theming           | Make the VFS Files surface actually work and restyle it to the app's visual language              | ✅ Done⁸      |
 | 119 | Compact Density Pass                  | Tighten margins/padding across surfaces; compact presentation where a tight default isn't enough  | ✅ Done⁹      |
-| 120 | Full-Width Screens                    | App/project pages drop centered max-width columns and use the full window width                   | ⬜ Open       |
+| 120 | Full-Width Screens                    | App/project pages drop centered max-width columns and use the full window width                   | ✅ Done¹⁰     |
 | 121 | Loading States & Smooth Transitions   | No FOUC: branded launch loader, animated surface/tab transitions, skeletons for async content     | ⬜ Open       |
 | 122 | Signature Motion & UX Flair           | Motion identity: signature easing, elevated run/status/delight moments, motion-design note        | ⬜ Open       |
 | 123 | Speech Mode                           | Wave icon toggles voice mode: speak commands through the command surface, app speaks results      | ⬜ Open       |
@@ -235,3 +235,8 @@ a persisted Compact mode toggle (`UIState.compactMode`) — one systemic
 mechanism instead of a per-component boolean. No before/after
 screenshots produced (no way to drive the running app visually from
 this environment).
+¹⁰ Ticket 120: dropped `mx-auto` (the actual centering mechanism) and
+widened the content cap on Settings/Project Settings/Profile Interview/
+workflow editor page bodies. `FirstRunAIWizard` deliberately kept
+centered — a hero-style onboarding screen matching `FirstRunWelcome`'s
+same convention, not a data-browsing page. Not verified live.

@@ -88,7 +88,7 @@ export default function NewWorkflowWizard({ onClose }: { onClose: () => void }) 
       </div>
 
       <div className="clide-scroll min-h-0 flex-1 overflow-y-auto px-8 pb-4">
-        <div className="mx-auto flex w-full max-w-[640px] flex-col gap-4">
+        <div className="flex w-full max-w-[820px] flex-col gap-4">
           {projectTasks.length === 0 && (
             <div className="rounded border border-amber-500/40 bg-amber-500/5 p-3 text-[13px] text-amber-200">
               This project has no tasks yet — workflows orchestrate existing tasks, so create a task first.

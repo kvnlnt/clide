@@ -764,7 +764,7 @@ export default function WorkflowEditor({ initial, onClose, draftNotes, focusName
       </div>
 
       <div className="clide-scroll min-h-0 flex-1 overflow-y-auto px-8 pb-4">
-        <div className="mx-auto flex w-full max-w-[860px] flex-col gap-5">
+        <div className="flex w-full max-w-[1000px] flex-col gap-5">
           {draftNotes && draftNotes.length > 0 && (
             <div className="flex flex-col gap-0.5 rounded-md border border-amber-400/30 bg-amber-400/5 px-3 py-2">
               {draftNotes.map((n, i) => (
