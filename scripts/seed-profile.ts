@@ -5,7 +5,7 @@
  * dev:hmr:<profile>` boots CLIDE into a realistic, repeatable scenario
  * instead of whatever has accumulated in the real dev app-data dir (ticket
  * 79). Reuses the same bun-side modules the running app uses (config.ts,
- * db/history.ts, forms/views.ts, ai/aiServices.ts) so fixtures can never
+ * db/history.ts, tasks/views.ts, ai/aiServices.ts) so fixtures can never
  * drift from the real on-disk/DB schema.
  *
  * Usage: CLIDE_PROFILE=<name> bun run scripts/seed-profile.ts
@@ -59,12 +59,12 @@ function pick<T>(arr: T[], i: number): T {
 
 // ---------------------------------------------------------------------------
 // Task templates — a small reusable pool, instantiated per project. Mirrors
-// the shape of forms/seed.ts's demo tasks (kept there for its own purpose);
+// the shape of tasks/seed.ts's demo tasks (kept there for its own purpose);
 // duplicated here on purpose so profile fixtures don't depend on that file's
 // internals changing out from under this script.
 // ---------------------------------------------------------------------------
 
-interface FormTemplate {
+interface TaskTemplate {
   name: string;
   description: string;
   tags: string[];
@@ -76,7 +76,7 @@ interface FormTemplate {
   brokenScript?: boolean;
 }
 
-const TEMPLATES: FormTemplate[] = [
+const TEMPLATES: TaskTemplate[] = [
   {
     name: "List Files",
     description: "Lists files in a directory as a table",
@@ -144,10 +144,10 @@ echo "Notification sent: \${1:-(no message)}"
   },
 ];
 
-async function writeTemplateForm(
+async function writeTemplateTask(
   projectPath: string,
   projectName: string,
-  template: FormTemplate,
+  template: TaskTemplate,
   now: string,
 ): Promise<string> {
   const slug = slugify(template.name);
@@ -160,17 +160,21 @@ async function writeTemplateForm(
     project: projectName,
     tags: template.tags,
     interpreter: "bash",
+    // Seeded personas are established users: adopted v1, so the thread isn't
+    // wallpapered with adopt banners on every task that has a successful run.
+    lifecycle: "adopted",
+    version: 1,
     createdAt: now,
     updatedAt: now,
   };
-  const form: TaskDefinition = {
+  const taskDef: TaskDefinition = {
     fields: template.fields,
     aiPromptField: template.aiPromptField,
     outputType: template.outputType,
     scriptFile: template.brokenScript ? undefined : "script.sh",
   };
   await Bun.write(join(dir, "meta.json"), JSON.stringify(meta, null, 2));
-  await Bun.write(join(dir, "form.json"), JSON.stringify(form, null, 2));
+  await Bun.write(join(dir, "form.json"), JSON.stringify(taskDef, null, 2));
   if (!template.brokenScript) {
     await Bun.write(join(dir, "script.sh"), template.script);
     try {
@@ -190,7 +194,7 @@ async function writeTemplateForm(
  */
 function seedRun(
   projectPath: string,
-  formSlug: string,
+  taskSlug: string,
   opts: {
     daysAgo?: number;
     hour?: number;
@@ -207,7 +211,7 @@ function seedRun(
   const scheduledAt = opts.status === "scheduled" ? futureISO(opts.scheduledInHours ?? 24) : null;
   createRun(projectPath, {
     id,
-    formSlug,
+    taskSlug,
     inputs: opts.inputs ?? {},
     status: opts.status,
     startedAt,
@@ -253,8 +257,8 @@ async function seedBeginner(): Promise<void> {
   const projectNames = ["My First Project", "Website Scripts"];
   for (let p = 0; p < projectNames.length; p++) {
     const project = await addProject(projectNames[p]!);
-    const forms = [TEMPLATES[0]!, TEMPLATES[1]!, TEMPLATES[2]!];
-    const slugs = await Promise.all(forms.map((t) => writeTemplateForm(project.path, project.name, t, now)));
+    const chosen = [TEMPLATES[0]!, TEMPLATES[1]!, TEMPLATES[2]!];
+    const slugs = await Promise.all(chosen.map((t) => writeTemplateTask(project.path, project.name, t, now)));
     for (let i = 0; i < 6; i++) {
       seedRun(project.path, pick(slugs, i), {
         daysAgo: i,
@@ -282,7 +286,7 @@ async function seedRegular(): Promise<void> {
   for (let p = 0; p < projectNames.length; p++) {
     const project = await addProject(projectNames[p]!);
     recents.push(project.name);
-    const slugs = await Promise.all(TEMPLATES.map((t) => writeTemplateForm(project.path, project.name, t, now)));
+    const slugs = await Promise.all(TEMPLATES.map((t) => writeTemplateTask(project.path, project.name, t, now)));
 
     // Canned project profile on the first project (tickets 100/101) so this
     // persona exercises the profile-context injection paths.
@@ -349,12 +353,12 @@ async function seedPower(): Promise<void> {
   for (let p = 0; p < projectNames.length; p++) {
     const project = await addProject(projectNames[p]!);
     recents.push(project.name);
-    const big = p < 3; // a few projects get the heavy 25+ form treatment
-    const formCount = big ? 26 : TEMPLATES.length;
+    const big = p < 3; // a few projects get the heavy 25+ task treatment
+    const taskCount = big ? 26 : TEMPLATES.length;
     const slugs: string[] = [];
-    for (let f = 0; f < formCount; f++) {
+    for (let f = 0; f < taskCount; f++) {
       const template = pick(TEMPLATES, f);
-      const slug = await writeTemplateForm(
+      const slug = await writeTemplateTask(
         project.path,
         project.name,
         f < TEMPLATES.length ? template : { ...template, name: `${template.name} ${f}` },
@@ -418,7 +422,7 @@ async function seedEdge(): Promise<void> {
     recents.push(project.name);
     const slugs = await Promise.all(
       TEMPLATES.map((t, i) =>
-        writeTemplateForm(
+        writeTemplateTask(
           project.path,
           project.name,
           i === 1 ? { ...t, brokenScript: true, name: `${t.name} (broken)` } : t,
@@ -431,8 +435,8 @@ async function seedEdge(): Promise<void> {
       seedRun(project.path, pick(slugs, i), { daysAgo: i, status: i % 4 === 0 ? "error" : "success" });
     }
 
-    // Orphaned schedule: references a form slug that doesn't exist in this project.
-    seedRun(project.path, "deleted-form-slug", { status: "scheduled", scheduledInHours: 4 });
+    // Orphaned schedule: references a task slug that doesn't exist in this project.
+    seedRun(project.path, "deleted-task-slug", { status: "scheduled", scheduledInHours: 4 });
 
     // 45 chips stacked on the exact same future day, to exercise "+N more" overflow.
     for (let i = 0; i < 45; i++) {

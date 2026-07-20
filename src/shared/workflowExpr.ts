@@ -335,7 +335,7 @@ export function expressionRefs(src: string): { roots: string[]; error?: string }
 // Scope rules (ticket 88): the single source of truth for what a step may
 // reference — earlier siblings and ancestors' earlier siblings. Steps inside
 // a parallel sibling branch or an unexecuted decision branch are out of
-// scope; after a parallel joins, its branches' form steps ARE in scope
+// scope; after a parallel joins, its branches' task steps ARE in scope
 // (guaranteed complete); after a decision or loop, its inner steps are NOT
 // (which branch ran / whether any iteration ran is runtime-dependent).
 // ---------------------------------------------------------------------------
@@ -344,19 +344,19 @@ export const ITEM_NAME = "item";
 export const TRIGGER_NAME = "trigger";
 
 /**
- * Referenceable form-step names per step, keyed by step name. Every scope
+ * Referenceable task-step names per step, keyed by step name. Every scope
  * includes `trigger`; steps inside loops also get `item`.
  */
 export function computeScopes(workflow: Workflow): Map<string, string[]> {
   const scopes = new Map<string, string[]>();
 
-  const formNamesIn = (steps: WorkflowStep[]): string[] => {
+  const taskStepNamesIn = (steps: WorkflowStep[]): string[] => {
     const names: string[] = [];
     for (const s of steps) {
       if (s.type === "form") names.push(s.name);
-      else if (s.type === "decision") names.push(...formNamesIn(s.then), ...formNamesIn(s.else ?? []));
-      else if (s.type === "loop") names.push(...formNamesIn(s.steps));
-      else names.push(...s.branches.flatMap(formNamesIn));
+      else if (s.type === "decision") names.push(...taskStepNamesIn(s.then), ...taskStepNamesIn(s.else ?? []));
+      else if (s.type === "loop") names.push(...taskStepNamesIn(s.steps));
+      else names.push(...s.branches.flatMap(taskStepNamesIn));
     }
     return names;
   };
@@ -379,8 +379,8 @@ export function computeScopes(workflow: Workflow): Map<string, string[]> {
           break;
         case "parallel":
           for (const branch of step.branches) walk(branch, avail, inLoop);
-          // Joined: every branch's form steps are guaranteed complete.
-          avail.push(...step.branches.flatMap(formNamesIn));
+          // Joined: every branch's task steps are guaranteed complete.
+          avail.push(...step.branches.flatMap(taskStepNamesIn));
           break;
       }
     }

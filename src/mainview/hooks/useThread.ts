@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useApp } from "../context/AppContext";
 import type { RunRecord, TaskFolder, ThreadViewFilters } from "../types/tasks";
 
-/** One or more consecutive same-form runs coalesced into a single card unit. */
+/** One or more consecutive same-task runs coalesced into a single card unit. */
 export interface RunGroup {
   /** Stable identity — the latest (newest) run's id. */
   key: string;
@@ -31,7 +31,7 @@ function dateLabel(iso: string): string {
 }
 
 /**
- * Coalesce consecutive same-form runs within a sorted run list into RunGroups.
+ * Coalesce consecutive same-task runs within a sorted run list into RunGroups.
  * When `standalonePinned` is set (inside saved views), pinned runs never merge.
  */
 function coalesceRuns(runs: RunRecord[], standalonePinned: boolean): RunGroup[] {
@@ -48,7 +48,7 @@ function coalesceRuns(runs: RunRecord[], standalonePinned: boolean): RunGroup[] 
 }
 
 /** AND across filter entries (chips); OR within a single entry's values. */
-function matchesView(run: RunRecord, filters: ThreadViewFilters, formsBySlug: Map<string, TaskFolder>): boolean {
+function matchesView(run: RunRecord, filters: ThreadViewFilters, tasksBySlug: Map<string, TaskFolder>): boolean {
   const entries = filters.entries ?? [];
   for (const entry of entries) {
     if (entry.values.length === 0) continue;
@@ -57,7 +57,7 @@ function matchesView(run: RunRecord, filters: ThreadViewFilters, formsBySlug: Ma
     } else if (entry.type === "status") {
       if (!entry.values.includes(run.status)) return false;
     } else {
-      const name = formsBySlug.get(run.taskSlug)?.meta.name.toLowerCase() ?? "";
+      const name = tasksBySlug.get(run.taskSlug)?.meta.name.toLowerCase() ?? "";
       const inputs = JSON.stringify(run.inputs ?? {}).toLowerCase();
       const isMatch = entry.values.some((k) => {
         const q = k.trim().toLowerCase();
@@ -79,27 +79,27 @@ interface ThreadModel {
  * Derives the ordered, grouped list of runs for the active project. On the
  * title tab (no active view) the order is purely reverse-chronological —
  * pinning is a view concern. Inside a saved view, pinned runs float to the
- * top under a "Pinned" bucket. Consecutive runs of the same form are
+ * top under a "Pinned" bucket. Consecutive runs of the same task are
  * coalesced into a single RunGroup.
  */
 export function useThread(): ThreadModel {
-  const { runs, formsBySlug, activeProject, views, activeViewId } = useApp();
+  const { runs, tasksBySlug, activeProject, views, activeViewId } = useApp();
 
   const activeView = activeViewId ? views.find((v) => v.id === activeViewId) : undefined;
   const inView = activeView !== undefined;
 
   const visibleRuns = useMemo(() => {
     let filtered = activeProject
-      ? runs.filter((r) => formsBySlug.get(r.taskSlug)?.meta.project === activeProject)
+      ? runs.filter((r) => tasksBySlug.get(r.taskSlug)?.meta.project === activeProject)
       : runs;
     if (activeView) {
-      filtered = filtered.filter((r) => matchesView(r, activeView.filters, formsBySlug));
+      filtered = filtered.filter((r) => matchesView(r, activeView.filters, tasksBySlug));
     }
     return [...filtered].sort((a, b) => {
       if (inView && a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
     });
-  }, [runs, formsBySlug, activeProject, activeView, inView]);
+  }, [runs, tasksBySlug, activeProject, activeView, inView]);
 
   const groups = useMemo(() => {
     // First pass: bucket by date label (pinned bucket only inside views).
@@ -113,7 +113,7 @@ export function useThread(): ThreadModel {
       }
       currentBucket.runs.push(run);
     }
-    // Second pass: coalesce consecutive same-form runs within each bucket.
+    // Second pass: coalesce consecutive same-task runs within each bucket.
     return dateBuckets.map(({ label, runs }) => ({
       label,
       items: coalesceRuns(runs, inView),
@@ -123,6 +123,6 @@ export function useThread(): ThreadModel {
   return {
     visibleRuns,
     groups,
-    formFor: (slug: string) => formsBySlug.get(slug),
+    formFor: (slug: string) => tasksBySlug.get(slug),
   };
 }

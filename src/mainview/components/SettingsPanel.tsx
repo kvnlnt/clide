@@ -105,7 +105,7 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
 
           {services?.length === 0 && !creating && (
             <div className="rounded-md border border-dashed border-clide-border px-3 py-4 text-center text-[13px] text-white/40">
-              No AI services configured yet. Add one to enable AI-powered form creation and magic fields.
+              No AI services configured yet. Add one to enable AI-powered task creation and magic fields.
             </div>
           )}
 

@@ -30,7 +30,7 @@ function Workspace() {
   const {
     sidebarOpen,
     newProjectOpen,
-    newFormOpen,
+    newTaskOpen,
     activeProject,
     activeViewId,
     views,
@@ -39,7 +39,7 @@ function Workspace() {
     setProjectSurface,
     projectMeta,
     closeNewProject,
-    closeNewForm,
+    closeNewTask,
     appSettingsOpen,
     closeAppSettings,
     aiWizardOpen,
@@ -81,7 +81,7 @@ function Workspace() {
   const dispatchViewAction = useCallback(
     (action: string) => {
       const overlayOpen =
-        newFormOpen ||
+        newTaskOpen ||
         appSettingsOpen ||
         newProjectOpen ||
         viewSettingsOpen ||
@@ -119,7 +119,7 @@ function Workspace() {
       setProjectSurface(projectSurface === surface ? "thread" : surface);
     },
     [
-      newFormOpen,
+      newTaskOpen,
       appSettingsOpen,
       newProjectOpen,
       viewSettingsOpen,
@@ -137,14 +137,14 @@ function Workspace() {
     ],
   );
 
-  // Native app-menu clicks (View → Forms/Calendar/…) route through the same dispatcher.
+  // Native app-menu clicks (View → Tasks/Calendar/…) route through the same dispatcher.
   useEffect(() => on("menuAction", dispatchViewAction), [dispatchViewAction]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       // All shortcuts are inert while a blocking overlay is open or no project is active.
       const overlayOpen =
-        newFormOpen ||
+        newTaskOpen ||
         appSettingsOpen ||
         newProjectOpen ||
         viewSettingsOpen ||
@@ -154,14 +154,14 @@ function Workspace() {
         profileInterview !== null;
       if (overlayOpen || !activeProject) return;
 
-      // ⌘P Forms, ⌘⇧C Calendar, ⌘⇧V Views, ⌘⇧U Workflows, ⌘, Settings.
+      // ⌘P Tasks, ⌘⇧C Calendar, ⌘⇧V Views, ⌘⇧U Workflows, ⌘, Settings.
       if (e.ctrlKey || e.metaKey) {
         const key = e.key.toLowerCase();
         const act = (action: string) => {
           e.preventDefault();
           dispatchViewAction(action);
         };
-        if (key === "p" && !e.shiftKey) return act("view:forms");
+        if (key === "p" && !e.shiftKey) return act("view:tasks");
         if (key === "c" && e.shiftKey) return act("view:calendar");
         if (key === "v" && e.shiftKey) return act("view:views");
         if (key === "u" && e.shiftKey) return act("view:workflows");
@@ -192,7 +192,7 @@ function Workspace() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
     dispatchViewAction,
-    newFormOpen,
+    newTaskOpen,
     appSettingsOpen,
     newProjectOpen,
     viewSettingsOpen,
@@ -223,7 +223,7 @@ function Workspace() {
           ) : (
             <>
               <ProjectToolbar />
-              {projectSurface === "forms" && <TasksPanel />}
+              {projectSurface === "tasks" && <TasksPanel />}
               {projectSurface === "views" && <ViewsPage />}
               {projectSurface === "workflows" && <WorkflowsPage />}
               {projectSurface === "calendar" && <CalendarPage />}
@@ -270,16 +270,16 @@ function Workspace() {
         </div>
       )}
 
-      {/* Form creation is a focused, modal activity (ticket 67): the wizard
+      {/* Task creation is a focused, modal activity (ticket 67): the wizard
           covers the entire window — tab strip and sidebar included — using
           the same overlay mechanic as Settings above. The workspace stays
           mounted underneath, untouched on close/create. */}
-      {newFormOpen && (
+      {newTaskOpen && (
         <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg">
           <div className="flex electrobun-webkit-app-region-drag">
             <TrafficLights />
           </div>
-          <NewTaskPage onClose={closeNewForm} />
+          <NewTaskPage onClose={closeNewTask} />
         </div>
       )}
 
@@ -288,7 +288,7 @@ function Workspace() {
           header/tab strip and sidebar too, not just the body. */}
       {newProjectOpen && <NewProjectModal onClose={closeNewProject} />}
 
-      {/* Workflow creation/editing takes over the whole window like the form
+      {/* Workflow creation/editing takes over the whole window like the task
           wizard (tickets 91/92) — same overlay mechanic. */}
       {workflowEditor && (
         <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg">
@@ -326,7 +326,7 @@ function Workspace() {
 
       {/* Gentle profile-interview offers (tickets 100 §3 / 101 §3) — dismissible
           corner cards, hidden while any takeover is open, never blocking. */}
-      {appProfileOffer && !profileInterview && !aiWizardOpen && !appSettingsOpen && !newFormOpen && !workflowEditor && (
+      {appProfileOffer && !profileInterview && !aiWizardOpen && !appSettingsOpen && !newTaskOpen && !workflowEditor && (
         <ProfileOfferCard
           title="Want CLIDE to know you?"
           body="A two-minute interview builds a profile that makes AI features personal. It stays on this machine."
@@ -342,7 +342,7 @@ function Workspace() {
         !profileInterview &&
         !aiWizardOpen &&
         !appSettingsOpen &&
-        !newFormOpen &&
+        !newTaskOpen &&
         !workflowEditor && (
           <ProfileOfferCard
             title={`Tell CLIDE about "${projectProfileOffer.name}"`}

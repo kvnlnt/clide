@@ -11,7 +11,7 @@ import StatusIcon from "./statusIcon";
 
 interface SubmissionAccordionRowProps {
   run: RunRecord;
-  form: TaskDefinition;
+  taskDef: TaskDefinition;
   outputType?: OutputType;
   chunks: OutputChunk[];
   open: boolean;
@@ -27,7 +27,7 @@ function formatTime(iso: string | null): string {
   });
 }
 
-function summarize(form: TaskDefinition, inputs: Record<string, unknown>, run: RunRecord): string {
+function summarize(taskDef: TaskDefinition, inputs: Record<string, unknown>, run: RunRecord): string {
   // Ticket 98: use AI summary when present
   if (run.summary) return run.summary;
 
@@ -47,7 +47,7 @@ function summarize(form: TaskDefinition, inputs: Record<string, unknown>, run: R
   }
 
   // Success: first filled field with label
-  const first = form.fields.find((f) => {
+  const first = taskDef.fields.find((f) => {
     const v = inputs[f.id];
     if (Array.isArray(v)) return v.length > 0;
     if (typeof v === "string") return v.trim().length > 0;
@@ -63,7 +63,7 @@ function summarize(form: TaskDefinition, inputs: Record<string, unknown>, run: R
 
 export default function SubmissionAccordionRow({
   run,
-  form,
+  taskDef,
   outputType,
   chunks,
   open,
@@ -81,7 +81,7 @@ export default function SubmissionAccordionRow({
   }, [open, run.id, run.status]);
 
   const time = formatTime(run.finishedAt ?? run.startedAt);
-  const summary = summarize(form, run.inputs, run);
+  const summary = summarize(taskDef, run.inputs, run);
   const hasOutput =
     run.status === "running" || run.status === "pending" || run.status === "success" || run.status === "error";
 
@@ -180,7 +180,7 @@ export default function SubmissionAccordionRow({
                 )}
               </>
             ) : (
-              <SubmittedSummary form={form} run={run} />
+              <SubmittedSummary taskDef={taskDef} run={run} />
             )
           ) : (
             <div className="py-2 text-[13px] text-white/40">No output yet.</div>

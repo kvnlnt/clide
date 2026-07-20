@@ -18,7 +18,7 @@ export interface DraftCard {
 }
 
 /** Which surface the title tab's body shows. Only meaningful when no view tab is active. */
-export type ProjectSurface = "thread" | "forms" | "views" | "calendar" | "files" | "project-settings" | "workflows";
+export type ProjectSurface = "thread" | "tasks" | "views" | "calendar" | "files" | "project-settings" | "workflows";
 
 /** What the profile interview takeover (tickets 100/101) is interviewing about. */
 export type ProfileInterviewTarget =
@@ -26,8 +26,8 @@ export type ProfileInterviewTarget =
   | { scope: "project"; projectPath: string; projectName: string };
 
 interface AppState {
-  forms: TaskFolder[];
-  formsBySlug: Map<string, TaskFolder>;
+  tasks: TaskFolder[];
+  tasksBySlug: Map<string, TaskFolder>;
   projects: string[];
   projectMeta: Project[];
   runs: RunRecord[];
@@ -40,9 +40,9 @@ interface AppState {
   recentProjects: string[];
   sidebarOpen: boolean;
   newProjectOpen: boolean;
-  newFormOpen: boolean;
+  newTaskOpen: boolean;
 
-  /** What the title tab's body shows (thread / Forms / Views / Project Settings). */
+  /** What the title tab's body shows (thread / Tasks / Views / Project Settings). */
   projectSurface: ProjectSurface;
   /** Switch the title tab's surface; also activates the title tab. */
   setProjectSurface: (surface: ProjectSurface) => void;
@@ -67,7 +67,7 @@ interface AppState {
   onboardingActive: boolean;
   completeOnboarding: () => void;
 
-  /** Quick-run form picker (⌘K/Ctrl+K or the toolbar Run button) — drops a draft into the current tab's thread. */
+  /** Quick-run task picker (⌘K/Ctrl+K or the toolbar Run button) — drops a draft into the current tab's thread. */
   runPickerOpen: boolean;
   openRunPicker: () => void;
   closeRunPicker: () => void;
@@ -121,16 +121,16 @@ interface AppState {
   toggleSidebar: () => void;
   openNewProject: () => void;
   closeNewProject: () => void;
-  openNewForm: () => void;
-  closeNewForm: () => void;
+  openNewTask: () => void;
+  closeNewTask: () => void;
 
-  addFormDraft: (taskSlug: string) => void;
+  addTaskDraft: (taskSlug: string) => void;
   removeDraft: (id: string) => void;
 
   createProject: (name: string, path?: string) => Promise<{ ok: boolean; error?: string }>;
   renameProject: (path: string, name: string) => Promise<{ ok: boolean; error?: string }>;
   deleteProject: (path: string, deleteFiles?: boolean) => Promise<void>;
-  deleteForm: (projectPath: string, slug: string) => Promise<{ ok: boolean; error?: string }>;
+  deleteTask: (projectPath: string, slug: string) => Promise<{ ok: boolean; error?: string }>;
   updateTaskMeta: (projectPath: string, slug: string, patch: TaskMetaPatch) => Promise<{ ok: boolean; error?: string }>;
 
   submitRun: (taskSlug: string, inputs: Record<string, unknown>) => Promise<void>;
@@ -151,7 +151,7 @@ interface AppState {
   /** Mark a run as read (ticket 97). Optimistically updates local state. */
   markRunRead: (runId: string) => Promise<void>;
 
-  refreshForms: () => Promise<void>;
+  refreshTasks: () => Promise<void>;
   refreshRuns: () => Promise<void>;
 }
 
@@ -190,7 +190,7 @@ export function useApp(): AppState {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [forms, setForms] = useState<TaskFolder[]>([]);
+  const [tasks, setTasks] = useState<TaskFolder[]>([]);
   const [projectList, setProjectList] = useState<Project[]>([]);
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [chunks, setChunks] = useState<Record<string, OutputChunk[]>>({});
@@ -201,7 +201,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [recentProjects, setRecentProjects] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
-  const [newFormOpen, setNewFormOpen] = useState(false);
+  const [newTaskOpen, setNewFormOpen] = useState(false);
   const [projectSurface, setProjectSurfaceState] = useState<ProjectSurface>("thread");
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const [runPickerOpen, setRunPickerOpen] = useState(false);
@@ -367,9 +367,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setActiveView(prev);
   }, [activeViewId, views, updateView, setActiveView, previousVisibleTab]);
 
-  const refreshForms = useCallback(async () => {
+  const refreshTasks = useCallback(async () => {
     const f = await api.listTasks();
-    setForms(f);
+    setTasks(f);
   }, []);
 
   const refreshProjects = useCallback(async () => {
@@ -403,14 +403,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Existing users with projects but no AI service (ticket 76).
       else if (aiServices.length === 0) setAiWizardOpen(true);
     })();
-    void refreshForms();
+    void refreshTasks();
     void refreshRuns();
-  }, [refreshForms, refreshRuns]);
+  }, [refreshTasks, refreshRuns]);
 
   // Push subscriptions.
   useEffect(() => {
     const offProjects = on("projects", (p) => setProjectList(p));
-    const offForms = on("tasks", (f) => setForms(f));
+    const offTasks = on("tasks", (f) => setTasks(f));
     const offChunk = on("chunk", (chunk: OutputChunk) => {
       setChunks((prev) => ({
         ...prev,
@@ -434,25 +434,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       offProjects();
-      offForms();
+      offTasks();
       offChunk();
       offStatus();
     };
   }, []);
 
-  const formsBySlug = useMemo(() => {
+  const tasksBySlug = useMemo(() => {
     const m = new Map<string, TaskFolder>();
-    for (const f of forms) m.set(f.meta.slug, f);
+    for (const f of tasks) m.set(f.meta.slug, f);
     return m;
-  }, [forms]);
+  }, [tasks]);
 
   const projects = useMemo(() => {
     const set = new Set<string>(projectList.map((p) => p.name));
-    for (const f of forms) {
+    for (const f of tasks) {
       if (f.meta.project) set.add(f.meta.project);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [projectList, forms]);
+  }, [projectList, tasks]);
 
   const toggleSidebar = useCallback(() => setSidebarOpen((s) => !s), []);
   // Switching surfaces always means "on the title tab" — clear any active view.
@@ -535,17 +535,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [refreshWorkflows]);
   const openNewProject = useCallback(() => setNewProjectOpen(true), []);
   const closeNewProject = useCallback(() => setNewProjectOpen(false), []);
-  const openNewForm = useCallback(() => {
+  const openNewTask = useCallback(() => {
     setProjectSurfaceState("thread");
     setNewFormOpen(true);
   }, []);
-  const closeNewForm = useCallback(() => setNewFormOpen(false), []);
+  const closeNewTask = useCallback(() => setNewFormOpen(false), []);
 
   const removeDraft = useCallback((id: string) => {
     setDrafts((prev) => prev.filter((d) => d.id !== id));
   }, []);
 
-  const addFormDraft = useCallback((taskSlug: string) => {
+  const addTaskDraft = useCallback((taskSlug: string) => {
     const id = `draft-${draftSeq.current++}`;
     setDrafts((prev) => [{ id, taskSlug }, ...prev]);
     setRecentSlugs((prev) => [taskSlug, ...prev.filter((s) => s !== taskSlug)].slice(0, 5));
@@ -576,7 +576,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const res = await api.renameProject(path, name);
       if (res.ok) {
         await refreshProjects();
-        await refreshForms();
+        await refreshTasks();
         if (res.project) {
           setActiveProject((cur) => {
             const old = projectList.find((p) => p.path === path)?.name;
@@ -586,7 +586,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       return { ok: res.ok, error: res.error };
     },
-    [refreshProjects, refreshForms, projectList],
+    [refreshProjects, refreshTasks, projectList],
   );
 
   const deleteProject = useCallback(
@@ -594,29 +594,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const removed = projectList.find((p) => p.path === path);
       await api.removeProject(path, deleteFiles);
       await refreshProjects();
-      await refreshForms();
+      await refreshTasks();
       await refreshRuns();
       setActiveProject((cur) => (cur && removed && cur === removed.name ? null : cur));
     },
-    [projectList, refreshProjects, refreshForms, refreshRuns],
+    [projectList, refreshProjects, refreshTasks, refreshRuns],
   );
 
-  const deleteForm = useCallback(
+  const deleteTask = useCallback(
     async (projectPath: string, slug: string) => {
       const res = await api.deleteTask(projectPath, slug);
-      if (res.ok) await refreshForms();
+      if (res.ok) await refreshTasks();
       return res;
     },
-    [refreshForms],
+    [refreshTasks],
   );
 
   const updateTaskMeta = useCallback(
     async (projectPath: string, slug: string, patch: TaskMetaPatch) => {
       const res = await api.updateTaskMeta(projectPath, slug, patch);
-      if (res.ok) await refreshForms();
+      if (res.ok) await refreshTasks();
       return res;
     },
-    [refreshForms],
+    [refreshTasks],
   );
 
   const submitRun = useCallback(
@@ -636,12 +636,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         scheduledAt: null,
         repeatInterval: null,
         readAt: null,
-        taskVersion: formsBySlug.get(taskSlug)?.meta.version ?? 1,
+        taskVersion: tasksBySlug.get(taskSlug)?.meta.version ?? 1,
       };
       setRuns((prev) => [optimistic, ...prev.filter((r) => r.id !== runId)]);
       setRecentSlugs((prev) => [taskSlug, ...prev.filter((s) => s !== taskSlug)].slice(0, 5));
     },
-    [formsBySlug],
+    [tasksBySlug],
   );
 
   const scheduleRun = useCallback(
@@ -698,8 +698,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value: AppState = {
-    forms,
-    formsBySlug,
+    tasks,
+    tasksBySlug,
     projects,
     projectMeta: projectList,
     runs,
@@ -710,7 +710,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     recentProjects,
     sidebarOpen,
     newProjectOpen,
-    newFormOpen,
+    newTaskOpen,
     projectSurface,
     setProjectSurface,
     appSettingsOpen,
@@ -757,14 +757,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toggleSidebar,
     openNewProject,
     closeNewProject,
-    openNewForm,
-    closeNewForm,
-    addFormDraft,
+    openNewTask,
+    closeNewTask,
+    addTaskDraft,
     removeDraft,
     createProject,
     renameProject,
     deleteProject,
-    deleteForm,
+    deleteTask,
     updateTaskMeta,
     submitRun,
     scheduleRun,
@@ -775,7 +775,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPinned,
     deleteRun,
     markRunRead,
-    refreshForms,
+    refreshTasks,
     refreshRuns,
   };
 

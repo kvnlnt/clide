@@ -16,11 +16,11 @@ import CommandFieldsEditor from "./CommandFieldsEditor";
 import { useEscapeToClose } from "./Modal";
 import OutputDefinitionsEditor from "./OutputDefinitionsEditor";
 import ServiceModelPicker, { type ServiceModelValue } from "./ServiceModelPicker";
-import FormPreview from "./TaskPreview";
+import TaskPreview from "./TaskPreview";
 import ToolChooser from "./ToolChooser";
 import WizardSteps from "./WizardSteps";
 
-interface NewFormPageProps {
+interface NewTaskPageProps {
   onClose: () => void;
 }
 
@@ -60,18 +60,18 @@ function previewInputs(fields: TaskField[], samples: Record<string, unknown>): R
 }
 
 /**
- * Command-backed form creation wizard (tickets 54, 59-63): state the goal →
+ * Command-backed task creation wizard (tickets 54, 59-63): state the goal →
  * specify or OK the tool → tune the pre-drafted fields → outputs & events.
  * The header step indicator jumps to any reachable step; AI accelerates
  * every step but never gates one.
  */
-export default function NewFormPage({ onClose }: NewFormPageProps) {
-  const { addFormDraft, projects, activeProject } = useApp();
+export default function NewTaskPage({ onClose }: NewTaskPageProps) {
+  const { addTaskDraft, projects, activeProject } = useApp();
 
   const [step, setStep] = useState<Step>(1);
   const [serviceModel, setServiceModel] = useState<ServiceModelValue>({ serviceId: "", model: "" });
 
-  // Step 1 — the goal doubles as the form's description.
+  // Step 1 — the goal doubles as the task's description.
   const [goal, setGoal] = useState("");
   const [name, setName] = useState("");
   const [project, setProject] = useState(activeProject || projects[0] || "");
@@ -219,11 +219,11 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
 
     setCreating(false);
     if (res.ok && res.slug) {
-      addFormDraft(res.slug);
+      addTaskDraft(res.slug);
       onClose();
       return;
     }
-    setCreateError(res.error ?? "Failed to create form");
+    setCreateError(res.error ?? "Failed to create task");
   };
 
   // Reachability mirrors the footer gating (ticket 63).
@@ -348,7 +348,7 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
                   {tool.spec && tool.spec.subcommands.length > 0 && (
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-white/30">
-                        One action this form does
+                        One action this task does
                       </label>
                       <div className="flex flex-wrap gap-1.5">
                         {tool.spec.subcommands.map((s) => (
@@ -374,7 +374,7 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
 
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[14px] font-bold text-white/70">
-                      Fixed base args <span className="font-normal text-white/40">(before the form's own fields)</span>
+                      Fixed base args <span className="font-normal text-white/40">(before the task's own fields)</span>
                     </label>
                     <input
                       className={`${inputBase} font-mono`}
@@ -442,7 +442,7 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
 
               <div className="flex items-center justify-between">
                 <span className="text-[13px] text-white/40">
-                  One field per input this action needs — the form does one thing well.
+                  One field per input this action needs — the task does one thing well.
                 </span>
                 {tool.spec && serviceModel.serviceId && (
                   <button
@@ -475,7 +475,7 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
                   />
                 </div>
                 <div className="w-full lg:w-[360px] lg:shrink-0">
-                  <FormPreview
+                  <TaskPreview
                     fields={fields}
                     sampleValues={sampleValues}
                     onSampleChange={(id, value) => setSampleValues((prev) => ({ ...prev, [id]: value }))}
@@ -536,7 +536,7 @@ export default function NewFormPage({ onClose }: NewFormPageProps) {
                 <Loader size={13} className="animate-spin" /> CREATING…
               </>
             ) : (
-              "CREATE FORM"
+              "CREATE TASK"
             )}
           </button>
         )}

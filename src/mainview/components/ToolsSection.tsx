@@ -178,8 +178,8 @@ export default function ToolsSection() {
     const res = await confirm({
       title: `Remove tool "${tool.name}"?`,
       message: tool.installedVia
-        ? `Forms that use it will fail at run time until it's registered again. This only removes it from CLIDE's registry — the "${tool.installedVia.package}" package installed via ${tool.installedVia.manager} stays on your system (ticket 103: uninstall is out of scope).`
-        : "Forms that use it will fail at run time until it's registered again.",
+        ? `Tasks that use it will fail at run time until it's registered again. This only removes it from CLIDE's registry — the "${tool.installedVia.package}" package installed via ${tool.installedVia.manager} stays on your system (ticket 103: uninstall is out of scope).`
+        : "Tasks that use it will fail at run time until it's registered again.",
       confirmLabel: "Remove",
       // Only copied-in custom installs own a binary CLIDE may delete (ticket 58).
       checkboxLabel: tool.sourceHash ? "Also delete the copied executable" : undefined,

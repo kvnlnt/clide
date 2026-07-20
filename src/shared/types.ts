@@ -683,7 +683,7 @@ export interface WorkflowStepRecord {
   status: WorkflowStepStatus;
   /** Nesting depth, for trace indentation. */
   depth: number;
-  /** Form steps: the exact resolved command string that ran. */
+  /** Task steps: the exact resolved command string that ran. */
   command?: string;
   stdout?: string;
   stderr?: string;
@@ -692,7 +692,7 @@ export interface WorkflowStepRecord {
   resolvedInputs?: Record<string, unknown>;
   /** Decision: evaluated condition + result; skipped: why. */
   note?: string;
-  /** Form steps: evaluated named outputs (ticket 86). */
+  /** Task steps: evaluated named outputs (ticket 86). */
   outputs?: OutputResult[];
 }
 
@@ -978,7 +978,7 @@ export type ClideRPC = {
         response: { ok: boolean; entry?: ToolRegistryEntry; error?: string };
       };
 
-      // Form creation wizard (tickets 54, 59-61) ------------------------------
+      // Task creation wizard (tickets 54, 59-61) ------------------------------
       suggestTools: {
         params: { query: string; serviceId: string; model: string };
         response: { ok: boolean; suggestions?: string[]; error?: string };

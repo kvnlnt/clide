@@ -43,7 +43,7 @@ function validateSpec(raw: unknown): ToolSpec {
 }
 
 const SYSTEM_PROMPT = [
-  "You read CLI tool documentation (--help/man output) for CLIDE, an app that wraps installed command-line tools in graphical forms.",
+  "You read CLI tool documentation (--help/man output) for CLIDE, an app that wraps installed command-line tools in graphical tasks.",
   "Extract its structure. Respond ONLY with a single JSON object of this exact shape:",
   `{
   "description": string,           // one line: what the tool does
@@ -73,7 +73,7 @@ export async function distillToolSpec(
 }
 
 const SUGGEST_SYSTEM_PROMPT = [
-  "The user describes something they want to do on the command line, for CLIDE — an app that wraps installed CLI tools in GUI forms.",
+  "The user describes something they want to do on the command line, for CLIDE — an app that wraps installed CLI tools in GUI tasks.",
   "Suggest up to 6 common CLI tool executable names (bare names only, no paths, no flags, no explanations) commonly available on macOS/Linux that could accomplish it.",
   'Respond ONLY with JSON: { "tools": string[] }',
 ].join("\n");

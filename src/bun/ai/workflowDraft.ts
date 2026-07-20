@@ -13,23 +13,27 @@ function extractJson(text: string): unknown {
   return JSON.parse(candidate.slice(start, end + 1));
 }
 
-/** Compact catalog of the project's forms — all the model may reference. */
-function formCatalog(forms: TaskFolder[]): string {
+/** Compact catalog of the project's tasks — all the model may reference. */
+function taskCatalog(tasks: TaskFolder[]): string {
   return JSON.stringify(
-    forms.map((f) => ({
-      slug: f.meta.slug,
-      name: f.meta.name,
-      description: f.meta.description,
-      fields: f.task.fields.map((field) => ({ id: field.id, label: field.label, type: field.type })),
-      outputs: (f.task.outputs ?? []).map((o) => ({ name: o.name, kind: o.kind })),
+    tasks.map((t) => ({
+      slug: t.meta.slug,
+      name: t.meta.name,
+      description: t.meta.description,
+      fields: t.task.fields.map((field) => ({ id: field.id, label: field.label, type: field.type })),
+      outputs: (t.task.outputs ?? []).map((o) => ({ name: o.name, kind: o.kind })),
     })),
     null,
     2,
   );
 }
 
+// The "form" step type and "formSlug" field below are the disk-format-firewalled
+// wire shape (see workflows/store.ts) — validateSteps() below is reused as-is to
+// parse this AI response, so the schema the model is asked to produce must match
+// disk JSON exactly even though the product concept is "task".
 const SYSTEM_PROMPT = [
-  "You draft a CLIDE Workflow: an ordered list of steps orchestrating the user's EXISTING forms.",
+  "You draft a CLIDE Workflow: an ordered list of steps orchestrating the user's EXISTING tasks.",
   "Respond ONLY with a single JSON object:",
   `{
   "steps": Step[]
@@ -41,7 +45,7 @@ where Step is one of:
 { "type": "parallel", "name": string, "branches": Step[][] }`,
   "Rules:",
   '- Step names: unique, slug-safe (^[a-z][a-z0-9_-]*$), descriptive, e.g. "fetch_rss".',
-  "- formSlug MUST be one of the cataloged forms. Never invent forms or field ids.",
+  "- formSlug MUST be one of the cataloged tasks. Never invent tasks or field ids.",
   "- Input values are literals or contain {{references}}: {{stepname.outputs.<outputName>}}, {{stepname.stdout}}, {{item.<prop>}} inside loops, {{trigger.params.<name>}}.",
   "- Only reference steps that complete earlier (earlier siblings / ancestors' earlier siblings).",
   "- Expressions (condition/over) support property access, .length, comparisons (== != < <= > >=), && || !, literals.",
@@ -55,7 +59,7 @@ export interface WorkflowDraftResult {
 
 /**
  * Drafts a workflow from the user's goal against the project's existing
- * forms (ticket 92). Validation is strict and partial: unknown form slugs
+ * tasks (ticket 92). Validation is strict and partial: unknown task slugs
  * are dropped with a visible note, unknown field ids are dropped, reference
  * syntax is checked, names de-duplicated — a partially valid draft is
  * delivered partially, never all-or-nothing.
@@ -63,7 +67,7 @@ export interface WorkflowDraftResult {
 export async function draftWorkflow(
   goal: string,
   name: string,
-  forms: TaskFolder[],
+  tasks: TaskFolder[],
   service: AIService,
   model: string,
   projectPath?: string,
@@ -74,7 +78,7 @@ export async function draftWorkflow(
   const user = [
     profile || null,
     `The user's goal for this workflow: ${goal}`,
-    `Available forms (the ONLY forms you may use):\n${formCatalog(forms)}`,
+    `Available tasks (the ONLY tasks you may use):\n${taskCatalog(tasks)}`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -84,15 +88,15 @@ export async function draftWorkflow(
   let steps = validateSteps(parsed.steps);
   const notes: string[] = [];
 
-  // Drop steps referencing forms that don't exist (and their now-dangling references stay visible in the editor).
-  const known = new Set(forms.map((f) => f.meta.slug));
-  const knownFieldIds = new Map(forms.map((f) => [f.meta.slug, new Set(f.task.fields.map((x) => x.id))]));
+  // Drop steps referencing tasks that don't exist (and their now-dangling references stay visible in the editor).
+  const known = new Set(tasks.map((t) => t.meta.slug));
+  const knownFieldIds = new Map(tasks.map((t) => [t.meta.slug, new Set(t.task.fields.map((x) => x.id))]));
 
   const prune = (list: WorkflowStep[]): WorkflowStep[] =>
     list.flatMap((step): WorkflowStep[] => {
       if (step.type === "form") {
         if (!known.has(step.taskSlug)) {
-          notes.push(`No form found for "${step.taskSlug}" — add a step manually or create that form first.`);
+          notes.push(`No task found for "${step.taskSlug}" — add a step manually or create that task first.`);
           return [];
         }
         const valid = knownFieldIds.get(step.taskSlug)!;

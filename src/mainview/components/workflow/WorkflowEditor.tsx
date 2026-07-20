@@ -33,11 +33,11 @@ const STEP_ICON = { form: Play, decision: GitBranch, loop: Repeat, parallel: Spl
 
 // ---------------------------------------------------------------------------
 // Validation (ticket 91): unknown/out-of-scope references, duplicate names,
-// missing forms, expression syntax, missing required fields. Non-blocking
+// missing tasks, expression syntax, missing required fields. Non-blocking
 // flags per step + a summary that gates Save.
 // ---------------------------------------------------------------------------
 
-function validate(workflow: Workflow, formsBySlug: Map<string, TaskFolder>): Map<string, string[]> {
+function validate(workflow: Workflow, tasksBySlug: Map<string, TaskFolder>): Map<string, string[]> {
   const problems = new Map<string, string[]>();
   const add = (name: string, msg: string) => problems.set(name, [...(problems.get(name) ?? []), msg]);
 
@@ -62,8 +62,8 @@ function validate(workflow: Workflow, formsBySlug: Map<string, TaskFolder>): Map
 
   for (const s of steps) {
     if (s.type === "form") {
-      const folder = formsBySlug.get(s.taskSlug);
-      if (!folder) add(s.name, `form "${s.taskSlug}" not found`);
+      const folder = tasksBySlug.get(s.taskSlug);
+      if (!folder) add(s.name, `task "${s.taskSlug}" not found`);
       else {
         for (const f of folder.task.fields) {
           if (f.required && !(f.id in s.inputs)) add(s.name, `required field "${f.label || f.id}" is unset`);
@@ -87,8 +87,8 @@ function validate(workflow: Workflow, formsBySlug: Map<string, TaskFolder>): Map
   return problems;
 }
 
-/** Reference suggestions for a step's scope: named outputs + stdout of in-scope form steps, trigger, item. */
-function buildSuggestions(workflow: Workflow, stepName: string, formsBySlug: Map<string, TaskFolder>): string[] {
+/** Reference suggestions for a step's scope: named outputs + stdout of in-scope task steps, trigger, item. */
+function buildSuggestions(workflow: Workflow, stepName: string, tasksBySlug: Map<string, TaskFolder>): string[] {
   const scopes = computeScopes(workflow);
   const scope = scopes.get(stepName) ?? [];
   const stepBySlugName = new Map(allSteps(workflow.steps).map((s) => [s.name, s]));
@@ -105,7 +105,7 @@ function buildSuggestions(workflow: Workflow, stepName: string, formsBySlug: Map
     }
     const step = stepBySlugName.get(root);
     if (step?.type === "form") {
-      const folder = formsBySlug.get(step.taskSlug);
+      const folder = tasksBySlug.get(step.taskSlug);
       for (const def of folder?.task.outputs ?? []) out.push(`${root}.outputs.${def.name}`);
       out.push(`${root}.stdout`, `${root}.exitCode`);
     }
@@ -176,15 +176,15 @@ function ReferenceInput({
 
 interface StepCtx {
   workflow: Workflow;
-  formsBySlug: Map<string, TaskFolder>;
-  projectForms: TaskFolder[];
+  tasksBySlug: Map<string, TaskFolder>;
+  projectTasks: TaskFolder[];
   problems: Map<string, string[]>;
 }
 
-function stepSummary(step: WorkflowStep, formsBySlug: Map<string, TaskFolder>): string {
+function stepSummary(step: WorkflowStep, tasksBySlug: Map<string, TaskFolder>): string {
   switch (step.type) {
     case "form":
-      return formsBySlug.get(step.taskSlug)?.meta.name ?? step.taskSlug;
+      return tasksBySlug.get(step.taskSlug)?.meta.name ?? step.taskSlug;
     case "decision":
       return `if ${step.condition || "…"}`;
     case "loop":
@@ -200,10 +200,10 @@ function placeholderResolve(value: string): string {
 }
 
 function TaskStepBody({ step, onChange, ctx }: { step: TaskStep; onChange: (s: TaskStep) => void; ctx: StepCtx }) {
-  const folder = ctx.formsBySlug.get(step.taskSlug);
+  const folder = ctx.tasksBySlug.get(step.taskSlug);
   const suggestions = useMemo(
-    () => buildSuggestions(ctx.workflow, step.name, ctx.formsBySlug),
-    [ctx.workflow, step.name, ctx.formsBySlug],
+    () => buildSuggestions(ctx.workflow, step.name, ctx.tasksBySlug),
+    [ctx.workflow, step.name, ctx.tasksBySlug],
   );
 
   const compiled = useMemo(() => {
@@ -221,19 +221,19 @@ function TaskStepBody({ step, onChange, ctx }: { step: TaskStep; onChange: (s: T
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <label className={fieldLabel}>Form</label>
+        <label className={fieldLabel}>Task</label>
         <div className="flex items-center gap-2">
           <select
             className={`${inputBase} flex-1 appearance-none`}
             value={step.taskSlug}
             onChange={(e) => onChange({ ...step, taskSlug: e.target.value, inputs: {} })}
           >
-            {!ctx.formsBySlug.has(step.taskSlug) && (
+            {!ctx.tasksBySlug.has(step.taskSlug) && (
               <option value={step.taskSlug} className="bg-clide-panel">
                 (missing) {step.taskSlug}
               </option>
             )}
-            {ctx.projectForms.map((f) => (
+            {ctx.projectTasks.map((f) => (
               <option key={f.meta.slug} value={f.meta.slug} className="bg-clide-panel">
                 {f.meta.name}
               </option>
@@ -315,8 +315,8 @@ function StepCard({
   const Icon = STEP_ICON[step.type];
   const issues = ctx.problems.get(step.name) ?? [];
   const suggestions = useMemo(
-    () => buildSuggestions(ctx.workflow, step.name, ctx.formsBySlug),
-    [ctx.workflow, step.name, ctx.formsBySlug],
+    () => buildSuggestions(ctx.workflow, step.name, ctx.tasksBySlug),
+    [ctx.workflow, step.name, ctx.tasksBySlug],
   );
 
   const iconBtn =
@@ -346,7 +346,7 @@ function StepCard({
                 </span>
               )}
             </div>
-            <span className="block truncate text-[12px] text-white/40">{stepSummary(step, ctx.formsBySlug)}</span>
+            <span className="block truncate text-[12px] text-white/40">{stepSummary(step, ctx.tasksBySlug)}</span>
           </div>
         </button>
         <button onClick={onMoveUp} disabled={!onMoveUp} className={iconBtn} title="Move up">
@@ -521,7 +521,7 @@ function StepList({
     const name = freshName(ctx.workflow, type === "form" ? "step" : type);
     const step: WorkflowStep =
       type === "form"
-        ? { type, name, taskSlug: ctx.projectForms[0]?.meta.slug ?? "", inputs: {} }
+        ? { type, name, taskSlug: ctx.projectTasks[0]?.meta.slug ?? "", inputs: {} }
         : type === "decision"
           ? { type, name, condition: "", then: [] }
           : type === "loop"
@@ -571,11 +571,11 @@ function StepList({
 function TriggersEditor({
   workflow,
   onChange,
-  projectForms,
+  projectTasks,
 }: {
   workflow: Workflow;
   onChange: (w: Workflow) => void;
-  projectForms: TaskFolder[];
+  projectTasks: TaskFolder[];
 }) {
   const triggers = workflow.triggers;
   const set = (next: WorkflowTrigger[]) => onChange({ ...workflow, triggers: next });
@@ -584,7 +584,7 @@ function TriggersEditor({
     <div className="flex flex-col gap-1.5">
       <label className="text-[11px] font-bold uppercase tracking-wider text-white/30">Triggers</label>
       <span className={fieldHint}>
-        Workflows start only from these — submitting a form on its own never propagates. Schedules fire only while CLIDE
+        Workflows start only from these — submitting a task on its own never propagates. Schedules fire only while CLIDE
         is running.
       </span>
       {triggers.map((t, i) => (
@@ -599,7 +599,7 @@ function TriggersEditor({
                   ? { type }
                   : type === "schedule"
                     ? { type, cron: "0 9 * * *" }
-                    : { type, taskSlug: projectForms[0]?.meta.slug ?? "" };
+                    : { type, taskSlug: projectTasks[0]?.meta.slug ?? "" };
               set(triggers.map((x, xi) => (xi === i ? next : x)));
             }}
           >
@@ -610,7 +610,7 @@ function TriggersEditor({
               Schedule (cron)
             </option>
             <option value="task-submitted" className="bg-clide-panel">
-              When a form finishes
+              When a task finishes
             </option>
           </select>
           {t.type === "schedule" && (
@@ -627,7 +627,7 @@ function TriggersEditor({
               value={t.taskSlug}
               onChange={(e) => set(triggers.map((x, xi) => (xi === i ? { ...t, taskSlug: e.target.value } : x)))}
             >
-              {projectForms.map((f) => (
+              {projectTasks.map((f) => (
                 <option key={f.meta.slug} value={f.meta.slug} className="bg-clide-panel">
                   {f.meta.name}
                 </option>
@@ -666,14 +666,14 @@ interface WorkflowEditorProps {
 }
 
 export default function WorkflowEditor({ initial, onClose, draftNotes, focusName }: WorkflowEditorProps) {
-  const { forms, activeProject, formsBySlug, saveWorkflow, openWorkflowEditor, refreshWorkflows } = useApp();
+  const { tasks, activeProject, tasksBySlug, saveWorkflow, openWorkflowEditor, refreshWorkflows } = useApp();
   const { confirm, toast } = useUIFeedback();
   const [wf, setWf] = useState<Workflow>(initial);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const projectForms = forms.filter((f) => f.meta.project === activeProject);
-  const problems = useMemo(() => validate(wf, formsBySlug), [wf, formsBySlug]);
+  const projectTasks = tasks.filter((t) => t.meta.project === activeProject);
+  const problems = useMemo(() => validate(wf, tasksBySlug), [wf, tasksBySlug]);
   const totalIssues = Array.from(problems.values()).reduce((n, list) => n + list.length, 0);
   const dirty = JSON.stringify(wf) !== JSON.stringify(initial);
 
@@ -703,7 +703,7 @@ export default function WorkflowEditor({ initial, onClose, draftNotes, focusName
     }
   };
 
-  const ctx: StepCtx = { workflow: wf, formsBySlug, projectForms, problems };
+  const ctx: StepCtx = { workflow: wf, tasksBySlug, projectTasks, problems };
 
   // Focus name input when requested (for duplicate flow). Select text so first
   // keystroke replaces it.
@@ -813,7 +813,7 @@ export default function WorkflowEditor({ initial, onClose, draftNotes, focusName
             />
           </div>
 
-          <TriggersEditor workflow={wf} onChange={setWf} projectForms={projectForms} />
+          <TriggersEditor workflow={wf} onChange={setWf} projectTasks={projectTasks} />
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-white/30">Steps</label>

@@ -69,8 +69,8 @@ async function generateAndSetSummary(
 }
 
 /**
- * Fired when a standalone (user/scheduler-initiated) form run completes
- * successfully — the workflow form-submitted trigger hook (ticket 90).
+ * Fired when a standalone (user/scheduler-initiated) task run completes
+ * successfully — the workflow task-submitted trigger hook (ticket 90).
  * Replaces the event bus: nothing implicit, one explicit listener.
  */
 export interface RunCompletionInfo {
@@ -105,7 +105,7 @@ export async function startRun(
 ): Promise<{ runId: string }> {
   const folder = await loadTaskFolder(projectPath, taskSlug, projectName);
   if (!folder) {
-    throw new Error(`Form not found: ${taskSlug}`);
+    throw new Error(`Task not found: ${taskSlug}`);
   }
 
   const runId = existingRunId ?? crypto.randomUUID();
@@ -142,8 +142,8 @@ export async function startRun(
   return { runId };
 }
 
-/** Spawns a form's process — direct tool invocation for command forms, interpreter+script for legacy. */
-function spawnForm(
+/** Spawns a task's process — direct tool invocation for command tasks, interpreter+script for legacy. */
+function spawnTaskProcess(
   folder: TaskFolder,
   inputs: Record<string, unknown>,
 ): {
@@ -212,9 +212,9 @@ async function execute(
 
   const capture = new OutputCapture(projectPath, runId);
 
-  let spawned: ReturnType<typeof spawnForm>;
+  let spawned: ReturnType<typeof spawnTaskProcess>;
   try {
-    spawned = spawnForm(folder, inputs);
+    spawned = spawnTaskProcess(folder, inputs);
   } catch (err) {
     finishWithError(runId, emitters, err instanceof Error ? err.message : `Failed to spawn: ${String(err)}`);
     return;
@@ -295,7 +295,7 @@ async function execute(
     void generateAndSetSummary(runId, folder, inputs, exitCode, capture.text, stderrText, outputs, emitters);
   }
 
-  // Workflow form-submitted triggers (ticket 90) fire on successful
+  // Workflow task-submitted triggers (ticket 90) fire on successful
   // standalone completion — outputs exist by now, which is the point.
   if (status === "success" && completionListener) {
     completionListener({
@@ -325,7 +325,7 @@ export async function readRunOutputs(projectPath: string, runId: string): Promis
 }
 
 // ---------------------------------------------------------------------------
-// One-shot execution for workflow form steps (ticket 89): same spawn path as
+// One-shot execution for workflow task steps (ticket 89): same spawn path as
 // standalone runs — the single-compiler rule — but no history DB record, no
 // thread card, no completion trigger (workflow steps never cascade).
 // ---------------------------------------------------------------------------
@@ -339,14 +339,14 @@ export interface ExecOnceResult {
   durationMs: number;
 }
 
-export async function execFormOnce(
+export async function execTaskOnce(
   folder: TaskFolder,
   inputs: Record<string, unknown>,
   /** Registry key for cancellation (the workflow run id); optional. */
   procKey?: string,
 ): Promise<ExecOnceResult> {
   const started = Date.now();
-  const spawned = spawnForm(folder, inputs); // throws on tool-not-installed; caller records the failure
+  const spawned = spawnTaskProcess(folder, inputs); // throws on tool-not-installed; caller records the failure
 
   if (procKey) registry.register(procKey, spawned.proc);
 

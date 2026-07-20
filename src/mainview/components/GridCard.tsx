@@ -3,7 +3,7 @@ import type { TaskFolder, GridCardSize, RunRecord } from "../types/tasks";
 import StatusIcon from "./statusIcon";
 
 interface GridCardProps {
-  form: TaskFolder;
+  task: TaskFolder;
   size: GridCardSize;
   lastRun: RunRecord | undefined;
   pinned: boolean;
@@ -38,7 +38,7 @@ function lastRunTime(run: RunRecord | undefined): string {
 }
 
 export default function GridCard({
-  form,
+  task,
   size,
   lastRun,
   pinned,
@@ -61,7 +61,7 @@ export default function GridCard({
       } ${SPAN[size]} ${MIN_H[size]}`}
     >
       <div className="flex items-start justify-between">
-        <span className="text-[14px] font-bold text-white">{form.meta.name}</span>
+        <span className="text-[14px] font-bold text-white">{task.meta.name}</span>
         <span
           className="hidden cursor-grab text-white/30 group-hover:block"
           title="Drag to reorder"
@@ -71,8 +71,8 @@ export default function GridCard({
         </span>
       </div>
 
-      {size !== "small" && form.meta.description && (
-        <p className="mt-1 line-clamp-3 text-[12px] text-white/40">{form.meta.description}</p>
+      {size !== "small" && task.meta.description && (
+        <p className="mt-1 line-clamp-3 text-[12px] text-white/40">{task.meta.description}</p>
       )}
 
       <div className="mt-3 flex items-center justify-between">

@@ -3,7 +3,7 @@ import { getDefaultAIService, legacyProviderForKind, listAIServices } from "./ai
 import { profileContext } from "./profileContext";
 import { complete } from "./providers";
 
-/** The form's creation service kind when a matching service exists, else the default service. */
+/** The task's creation service kind when a matching service exists, else the default service. */
 async function resolveService(folder: TaskFolder): Promise<AIService | null> {
   const services = await listAIServices();
   if (services.length === 0) return null;
@@ -85,7 +85,7 @@ export async function fillMagicFields(
     }));
 
   const system = [
-    "You fill form fields for CLIDE, a shell automation app.",
+    "You fill task fields for CLIDE, a shell automation app.",
     "Each field below has an associative prompt describing how to fill it.",
     "Respond ONLY with a single JSON object mapping field id to value, e.g.",
     '{ "target-date": "2026-07-01" }',
@@ -99,7 +99,7 @@ export async function fillMagicFields(
 
   const user = [
     `Today's date: ${new Date().toISOString()}`,
-    `Form: ${folder.meta.name} — ${folder.meta.description}`,
+    `Task: ${folder.meta.name} — ${folder.meta.description}`,
     `Fields to fill:\n${JSON.stringify(fieldSpecs, null, 2)}`,
   ].join("\n\n");
 

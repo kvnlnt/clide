@@ -3,7 +3,7 @@ import { buildCommand, formatCommandPreview } from "../types/tasks";
 import type { TaskDefinition, RunRecord } from "../types/tasks";
 
 interface SubmittedSummaryProps {
-  form: TaskDefinition;
+  taskDef: TaskDefinition;
   run: RunRecord;
 }
 
@@ -21,15 +21,15 @@ function formatValue(value: unknown): string {
 }
 
 /**
- * The "Submitted" tab (replaces the old disabled-form rendering): a friendly
+ * The "Submitted" tab (replaces the old disabled-task rendering): a friendly
  * label → value list of what the user submitted, followed by the official
  * command line that ran. Prefers the argv recorded at execution time
- * (`run.command`, ticket 52); falls back to rebuilding it from the form's
- * command spec for runs predating that column. Legacy script forms have no
+ * (`run.command`, ticket 52); falls back to rebuilding it from the task's
+ * command spec for runs predating that column. Legacy script tasks have no
  * command line to show — the list stands alone.
  */
-export default function SubmittedSummary({ form, run }: SubmittedSummaryProps) {
-  const rows = form.fields
+export default function SubmittedSummary({ taskDef, run }: SubmittedSummaryProps) {
+  const rows = taskDef.fields
     .filter((f) => isFilled(run.inputs[f.id]))
     .map((f) => ({ id: f.id, label: f.label || f.id, value: formatValue(run.inputs[f.id]) }));
 
@@ -41,8 +41,8 @@ export default function SubmittedSummary({ form, run }: SubmittedSummaryProps) {
   let commandLine: string | null = null;
   if (run.command) {
     commandLine = formatCommandPreview(run.command.tool, run.command.argv);
-  } else if (form.command) {
-    const built = buildCommand(form, run.inputs);
+  } else if (taskDef.command) {
+    const built = buildCommand(taskDef, run.inputs);
     commandLine = formatCommandPreview(built.tool, built.argv);
   }
 

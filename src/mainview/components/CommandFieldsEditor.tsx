@@ -52,7 +52,7 @@ interface Props {
 }
 
 /**
- * CRUD editor for a command-backed form's input fields (tickets 61/64/65):
+ * CRUD editor for a command-backed task's input fields (tickets 61/64/65):
  * one labeled card per field — title, summary, and a body where every
  * control says what it does. Mapping leads with the tool's real options
  * from its spec, phrased in plain language, with a Custom escape hatch.
@@ -95,7 +95,7 @@ export default function CommandFieldsEditor({ fields, onChange, toolSpec, openId
     <div className="flex flex-col gap-1.5">
       <label className="text-[11px] font-bold uppercase tracking-wider text-white/30">Fields</label>
       <div className="flex flex-col gap-1.5">
-        {fields.length === 0 && <div className="text-[13px] text-white/30">No fields — the form is a button.</div>}
+        {fields.length === 0 && <div className="text-[13px] text-white/30">No fields — the task is a button.</div>}
         {fields.map((field, i) => (
           <FieldCard
             key={field.id}
@@ -206,7 +206,7 @@ function FieldCard({
                   }
                 }}
               />
-              <span className={fieldHint}>Shown as the field's title on the form</span>
+              <span className={fieldHint}>Shown as the field's title on the task</span>
             </div>
             <div className="flex flex-col gap-1">
               <label className={fieldLabel}>Input type</label>
@@ -221,7 +221,7 @@ function FieldCard({
                   </option>
                 ))}
               </select>
-              <span className={fieldHint}>What the person filling the form will see</span>
+              <span className={fieldHint}>What the person filling out the task will see</span>
             </div>
           </div>
 
@@ -233,7 +233,7 @@ function FieldCard({
               value={field.description ?? ""}
               onChange={(e) => onUpdate({ description: e.target.value || undefined })}
             />
-            <span className={fieldHint}>Tells the person filling the form what to enter</span>
+            <span className={fieldHint}>Tells the person filling out the task what to enter</span>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -255,7 +255,7 @@ function FieldCard({
                 />
                 Required
               </label>
-              <span className={fieldHint}>The form can't be submitted without it</span>
+              <span className={fieldHint}>The task can't be submitted without it</span>
               <label className="flex cursor-pointer items-center gap-2 text-[13px] text-white/70">
                 <input
                   type="checkbox"

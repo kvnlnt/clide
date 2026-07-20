@@ -51,7 +51,7 @@ export function defaultProjectsDir(): string {
 
 /**
  * Machine-global tool registry (ticket 53): one JSON file per registered CLI
- * tool. Global, not per-project — the same installed tool serves forms in
+ * tool. Global, not per-project — the same installed tool serves tasks in
  * every project.
  */
 export function toolsDir(): string {
@@ -81,7 +81,7 @@ export function ensureDir(dir: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Per-project paths. A project is a folder on disk that houses all of its forms,
+// Per-project paths. A project is a folder on disk that houses all of its tasks,
 // run history, and outputs.
 // ---------------------------------------------------------------------------
 

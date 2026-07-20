@@ -58,7 +58,7 @@ export default function FirstRunAIWizard({ onSkip, onDone, chained }: FirstRunAI
           </div>
           <h1 className="text-[26px] font-bold text-white">First things first</h1>
           <p className="max-w-[420px] text-[14px] leading-relaxed text-white/50">
-            CLIDE's features — form creation, magic fields, tool inspection — are powered by AI. Connect a service to
+            CLIDE's features — task creation, magic fields, tool inspection — are powered by AI. Connect a service to
             get started. This can be a local model running on your machine, or a remote provider like Claude or
             OpenAI. You can add more or change this anytime in Settings.
           </p>

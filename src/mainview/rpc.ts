@@ -42,7 +42,7 @@ type EventMap = {
   tasks: TaskFolder[];
   chunk: OutputChunk;
   status: RunStatusUpdate;
-  /** Native app-menu action id, e.g. "view:forms". */
+  /** Native app-menu action id, e.g. "view:tasks". */
   menuAction: string;
   /** Live workflow-run state (full record) on every step transition. */
   workflowRun: WorkflowRun;

@@ -220,7 +220,7 @@ export default function WorkflowsPage() {
               <div className="flex flex-col gap-1">
                 <span className="text-[14px] font-medium text-white/70">No workflows yet</span>
                 <span className="text-[13px] text-white/40">
-                  Orchestrate this project's forms into multi-step automations.
+                  Orchestrate this project's tasks into multi-step automations.
                 </span>
               </div>
               <button

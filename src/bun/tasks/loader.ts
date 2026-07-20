@@ -222,7 +222,7 @@ function validateOutputs(raw: unknown, outputType: OutputType): OutputDefinition
   ];
 }
 
-function validateForm(raw: unknown): TaskDefinition | null {
+function validateTaskDefinition(raw: unknown): TaskDefinition | null {
   if (!isObject(raw)) return null;
   if (!Array.isArray(raw.fields)) return null;
   const fields = raw.fields.map(validateField).filter((f): f is TaskField => f !== null);
@@ -254,7 +254,7 @@ function validateForm(raw: unknown): TaskDefinition | null {
     outputs: validateOutputs(raw.outputs, outputType),
     // `events` keys on disk are ignored since ticket 85 (bus removed).
     command,
-    // Legacy script forms always had a scriptFile; a command form has none.
+    // Legacy script tasks always had a scriptFile; a command task has none.
     scriptFile: typeof raw.scriptFile === "string" ? raw.scriptFile : command ? undefined : "script.sh",
     engine,
     nativeTool,
@@ -296,7 +296,7 @@ export async function loadTaskFolder(
   const metaRaw = await readJson(join(dir, "meta.json"));
   const formRaw = await readJson(join(dir, "form.json")); // Disk still says "form.json"
   const meta = validateMeta(metaRaw, slug, projectName);
-  const task = validateForm(formRaw);
+  const task = validateTaskDefinition(formRaw);
   if (!meta || !task) {
     console.warn(`[tasks] Skipping malformed task folder: ${slug}`);
     return null;
@@ -319,7 +319,7 @@ export async function loadTaskVersion(
   const metaRaw = await readJson(join(versionDir, "meta.json"));
   const formRaw = await readJson(join(versionDir, "form.json"));
   const meta = validateMeta(metaRaw, slug, projectName);
-  const task = validateForm(formRaw);
+  const task = validateTaskDefinition(formRaw);
   if (!meta || !task) return null;
   const native = await loadNativeConfig(versionDir, task.nativeTool);
   return { meta, task, projectPath, native };

@@ -231,10 +231,10 @@ export function getRun(id: string): RunRecord | null {
   return row ? rowToRecord(row) : null;
 }
 
-export function getRunHistory(projectPath: string, formSlug: string, limit: number): RunRecord[] {
+export function getRunHistory(projectPath: string, taskSlug: string, limit: number): RunRecord[] {
   const rows = getDb(projectPath)
     .query(`SELECT * FROM runs WHERE form_slug = ? ORDER BY started_at DESC LIMIT ?`)
-    .all(formSlug, limit) as RunRow[];
+    .all(taskSlug, limit) as RunRow[];
   return rows.map(rowToRecord);
 }
 

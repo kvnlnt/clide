@@ -12,33 +12,33 @@ interface RunPickerProps {
 }
 
 type Entry =
-  | { kind: "form"; slug: string; name: string; description: string }
+  | { kind: "task"; slug: string; name: string; description: string }
   | { kind: "workflow"; workflow: Workflow };
 
 /**
- * The ⌘K run dialog (ticket 93): one search over forms AND workflows,
+ * The ⌘K run dialog (ticket 93): one search over tasks AND workflows,
  * grouped under labeled sections with per-row type distinction. Picking a
- * form drops a draft card; picking a workflow starts a manual run. Distinct
- * "New form…" / "New workflow…" actions live in the footer.
+ * task drops a draft card; picking a workflow starts a manual run. Distinct
+ * "New task…" / "New workflow…" actions live in the footer.
  */
 export default function RunPicker({ onClose }: RunPickerProps) {
   const {
-    forms,
+    tasks,
     recentSlugs,
-    addFormDraft,
+    addTaskDraft,
     activeProject,
-    openNewForm,
+    openNewTask,
     openWorkflowEditor,
     workflows,
     setProjectSurface,
   } = useApp();
   const { toast } = useUIFeedback();
-  const scopedForms = activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms;
+  const scopedTasks = activeProject ? tasks.filter((f) => f.meta.project === activeProject) : tasks;
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const formResults = useTaskSearch(scopedForms, query, recentSlugs);
+  const taskResults = useTaskSearch(scopedTasks, query, recentSlugs);
   const workflowResults = useMemo(() => {
     const q = query.trim().toLowerCase();
     return workflows.filter(
@@ -46,15 +46,15 @@ export default function RunPicker({ onClose }: RunPickerProps) {
     );
   }, [workflows, query]);
 
-  // One flat keyboard-navigable list in visual order: forms section, then workflows.
+  // One flat keyboard-navigable list in visual order: tasks section, then workflows.
   const entries: Entry[] = useMemo(
     () => [
-      ...formResults.map(
-        (f): Entry => ({ kind: "form", slug: f.meta.slug, name: f.meta.name, description: f.meta.description }),
+      ...taskResults.map(
+        (f): Entry => ({ kind: "task", slug: f.meta.slug, name: f.meta.name, description: f.meta.description }),
       ),
       ...workflowResults.map((w): Entry => ({ kind: "workflow", workflow: w })),
     ],
-    [formResults, workflowResults],
+    [taskResults, workflowResults],
   );
 
   useEffect(() => {
@@ -68,8 +68,8 @@ export default function RunPicker({ onClose }: RunPickerProps) {
   const choose = async (index: number) => {
     const entry = entries[index];
     if (!entry) return;
-    if (entry.kind === "form") {
-      addFormDraft(entry.slug);
+    if (entry.kind === "task") {
+      addTaskDraft(entry.slug);
       onClose();
       return;
     }
@@ -147,21 +147,21 @@ export default function RunPicker({ onClose }: RunPickerProps) {
           </div>
         )}
 
-        {formResults.length > 0 && sectionHeader("Tasks")}
-        {formResults.map((form) => {
+        {taskResults.length > 0 && sectionHeader("Tasks")}
+        {taskResults.map((task) => {
           flatIndex++;
           const i = flatIndex;
           return (
             <button
-              key={form.meta.slug}
+              key={task.meta.slug}
               onClick={() => void choose(i)}
               onMouseEnter={() => setActive(i)}
               className={rowClass(active === i)}
             >
               <FileText size={14} className="shrink-0 text-white/40" />
-              <span className="min-w-0 truncate text-white">{form.meta.name}</span>
-              {form.meta.description && (
-                <span className="min-w-0 shrink truncate text-[12px] text-white/40">{form.meta.description}</span>
+              <span className="min-w-0 truncate text-white">{task.meta.name}</span>
+              {task.meta.description && (
+                <span className="min-w-0 shrink truncate text-[12px] text-white/40">{task.meta.description}</span>
               )}
             </button>
           );
@@ -197,7 +197,7 @@ export default function RunPicker({ onClose }: RunPickerProps) {
         <button
           onClick={() => {
             onClose();
-            openNewForm();
+            openNewTask();
           }}
           className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-white/60 hover:bg-white/5 hover:text-white"
         >

@@ -10,7 +10,7 @@ import type {
 } from "../../shared/types";
 import { ITEM_NAME, TRIGGER_NAME, evalExpressionString, isTruthy, resolveTemplate } from "../../shared/workflowExpr";
 import { fallbackWorkflowSummary, generateWorkflowSummary } from "../ai/runSummary";
-import { execFormOnce } from "../runner/execute";
+import { execTaskOnce } from "../runner/execute";
 import * as procRegistry from "../runner/registry";
 import { loadTaskFolder } from "../tasks/loader";
 import { saveRun } from "./runStore";
@@ -18,8 +18,8 @@ import { saveRun } from "./runStore";
 // ---------------------------------------------------------------------------
 // Workflow execution engine (ticket 89). Sequential per list; parallel steps
 // run concurrently and rejoin; decisions/loops evaluate via the shared
-// expression module. Form steps go through the SAME buildCommand/spawn path
-// as standalone runs (execFormOnce) — preview, dry run, and execution can
+// expression module. Task steps go through the SAME buildCommand/spawn path
+// as standalone runs (execTaskOnce) — preview, dry run, and execution can
 // never disagree. Failure policy v1: a failed step halts the workflow and
 // the rest are marked skipped.
 // ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ function pushSkippedTree(ctx: EngineCtx, steps: WorkflowStep[], depth: number, n
   }
 }
 
-async function runFormStep(ctx: EngineCtx, step: TaskStep, env: Env, depth: number, suffix: string): Promise<boolean> {
+async function runTaskStep(ctx: EngineCtx, step: TaskStep, env: Env, depth: number, suffix: string): Promise<boolean> {
   const record: WorkflowStepRecord = { name: step.name + suffix, type: "form", status: "running", depth };
   ctx.run.records.push(record);
   await publish(ctx);
@@ -101,7 +101,7 @@ async function runFormStep(ctx: EngineCtx, step: TaskStep, env: Env, depth: numb
   const folder = await loadTaskFolder(ctx.projectPath, step.taskSlug, ctx.projectName);
   if (!folder) {
     record.status = "failed";
-    record.note = `form not found: ${step.taskSlug}`;
+    record.note = `task not found: ${step.taskSlug}`;
     await publish(ctx);
     return false;
   }
@@ -109,7 +109,7 @@ async function runFormStep(ctx: EngineCtx, step: TaskStep, env: Env, depth: numb
   const procKey = `${ctx.run.runId}:${ctx.procSeq++}`;
   ctx.handle.procKeys.add(procKey);
   try {
-    const result = await execFormOnce(folder, resolved, procKey);
+    const result = await execTaskOnce(folder, resolved, procKey);
     record.command = result.commandDisplay;
     record.stdout = result.stdout;
     record.stderr = result.stderr;
@@ -171,7 +171,7 @@ async function runSteps(
     let ok = true;
     switch (step.type) {
       case "form":
-        ok = await runFormStep(ctx, step, env, depth, suffix);
+        ok = await runTaskStep(ctx, step, env, depth, suffix);
         break;
 
       case "decision": {
@@ -366,8 +366,8 @@ export async function dryRunWorkflow(
         case "form": {
           const folder = await loadTaskFolder(projectPath, step.taskSlug, projectName);
           if (!folder) {
-            plan.push({ name: step.name, type: "form", depth, summary: `form not found: ${step.taskSlug}` });
-            problems.push(`step "${step.name}": form "${step.taskSlug}" not found`);
+            plan.push({ name: step.name, type: "form", depth, summary: `task not found: ${step.taskSlug}` });
+            problems.push(`step "${step.name}": task "${step.taskSlug}" not found`);
             break;
           }
           const inputs: Record<string, unknown> = {};
@@ -379,7 +379,7 @@ export async function dryRunWorkflow(
             const built = buildCommand(folder.task, inputs);
             summary = formatCommandPreview(built.tool, built.argv);
           } else {
-            summary = `(script form) ${folder.meta.name}`;
+            summary = `(script task) ${folder.meta.name}`;
           }
           plan.push({ name: step.name, type: "form", depth, summary });
           break;
@@ -444,37 +444,37 @@ export async function replayStep(
 ): Promise<{ ok: boolean; record?: WorkflowStepRecord; error?: string }> {
   const original = run.records[recordIndex];
   if (!original) return { ok: false, error: "No such step record." };
-  if (original.type !== "form") return { ok: false, error: "Only form steps can be replayed." };
+  if (original.type !== "form") return { ok: false, error: "Only task steps can be replayed." };
   if (!original.resolvedInputs) return { ok: false, error: "This step has no captured inputs to replay." };
 
   // Locate the step in the run's snapshot (strip loop-iteration suffixes).
   const plainName = original.name.replace(/\[\d+\]/g, "");
-  const findForm = (steps: WorkflowStep[]): TaskStep | null => {
+  const findTaskStep = (steps: WorkflowStep[]): TaskStep | null => {
     for (const s of steps) {
       if (s.type === "form" && s.name === plainName) return s;
       if (s.type === "decision") {
-        const hit = findForm(s.then) ?? findForm(s.else ?? []);
+        const hit = findTaskStep(s.then) ?? findTaskStep(s.else ?? []);
         if (hit) return hit;
       } else if (s.type === "loop") {
-        const hit = findForm(s.steps);
+        const hit = findTaskStep(s.steps);
         if (hit) return hit;
       } else if (s.type === "parallel") {
         for (const b of s.branches) {
-          const hit = findForm(b);
+          const hit = findTaskStep(b);
           if (hit) return hit;
         }
       }
     }
     return null;
   };
-  const step = findForm(run.workflow.steps);
+  const step = findTaskStep(run.workflow.steps);
   if (!step) return { ok: false, error: `Step "${plainName}" not found in the run's snapshot.` };
 
   const folder = await loadTaskFolder(projectPath, step.taskSlug, projectName);
-  if (!folder) return { ok: false, error: `Form "${step.taskSlug}" no longer exists.` };
+  if (!folder) return { ok: false, error: `Task "${step.taskSlug}" no longer exists.` };
 
   try {
-    const result = await execFormOnce(folder, original.resolvedInputs, `replay:${run.runId}:${recordIndex}`);
+    const result = await execTaskOnce(folder, original.resolvedInputs, `replay:${run.runId}:${recordIndex}`);
     const record: WorkflowStepRecord = {
       name: `${original.name} (replay)`,
       type: "form",

@@ -25,11 +25,11 @@ interface Props {
  * behind the kebab menu (ticket 50), not inline in this toolbar.
  */
 export default function ViewToolbar({ view }: Props) {
-  const { forms, activeProject, updateView, openRunPicker, openViewSettings } = useApp();
+  const { tasks, activeProject, updateView, openRunPicker, openViewSettings } = useApp();
 
   const anchorRef = useRef<HTMLButtonElement | null>(null);
   const [popover, setPopover] = useState<PopoverState | null>(null);
-  const [formQuery, setFormQuery] = useState("");
+  const [taskQuery, setTaskQuery] = useState("");
   const [keywordInput, setKeywordInput] = useState("");
 
   // Only resync local echo state when the active view itself changes.
@@ -38,24 +38,24 @@ export default function ViewToolbar({ view }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.id]);
 
-  const projectForms = forms.filter((f) => f.meta.project === activeProject);
+  const projectTasks = tasks.filter((f) => f.meta.project === activeProject);
   const entries = view.filters.entries ?? [];
 
-  const nameFor = (slug: string) => projectForms.find((f) => f.meta.slug === slug)?.meta.name ?? slug;
+  const nameFor = (slug: string) => projectTasks.find((f) => f.meta.slug === slug)?.meta.name ?? slug;
 
   const currentEntry = popover?.mode === "criteria" ? entries.find((e) => e.id === popover.entryId) : undefined;
   const currentValues = currentEntry?.values ?? [];
 
-  const formSuggestions = useMemo(() => {
-    const q = formQuery.trim().toLowerCase();
-    return projectForms
+  const taskSuggestions = useMemo(() => {
+    const q = taskQuery.trim().toLowerCase();
+    return projectTasks
       .filter(
         (f) =>
           !currentValues.includes(f.meta.slug) &&
           (q === "" || f.meta.name.toLowerCase().includes(q) || f.meta.slug.includes(q)),
       )
       .slice(0, 8);
-  }, [projectForms, currentValues, formQuery]);
+  }, [projectTasks, currentValues, taskQuery]);
 
   const setEntries = (next: FilterEntry[]) => {
     const filters = { ...view.filters };
@@ -85,13 +85,13 @@ export default function ViewToolbar({ view }: Props) {
 
   const openEditPopover = (e: React.MouseEvent<HTMLButtonElement>, entry: FilterEntry) => {
     anchorRef.current = e.currentTarget;
-    setFormQuery("");
+    setTaskQuery("");
     setKeywordInput("");
     setPopover({ mode: "criteria", type: entry.type, entryId: entry.id });
   };
 
   const pickType = (type: FilterEntryType) => {
-    setFormQuery("");
+    setTaskQuery("");
     setKeywordInput("");
     setPopover({ mode: "criteria", type, entryId: crypto.randomUUID() });
   };
@@ -201,27 +201,27 @@ export default function ViewToolbar({ view }: Props) {
             )}
             <input
               autoFocus
-              value={formQuery}
-              onChange={(e) => setFormQuery(e.target.value)}
+              value={taskQuery}
+              onChange={(e) => setTaskQuery(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && formSuggestions[0]) {
-                  applyValues("task", popover.entryId, [...currentValues, formSuggestions[0].meta.slug]);
-                  setFormQuery("");
+                if (e.key === "Enter" && taskSuggestions[0]) {
+                  applyValues("task", popover.entryId, [...currentValues, taskSuggestions[0].meta.slug]);
+                  setTaskQuery("");
                 }
               }}
-              placeholder="Search forms…"
+              placeholder="Search tasks…"
               className={popoverInput}
             />
             <div className="clide-scroll mt-1 max-h-40 space-y-0.5 overflow-y-auto">
-              {formSuggestions.length === 0 && (
-                <div className="px-1 py-0.5 text-[12px] italic text-white/30">No forms match</div>
+              {taskSuggestions.length === 0 && (
+                <div className="px-1 py-0.5 text-[12px] italic text-white/30">No tasks match</div>
               )}
-              {formSuggestions.map((f) => (
+              {taskSuggestions.map((f) => (
                 <button
                   key={f.meta.slug}
                   onClick={() => {
                     applyValues("task", popover.entryId, [...currentValues, f.meta.slug]);
-                    setFormQuery("");
+                    setTaskQuery("");
                   }}
                   className="block w-full truncate rounded px-1.5 py-0.5 text-left text-[13px] text-white/60 hover:bg-white/5 hover:text-white"
                 >

@@ -8,7 +8,7 @@ import GridCard from "./GridCard";
 const SIZE_CYCLE: GridCardSize[] = ["small", "medium", "large"];
 
 export default function GridView() {
-  const { forms, activeProject, runs, submitRun, addFormDraft } = useApp();
+  const { tasks, activeProject, runs, submitRun, addTaskDraft } = useApp();
 
   // Ticket 20: grid view is retired from the render path and the list/grid
   // toggle no longer exists in AppContext. Stub it locally so this dead
@@ -18,21 +18,21 @@ export default function GridView() {
 
   const projectSlug = activeProject ?? "all";
 
-  const projectForms = useMemo(
-    () => (activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms),
-    [forms, activeProject],
+  const projectTasks = useMemo(
+    () => (activeProject ? tasks.filter((f) => f.meta.project === activeProject) : tasks),
+    [tasks, activeProject],
   );
 
   const [order, setOrder] = useState<string[]>([]);
   const [sizes, setSizes] = useState<Record<string, GridCardSize>>({});
   const [dragging, setDragging] = useState<string | null>(null);
 
-  // Load persisted layout whenever the project or its form set changes.
+  // Load persisted layout whenever the project or its task set changes.
   useEffect(() => {
     let cancelled = false;
     void api.getLayout(projectSlug).then((layout) => {
       if (cancelled) return;
-      const slugs = projectForms.map((f) => f.meta.slug);
+      const slugs = projectTasks.map((f) => f.meta.slug);
       const ordered = layout.cards
         .sort((a, b) => a.position - b.position)
         .map((c) => c.taskSlug)
@@ -46,7 +46,7 @@ export default function GridView() {
     return () => {
       cancelled = true;
     };
-  }, [projectSlug, projectForms]);
+  }, [projectSlug, projectTasks]);
 
   const lastRunBySlug = useMemo(() => {
     const m = new Map<string, RunRecord>();
@@ -76,15 +76,15 @@ export default function GridView() {
     [projectSlug],
   );
 
-  // Pinned forms float to the first row.
+  // Pinned tasks float to the first row.
   const displayOrder = useMemo(() => {
-    const present = order.filter((s) => projectForms.some((f) => f.meta.slug === s));
+    const present = order.filter((s) => projectTasks.some((f) => f.meta.slug === s));
     return [...present].sort((a, b) => {
       const pa = pinnedSlugs.has(a) ? 0 : 1;
       const pb = pinnedSlugs.has(b) ? 0 : 1;
       return pa - pb;
     });
-  }, [order, projectForms, pinnedSlugs]);
+  }, [order, projectTasks, pinnedSlugs]);
 
   const handleDrop = (targetSlug: string) => {
     if (!dragging || dragging === targetSlug) return;
@@ -107,16 +107,16 @@ export default function GridView() {
     persist(order, nextSizes);
   };
 
-  const openForm = (slug: string) => {
-    addFormDraft(slug);
+  const openTask = (slug: string) => {
+    addTaskDraft(slug);
     setViewMode("list");
   };
 
   const quickRun = (slug: string) => {
-    const folder = projectForms.find((f) => f.meta.slug === slug);
+    const folder = projectTasks.find((f) => f.meta.slug === slug);
     const hasRequired = folder?.task.fields.some((f) => f.required);
     if (hasRequired) {
-      openForm(slug);
+      openTask(slug);
     } else {
       void submitRun(slug, {});
       setViewMode("list");
@@ -136,21 +136,21 @@ export default function GridView() {
       </div>
       {displayOrder.length === 0 ? (
         <div className="flex h-full items-center justify-center text-[14px] italic text-white/30">
-          No forms in this project
+          No tasks in this project
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-3  pl-1.5 pr-3">
           {displayOrder.map((slug) => {
-            const folder = projectForms.find((f) => f.meta.slug === slug);
+            const folder = projectTasks.find((f) => f.meta.slug === slug);
             if (!folder) return null;
             return (
               <GridCard
                 key={slug}
-                form={folder}
+                task={folder}
                 size={sizes[slug] ?? "small"}
                 lastRun={lastRunBySlug.get(slug)}
                 pinned={pinnedSlugs.has(slug)}
-                onOpen={() => openForm(slug)}
+                onOpen={() => openTask(slug)}
                 onQuickRun={() => quickRun(slug)}
                 onCycleSize={() => cycleSize(slug)}
                 onDragStart={() => setDragging(slug)}

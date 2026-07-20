@@ -4,14 +4,14 @@ import { useApp } from "../context/AppContext";
 import SidebarProject from "./SidebarProject";
 
 export default function Sidebar() {
-  const { forms, projects, runs, activeProject, setActiveProject, openNewProject } = useApp();
+  const { tasks, projects, runs, activeProject, setActiveProject, openNewProject } = useApp();
 
-  // Map each form slug to its project so we can attribute runs to projects.
+  // Map each task slug to its project so we can attribute runs to projects.
   const slugToProject = useMemo(() => {
     const m = new Map<string, string>();
-    for (const f of forms) m.set(f.meta.slug, f.meta.project);
+    for (const f of tasks) m.set(f.meta.slug, f.meta.project);
     return m;
-  }, [forms]);
+  }, [tasks]);
 
   // Unread terminal runs per project (ticket 97): red if any unread error, green otherwise, zero → no badge.
   const counts = useMemo(() => {

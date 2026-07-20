@@ -4,8 +4,8 @@ import type { TaskDefinition } from "../types/tasks";
 import { buildCommand, formatCommandPreview } from "../types/tasks";
 import TaskField from "./TaskField";
 
-interface FormCardBodyProps {
-  form: TaskDefinition;
+interface TaskCardBodyProps {
+  taskDef: TaskDefinition;
   values: Record<string, unknown>;
   onChange: (id: string, value: unknown) => void;
   disabled?: boolean;
@@ -17,10 +17,10 @@ interface FormCardBodyProps {
   taskSlug?: string;
 }
 
-/** Live "what will run" line for command-backed forms (ticket 52) — recomputed from current values. */
-function CommandPreview({ form, values }: { form: TaskDefinition; values: Record<string, unknown> }) {
-  if (!form.command) return null;
-  const built = buildCommand(form, values);
+/** Live "what will run" line for command-backed tasks (ticket 52) — recomputed from current values. */
+function CommandPreview({ taskDef, values }: { taskDef: TaskDefinition; values: Record<string, unknown> }) {
+  if (!taskDef.command) return null;
+  const built = buildCommand(taskDef, values);
   return (
     <div className="flex items-start gap-1.5 rounded-md border border-clide-border bg-clide-bg px-2.5 py-2 font-mono text-[12px] text-white/60">
       <Terminal size={13} className="mt-0.5 shrink-0 text-white/30" />
@@ -30,9 +30,9 @@ function CommandPreview({ form, values }: { form: TaskDefinition; values: Record
 }
 
 /**
- * "Starts workflows" (ticket 90): every workflow using this form as a
+ * "Starts workflows" (ticket 90): every workflow using this task as a
  * trigger, so "what happens if I hit submit?" is always answered on the
- * form itself. Renders nothing when no workflow is attached.
+ * task itself. Renders nothing when no workflow is attached.
  */
 function StartsWorkflows({ taskSlug }: { taskSlug?: string }) {
   const { workflows } = useApp();
@@ -52,20 +52,20 @@ function StartsWorkflows({ taskSlug }: { taskSlug?: string }) {
   );
 }
 
-export default function FormCardBody({
-  form,
+export default function TaskCardBody({
+  taskDef,
   values,
   onChange,
   disabled,
   filling,
   fillFailed,
   taskSlug,
-}: FormCardBodyProps) {
-  if (form.fields.length === 0) {
+}: TaskCardBodyProps) {
+  if (taskDef.fields.length === 0) {
     return (
       <div className="flex flex-col gap-3 px-5 py-3.5">
         <div className="text-[13px] text-white/40">No inputs — press SEND to run.</div>
-        <CommandPreview form={form} values={values} />
+        <CommandPreview taskDef={taskDef} values={values} />
         <StartsWorkflows taskSlug={taskSlug} />
       </div>
     );
@@ -77,7 +77,7 @@ export default function FormCardBody({
           <Sparkles size={11} /> couldn't auto-fill — fill the fields manually
         </div>
       )}
-      {form.fields.map((field) => {
+      {taskDef.fields.map((field) => {
         const isFilling = filling?.has(field.id) === true;
         return (
           <div key={field.id} className={`flex flex-col gap-1.5 ${isFilling ? "animate-pulse" : ""}`}>
@@ -103,7 +103,7 @@ export default function FormCardBody({
           </div>
         );
       })}
-      <CommandPreview form={form} values={values} />
+      <CommandPreview taskDef={taskDef} values={values} />
       <StartsWorkflows taskSlug={taskSlug} />
     </div>
   );

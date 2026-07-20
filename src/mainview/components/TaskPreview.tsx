@@ -14,8 +14,8 @@ interface FormPreviewProps {
 
 /**
  * Step 3's "How it will look" pane (ticket 66): the fields rendered exactly
- * as the form card will show them — same `TaskField` controls, same
- * label/help-text markup as FormCardBody — and interactive, so sample
+ * as the task card will show them — same `TaskField` controls, same
+ * label/help-text markup as TaskCardBody — and interactive, so sample
  * values feed the featured command preview. Two views of one list: the
  * open editor card is ringed here, and clicking a field jumps to its card.
  */

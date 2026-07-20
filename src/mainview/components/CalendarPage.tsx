@@ -63,7 +63,7 @@ function projectOccurrences(run: RunRecord, rangeStart: Date, rangeEnd: Date): D
 }
 
 export default function CalendarPage() {
-  const { activeProject, runs, formsBySlug, updateScheduledRun, runScheduledNow, deleteRun } = useApp();
+  const { activeProject, runs, tasksBySlug, updateScheduledRun, runScheduledNow, deleteRun } = useApp();
   const { confirm, toast } = useUIFeedback();
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -81,8 +81,8 @@ export default function CalendarPage() {
   };
 
   const scheduled = useMemo(
-    () => runs.filter((r) => r.status === "scheduled" && formsBySlug.get(r.taskSlug)?.meta.project === activeProject),
-    [runs, formsBySlug, activeProject],
+    () => runs.filter((r) => r.status === "scheduled" && tasksBySlug.get(r.taskSlug)?.meta.project === activeProject),
+    [runs, tasksBySlug, activeProject],
   );
 
   const gridStart = useMemo(() => startOfGrid(month), [month]);
@@ -162,9 +162,9 @@ export default function CalendarPage() {
                   >
                     {day.getDate()}
                   </span>
-                  {/* Hover affordance (ticket 69): schedule a form for this day. */}
+                  {/* Hover affordance (ticket 69): schedule a task for this day. */}
                   <span
-                    title="Schedule a form for this day"
+                    title="Schedule a task for this day"
                     className="flex h-4 w-4 items-center justify-center rounded text-white/40 opacity-0 transition-opacity group-hover:opacity-100"
                   >
                     <Plus size={11} />
@@ -178,7 +178,7 @@ export default function CalendarPage() {
                       e.stopPropagation();
                       openDetail(chip.run.id);
                     }}
-                    title={`${formsBySlug.get(chip.run.taskSlug)?.meta.name ?? chip.run.taskSlug} — ${chip.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+                    title={`${tasksBySlug.get(chip.run.taskSlug)?.meta.name ?? chip.run.taskSlug} — ${chip.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
                     className={`truncate rounded px-1.5 py-0.5 text-left text-[11px] ${
                       chip.projected
                         ? "border border-dashed border-white/10 text-white/30"
@@ -186,7 +186,7 @@ export default function CalendarPage() {
                     }`}
                   >
                     {chip.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{" "}
-                    {formsBySlug.get(chip.run.taskSlug)?.meta.name ?? chip.run.taskSlug}
+                    {tasksBySlug.get(chip.run.taskSlug)?.meta.name ?? chip.run.taskSlug}
                   </button>
                 ))}
                 {overflow > 0 && <span className="text-[10px] text-white/30">+{overflow} more</span>}
@@ -200,7 +200,7 @@ export default function CalendarPage() {
         {selected && (
           <ScheduleDetail
             run={selected}
-            formName={formsBySlug.get(selected.taskSlug)?.meta.name ?? selected.taskSlug}
+            formName={tasksBySlug.get(selected.taskSlug)?.meta.name ?? selected.taskSlug}
             onClose={() => setSelectedId(null)}
             onSave={async (scheduledAt, repeat) => {
               await updateScheduledRun(selected.id, scheduledAt, repeat);
@@ -213,7 +213,7 @@ export default function CalendarPage() {
               setSelectedId(null);
             }}
             onCancel={async () => {
-              const name = formsBySlug.get(selected.taskSlug)?.meta.name ?? selected.taskSlug;
+              const name = tasksBySlug.get(selected.taskSlug)?.meta.name ?? selected.taskSlug;
               const res = await confirm({
                 title: "Cancel this scheduled run?",
                 message: `"${name}" will no longer run${selected.repeatInterval && selected.repeatInterval !== "none" ? ", including future repeats" : ""}.`,
@@ -230,7 +230,7 @@ export default function CalendarPage() {
 
         {scheduled.length === 0 && !composeDate && (
           <div className="mt-6 text-center text-[13px] text-white/30">
-            Nothing scheduled. Click a day to schedule a form, or use a form's ⋯ menu.
+            Nothing scheduled. Click a day to schedule a task, or use a task's ⋯ menu.
           </div>
         )}
       </div>

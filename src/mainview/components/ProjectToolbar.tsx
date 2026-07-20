@@ -4,7 +4,7 @@ import Toolbar from "./Toolbar";
 
 /**
  * Toolbar for the project title tab: fused visually to the active tab above
- * it. Replaces the old ChevronDown dropdown (Forms / Settings / Hidden views)
+ * it. Replaces the old ChevronDown dropdown (Tasks / Settings / Hidden views)
  * — those surfaces now live as toolbar buttons that swap the title tab's body
  * content in place. Hidden-view management lives on the Views page now.
  */
@@ -30,9 +30,9 @@ export default function ProjectToolbar() {
         Workflows
       </button>
       <button
-        onClick={() => setProjectSurface(projectSurface === "forms" ? "thread" : "forms")}
-        title="Forms (⌘P)"
-        className={`${btnBase} ${projectSurface === "forms" ? btnActive : btnInactive}`}
+        onClick={() => setProjectSurface(projectSurface === "tasks" ? "thread" : "tasks")}
+        title="Tasks (⌘P)"
+        className={`${btnBase} ${projectSurface === "tasks" ? btnActive : btnInactive}`}
       >
         <FileText size={13} />
         Tasks

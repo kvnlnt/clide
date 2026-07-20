@@ -3,10 +3,10 @@ import { useApp } from "../context/AppContext";
 
 /**
  * Empty-thread state. When a filter view is active it explains the empty
- * result; otherwise it invites the user to create or open a form.
+ * result; otherwise it invites the user to create or open a task.
  */
 export default function ThreadEmpty({ filtered = false }: { filtered?: boolean }) {
-  const { openNewForm, setProjectSurface } = useApp();
+  const { openNewTask, setProjectSurface } = useApp();
 
   if (filtered) {
     return (
@@ -25,23 +25,23 @@ export default function ThreadEmpty({ filtered = false }: { filtered?: boolean }
         <div className="flex flex-col gap-1.5">
           <h2 className="text-[17px] font-semibold text-white/80">Nothing here yet</h2>
           <p className="max-w-[300px] text-[13px] leading-relaxed text-white/40">
-            Forms are small scripts with a friendly face. Create one with AI, or open one you already have.
+            Tasks are small scripts with a friendly face. Create one with AI, or open one you already have.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={openNewForm}
+            onClick={openNewTask}
             className="flex items-center gap-2 rounded-md bg-white/10 px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-white/20"
           >
             <Sparkles size={14} />
-            Create a form
+            Create a task
           </button>
           <button
-            onClick={() => setProjectSurface("forms")}
+            onClick={() => setProjectSurface("tasks")}
             className="flex items-center gap-2 rounded-md border border-white/10 px-4 py-2 text-[13px] font-medium text-white/60 transition-colors hover:border-white/20 hover:text-white"
           >
             <Search size={14} />
-            Browse forms
+            Browse tasks
           </button>
         </div>
         <div className="text-[12px] text-white/25">

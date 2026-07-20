@@ -26,7 +26,7 @@ function triggerLabel(run: WorkflowRun): string {
   const t = run.trigger;
   if (t.type === "manual") return "manual";
   if (t.type === "schedule") return `schedule ${t.detail ?? ""}`.trim();
-  return `on ${t.detail ?? "form"}`;
+  return `on ${t.detail ?? "task"}`;
 }
 
 // ---------------------------------------------------------------------------

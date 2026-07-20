@@ -4,10 +4,10 @@ import { listWorkflows } from "./store";
 
 // ---------------------------------------------------------------------------
 // Workflow triggers (ticket 90). Triggers live on the workflow, never on
-// forms. Schedule triggers use a minimal cron subset (m h dom mon dow with
+// tasks. Schedule triggers use a minimal cron subset (m h dom mon dow with
 // numbers, *, ",", "-", "/") evaluated only while the app runs — no daemon,
-// no back-fill. Form-submitted triggers fire when a STANDALONE run of the
-// referenced form completes successfully; workflow-internal steps never
+// no back-fill. Task-submitted triggers fire when a STANDALONE run of the
+// referenced task completes successfully; workflow-internal steps never
 // cascade.
 // ---------------------------------------------------------------------------
 
@@ -20,12 +20,12 @@ export type WorkflowStarter = (
 
 interface TriggerState {
   projects: Project[];
-  /** `${projectPath}\0${formSlug}` → workflows with a matching form-submitted trigger. */
-  formIndex: Map<string, { project: Project; workflow: Workflow }[]>;
+  /** `${projectPath}\0${taskSlug}` → workflows with a matching task-submitted trigger. */
+  taskIndex: Map<string, { project: Project; workflow: Workflow }[]>;
   schedules: { project: Project; workflow: Workflow; cron: string; lastFiredMinute: number }[];
 }
 
-const state: TriggerState = { projects: [], formIndex: new Map(), schedules: [] };
+const state: TriggerState = { projects: [], taskIndex: new Map(), schedules: [] };
 let starter: WorkflowStarter | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
 
@@ -98,7 +98,7 @@ function cronMatches(expr: string, date: Date): boolean {
 /** Rebuilds the trigger indexes from disk — call on startup and whenever workflows change. */
 export async function refreshWorkflowTriggers(projects: Project[]): Promise<void> {
   state.projects = projects;
-  const formIndex = new Map<string, { project: Project; workflow: Workflow }[]>();
+  const taskIndex = new Map<string, { project: Project; workflow: Workflow }[]>();
   const schedules: TriggerState["schedules"] = [];
 
   for (const project of projects) {
@@ -107,9 +107,9 @@ export async function refreshWorkflowTriggers(projects: Project[]): Promise<void
       for (const trigger of workflow.triggers) {
         if (trigger.type === "task-submitted") {
           const key = `${project.path}\0${trigger.taskSlug}`;
-          const list = formIndex.get(key) ?? [];
+          const list = taskIndex.get(key) ?? [];
           list.push({ project, workflow });
-          formIndex.set(key, list);
+          taskIndex.set(key, list);
         } else if (trigger.type === "schedule") {
           if (validateCron(trigger.cron)) {
             console.warn(`[workflow] "${workflow.name}": invalid cron "${trigger.cron}" — trigger disabled.`);
@@ -122,14 +122,14 @@ export async function refreshWorkflowTriggers(projects: Project[]): Promise<void
     }
   }
 
-  state.formIndex = formIndex;
+  state.taskIndex = taskIndex;
   state.schedules = schedules;
 }
 
-/** Standalone form-run completion → start every matching enabled workflow (ticket 90). */
-export function onFormRunCompleted(info: RunCompletionInfo): void {
+/** Standalone task-run completion → start every matching enabled workflow (ticket 90). */
+export function onTaskRunCompleted(info: RunCompletionInfo): void {
   if (!starter) return;
-  const matches = state.formIndex.get(`${info.projectPath}\0${info.taskSlug}`) ?? [];
+  const matches = state.taskIndex.get(`${info.projectPath}\0${info.taskSlug}`) ?? [];
   for (const { project, workflow } of matches) {
     const outputs: Record<string, unknown> = {};
     for (const o of info.outputs) if (o.ok) outputs[o.name] = o.value;

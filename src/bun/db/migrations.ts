@@ -28,7 +28,7 @@ export function migrate(db: Database): void {
     repeat_interval: "ALTER TABLE runs ADD COLUMN repeat_interval TEXT",
     // Ticket 23: provenance of event-bus auto-submitted runs (JSON RunTrigger).
     triggered_by: "ALTER TABLE runs ADD COLUMN triggered_by TEXT",
-    // Ticket 52: resolved tool + argv for command-backed forms (JSON { tool, argv }).
+    // Ticket 52: resolved tool + argv for command-backed tasks (JSON { tool, argv }).
     resolved_command: "ALTER TABLE runs ADD COLUMN resolved_command TEXT",
     // Ticket 97: when the run was marked read (ISO timestamp).
     read_at: "ALTER TABLE runs ADD COLUMN read_at TEXT",

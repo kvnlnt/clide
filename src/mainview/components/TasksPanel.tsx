@@ -17,22 +17,22 @@ import { useUIFeedback } from "./UIFeedback";
  */
 export default function TasksPanel() {
   const {
-    forms,
+    tasks,
     recentSlugs,
-    openNewForm,
+    openNewTask,
     setProjectSurface,
     activeProject,
-    deleteForm,
+    deleteTask,
     updateTaskMeta,
   } = useApp();
-  const scopedForms = activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms;
+  const scopedTasks = activeProject ? tasks.filter((f) => f.meta.project === activeProject) : tasks;
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const results = useTaskSearch(scopedForms, query, recentSlugs);
-  const createIndex = results.length; // "Create new form" sits after results.
+  const results = useTaskSearch(scopedTasks, query, recentSlugs);
+  const createIndex = results.length; // "Create Task" sits after results.
   const total = results.length + 1;
 
   useEffect(() => {
@@ -47,11 +47,11 @@ export default function TasksPanel() {
   // create or run anything (ticket 113).
   const choose = (index: number) => {
     if (index === createIndex) {
-      openNewForm();
+      openNewTask();
       return;
     }
-    const form = results[index];
-    if (form) setEditingSlug((cur) => (cur === form.meta.slug ? null : form.meta.slug));
+    const task = results[index];
+    if (task) setEditingSlug((cur) => (cur === task.meta.slug ? null : task.meta.slug));
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -109,22 +109,22 @@ export default function TasksPanel() {
         )}
         {results.length > 0 && (
           <div className="flex flex-col divide-y divide-white/5 border-t border-white/5">
-            {results.map((form, i) => (
+            {results.map((task, i) => (
               <TasksPanelRow
-                key={form.meta.slug}
-                form={form}
+                key={task.meta.slug}
+                task={task}
                 active={active === i}
                 showProject={!activeProject}
-                editing={editingSlug === form.meta.slug}
+                editing={editingSlug === task.meta.slug}
                 onSelect={() => choose(i)}
                 onHover={() => setActive(i)}
                 onEdit={() => {
-                  setEditingSlug((cur) => (cur === form.meta.slug ? null : form.meta.slug));
+                  setEditingSlug((cur) => (cur === task.meta.slug ? null : task.meta.slug));
                 }}
                 onCloseEditors={() => {
                   setEditingSlug(null);
                 }}
-                deleteForm={deleteForm}
+                deleteTask={deleteTask}
                 updateTaskMeta={updateTaskMeta}
               />
             ))}
@@ -136,7 +136,7 @@ export default function TasksPanel() {
 }
 
 interface TasksPanelRowProps {
-  form: TaskFolder;
+  task: TaskFolder;
   active: boolean;
   showProject: boolean;
   editing: boolean;
@@ -144,7 +144,7 @@ interface TasksPanelRowProps {
   onHover: () => void;
   onEdit: () => void;
   onCloseEditors: () => void;
-  deleteForm: (projectPath: string, slug: string) => Promise<{ ok: boolean; error?: string }>;
+  deleteTask: (projectPath: string, slug: string) => Promise<{ ok: boolean; error?: string }>;
   updateTaskMeta: (
     projectPath: string,
     slug: string,
@@ -153,7 +153,7 @@ interface TasksPanelRowProps {
 }
 
 function TasksPanelRow({
-  form,
+  task,
   active,
   showProject,
   editing,
@@ -161,34 +161,34 @@ function TasksPanelRow({
   onHover,
   onEdit,
   onCloseEditors,
-  deleteForm,
+  deleteTask,
   updateTaskMeta,
 }: TasksPanelRowProps) {
   const { confirm, toast } = useUIFeedback();
-  const { workflows, runs, refreshForms } = useApp();
+  const { workflows, runs, refreshTasks } = useApp();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [stepsEditorOpen, setStepsEditorOpen] = useState(false);
   const [dismissedAdopt, setDismissedAdopt] = useState(false);
 
-  // "Starts workflows" (ticket 90): visible wherever the form is managed.
+  // "Starts workflows" (ticket 90): visible wherever the task is managed.
   const startsWorkflows = workflows.filter(
-    (w) => w.enabled && w.triggers.some((t) => t.type === "task-submitted" && t.taskSlug === form.meta.slug),
+    (w) => w.enabled && w.triggers.some((t) => t.type === "task-submitted" && t.taskSlug === task.meta.slug),
   );
 
   // Check if task has a successful run (for adoption affordance)
-  const hasSuccessfulRun = runs.some((r) => r.taskSlug === form.meta.slug && r.status === "success");
-  const showAdoptAffordance = form.meta.lifecycle === "draft" && hasSuccessfulRun && !dismissedAdopt;
+  const hasSuccessfulRun = runs.some((r) => r.taskSlug === task.meta.slug && r.status === "success");
+  const showAdoptAffordance = task.meta.lifecycle === "draft" && hasSuccessfulRun && !dismissedAdopt;
 
   const adopt = async () => {
     setBusy(true);
     setError(null);
-    const res = await api.adoptTask(form.projectPath, form.meta.slug);
+    const res = await api.adoptTask(task.projectPath, task.meta.slug);
     setBusy(false);
     if (res.ok) {
       toast("Task adopted");
-      await refreshForms();
+      await refreshTasks();
     } else {
       setError(res.error ?? "Adoption failed");
     }
@@ -196,21 +196,21 @@ function TasksPanelRow({
 
   const remove = async () => {
     // Check for workflow references
-    const refs = await api.getWorkflowsReferencingTask(form.projectPath, form.meta.slug);
-    let message = "Files on disk are removed and history cards in the thread lose their form.";
+    const refs = await api.getWorkflowsReferencingTask(task.projectPath, task.meta.slug);
+    let message = "Files on disk are removed and history cards in the thread lose their task.";
     if (refs.workflows.length > 0) {
       const workflowNames = refs.workflows.map((w) => w.workflowName).join(", ");
       message += ` WARNING: This task is pinned by ${refs.workflows.length} workflow${refs.workflows.length === 1 ? "" : "s"}: ${workflowNames}`;
     }
 
     const res = await confirm({
-      title: `Delete task "${form.meta.name}"?`,
+      title: `Delete task "${task.meta.name}"?`,
       message,
       confirmLabel: "Delete",
     });
     if (!res.ok) return;
     setBusy(true);
-    const result = await deleteForm(form.projectPath, form.meta.slug);
+    const result = await deleteTask(task.projectPath, task.meta.slug);
     setBusy(false);
     if (result.ok) toast("Task deleted");
     else toast(result.error ?? "Delete failed", "error");
@@ -221,27 +221,27 @@ function TasksPanelRow({
       <div className="flex w-full items-center gap-4 px-3 py-2.5">
         <button onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-4 text-left">
           <div className="flex w-[220px] shrink-0 items-center gap-2">
-            <span className="truncate text-[14px] text-white">{form.meta.name}</span>
-            <span className="text-[11px] text-white/40">v{form.meta.version}</span>
-            {form.meta.lifecycle === "draft" ? (
+            <span className="truncate text-[14px] text-white">{task.meta.name}</span>
+            <span className="text-[11px] text-white/40">v{task.meta.version}</span>
+            {task.meta.lifecycle === "draft" ? (
               <span className="rounded-full bg-yellow-500/20 px-1.5 py-0.5 text-[9px] font-medium text-yellow-400">
                 draft
               </span>
             ) : (
               <Lock size={10} className="text-white/30" />
             )}
-            {form.task.engine === "native" && (
+            {task.task.engine === "native" && (
               <span className="rounded-full bg-purple-500/20 px-1.5 py-0.5 text-[9px] font-medium text-purple-400">
                 native
               </span>
             )}
           </div>
-          <span className="min-w-0 flex-1 truncate text-[12px] text-white/40">{form.meta.description || "—"}</span>
-          {form.meta.tags.length > 0 && (
-            <span className="w-[160px] shrink-0 truncate text-[11px] text-white/30">{form.meta.tags.join(" · ")}</span>
+          <span className="min-w-0 flex-1 truncate text-[12px] text-white/40">{task.meta.description || "—"}</span>
+          {task.meta.tags.length > 0 && (
+            <span className="w-[160px] shrink-0 truncate text-[11px] text-white/30">{task.meta.tags.join(" · ")}</span>
           )}
           {showProject && (
-            <span className="w-[100px] shrink-0 truncate text-[12px] text-clide-muted">{form.meta.project}</span>
+            <span className="w-[100px] shrink-0 truncate text-[12px] text-clide-muted">{task.meta.project}</span>
           )}
         </button>
         <div className="flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100">
@@ -255,7 +255,7 @@ function TasksPanelRow({
           </button>
           <button
             type="button"
-            onClick={() => void api.openFolder(`${form.projectPath}/forms/${form.meta.slug}`)}
+            onClick={() => void api.openFolder(`${task.projectPath}/tasks/${task.meta.slug}`)}
             title="Reveal folder in Finder"
             className="flex h-6 w-6 items-center justify-center rounded text-white/40 hover:bg-white/10 hover:text-white"
           >
@@ -304,12 +304,12 @@ function TasksPanelRow({
 
       {editing && (
         <TaskMetaEditor
-          form={form}
+          task={task}
           busy={busy}
           onSave={async (patch) => {
             setBusy(true);
             setError(null);
-            const res = await updateTaskMeta(form.projectPath, form.meta.slug, patch);
+            const res = await updateTaskMeta(task.projectPath, task.meta.slug, patch);
             setBusy(false);
             if (res.ok) {
               onCloseEditors();
@@ -318,10 +318,10 @@ function TasksPanelRow({
             }
           }}
           onCancel={onCloseEditors}
-          // Task-level actions live in the edit form, not a row menu (ticket 112).
+          // Task-level actions live in the edit surface, not a row menu (ticket 112).
           actions={
             <>
-              {form.meta.lifecycle === "draft" && hasSuccessfulRun && (
+              {task.meta.lifecycle === "draft" && hasSuccessfulRun && (
                 <button
                   onClick={() => void adopt()}
                   disabled={busy}
@@ -331,7 +331,7 @@ function TasksPanelRow({
                   Adopt task
                 </button>
               )}
-              {form.task.engine === "native" && form.task.nativeTool === "browser-automation" && (
+              {task.task.engine === "native" && task.task.nativeTool === "browser-automation" && (
                 <button
                   onClick={() => setStepsEditorOpen(true)}
                   className="flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-[11px] text-white/70 hover:bg-white/10 hover:text-white"
@@ -354,23 +354,23 @@ function TasksPanelRow({
 
       {versionHistoryOpen && (
         <TaskVersionHistoryModal
-          projectPath={form.projectPath}
-          slug={form.meta.slug}
-          currentVersion={form.meta.version}
+          projectPath={task.projectPath}
+          slug={task.meta.slug}
+          currentVersion={task.meta.version}
           onClose={() => setVersionHistoryOpen(false)}
           onRollback={async () => {
-            await refreshForms();
+            await refreshTasks();
           }}
         />
       )}
 
       {stepsEditorOpen && (
         <BrowserStepsEditorModal
-          folder={form}
+          folder={task}
           onClose={() => setStepsEditorOpen(false)}
           onSave={() => {
             setStepsEditorOpen(false);
-            void refreshForms();
+            void refreshTasks();
           }}
         />
       )}
@@ -379,18 +379,18 @@ function TasksPanelRow({
 }
 
 interface TaskMetaEditorProps {
-  form: TaskFolder;
+  task: TaskFolder;
   busy: boolean;
   onSave: (patch: { name?: string; description?: string; tags?: string[] }) => Promise<void>;
   onCancel: () => void;
-  /** Task-level actions (adopt, version history, edit steps) rendered as part of the form (ticket 112). */
+  /** Task-level actions (adopt, version history, edit steps) rendered as part of the editor (ticket 112). */
   actions?: React.ReactNode;
 }
 
-function TaskMetaEditor({ form, busy, onSave, onCancel, actions }: TaskMetaEditorProps) {
-  const [name, setName] = useState(form.meta.name);
-  const [description, setDescription] = useState(form.meta.description);
-  const [tags, setTags] = useState(form.meta.tags.join(", "));
+function TaskMetaEditor({ task, busy, onSave, onCancel, actions }: TaskMetaEditorProps) {
+  const [name, setName] = useState(task.meta.name);
+  const [description, setDescription] = useState(task.meta.description);
+  const [tags, setTags] = useState(task.meta.tags.join(", "));
   const [error, setError] = useState<string | null>(null);
 
   const inputBase =
@@ -415,7 +415,7 @@ function TaskMetaEditor({ form, busy, onSave, onCancel, actions }: TaskMetaEdito
     <div
       className="mx-3 mb-2 flex max-w-[560px] flex-col gap-2 rounded-md border border-white/5 bg-clide-surface px-2.5 py-2"
       onKeyDown={(e) => {
-        // Keep panel-level palette navigation out of the edit form.
+        // Keep panel-level palette navigation out of this editor.
         e.stopPropagation();
         if (e.key === "Escape") onCancel();
       }}

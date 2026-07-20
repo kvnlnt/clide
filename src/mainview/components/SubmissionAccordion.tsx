@@ -9,7 +9,7 @@ import SubmissionAccordionRow from "./SubmissionAccordionRow";
 
 interface SubmissionAccordionProps {
   runs: RunRecord[];
-  form: TaskDefinition;
+  taskDef: TaskDefinition;
   outputType?: OutputType;
   chunks: Record<string, OutputChunk[]>;
   activeTab: "results" | "submitted";
@@ -17,7 +17,7 @@ interface SubmissionAccordionProps {
 
 export default function SubmissionAccordion({
   runs,
-  form,
+  taskDef,
   outputType,
   chunks,
   activeTab,
@@ -42,7 +42,7 @@ export default function SubmissionAccordion({
         <SubmissionAccordionRow
           key={run.id}
           run={run}
-          form={form}
+          taskDef={taskDef}
           outputType={outputType}
           chunks={chunks[run.id] ?? []}
           open={openIds.has(run.id)}

@@ -15,7 +15,7 @@ interface Props {
 }
 
 /**
- * Header step indicator for the form-creation wizard (ticket 63): every step
+ * Header step indicator for the task-creation wizard (ticket 63): every step
  * visible with its name, one click jumps to any reachable step. States:
  * complete (visited-and-behind), current, upcoming-reachable, unreachable.
  */

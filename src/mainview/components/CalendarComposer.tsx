@@ -39,16 +39,16 @@ interface CalendarComposerProps {
 }
 
 /**
- * Schedule a form directly from a calendar day (tickets 69/74): pick a form,
+ * Schedule a task directly from a calendar day (tickets 69/74): pick a task,
  * fill its real fields (magic fields auto-fill, same path as the card), set
  * time/repeat, done — the date is prefilled from the clicked cell. Renders
- * as a modal over the body pane so long forms scroll inside it instead of
+ * as a modal over the body pane so long tasks scroll inside it instead of
  * running off the bottom of the page.
  */
 export default function CalendarComposer({ date, onClose }: CalendarComposerProps) {
-  const { forms, activeProject, recentSlugs, scheduleRun, openNewForm } = useApp();
+  const { tasks, activeProject, recentSlugs, scheduleRun, openNewTask } = useApp();
   const { toast } = useUIFeedback();
-  const scopedForms = activeProject ? forms.filter((f) => f.meta.project === activeProject) : forms;
+  const scopedTasks = activeProject ? tasks.filter((f) => f.meta.project === activeProject) : tasks;
 
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<TaskFolder | null>(null);
@@ -62,10 +62,10 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
   const [repeat, setRepeat] = useState<RepeatInterval>("none");
   const [saving, setSaving] = useState(false);
 
-  const results = useTaskSearch(scopedForms, query, recentSlugs);
+  const results = useTaskSearch(scopedTasks, query, recentSlugs);
 
   const pick = (folder: TaskFolder) => {
-    // Switching forms resets everything — stale values must not leak (ticket 69).
+    // Switching tasks resets everything — stale values must not leak (ticket 69).
     setPicked(folder);
     setValues({});
     setFillFailed(false);
@@ -146,13 +146,13 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
       </div>
 
       <div className="clide-scroll flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
-        {scopedForms.length === 0 ? (
+        {scopedTasks.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center">
             <span className="text-[13px] text-white/50">This project has no tasks yet.</span>
             <button
               onClick={() => {
                 onClose();
-                openNewForm();
+                openNewTask();
               }}
               className="rounded-md bg-white/10 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-white/20"
             >
@@ -203,11 +203,11 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
               )}
             </div>
 
-            {/* The picked form's real fields — same rendering as the card. */}
+            {/* The picked task's real fields — same rendering as the card. */}
             {picked && (
               <div className="rounded-md border border-clide-border bg-clide-surface">
                 <TaskCardBody
-                  form={picked.task}
+                  taskDef={picked.task}
                   values={values}
                   onChange={setValue}
                   filling={filling}

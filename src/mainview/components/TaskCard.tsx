@@ -20,7 +20,7 @@ import OutputBlock from "./output/OutputBlock";
 export interface TaskCardProps {
   /** All runs for this group, newest first. Single-run groups have length 1. */
   runs: RunRecord[];
-  form: TaskDefinition;
+  taskDef: TaskDefinition;
   meta: TaskMeta;
   outputType?: OutputType;
   /** Keyed by run id — full chunks map passed down so accordion rows can slice. */
@@ -43,7 +43,7 @@ function isFilled(value: unknown): boolean {
   return value !== undefined && value !== null;
 }
 
-function summarize(form: TaskDefinition, inputs: Record<string, unknown>, run: RunRecord): string {
+function summarize(taskDef: TaskDefinition, inputs: Record<string, unknown>, run: RunRecord): string {
   // Ticket 98: use AI summary when present
   if (run.summary) return run.summary;
 
@@ -58,7 +58,7 @@ function summarize(form: TaskDefinition, inputs: Record<string, unknown>, run: R
   }
 
   // Success: first filled field with label
-  const first = form.fields.find((f) => isFilled(inputs[f.id]));
+  const first = taskDef.fields.find((f) => isFilled(inputs[f.id]));
   if (first) {
     const v = inputs[first.id];
     const displayValue = Array.isArray(v) ? v.join(", ") : String(v);
@@ -68,11 +68,11 @@ function summarize(form: TaskDefinition, inputs: Record<string, unknown>, run: R
 }
 
 /** Summary for grouped runs (ticket 98 §2): latest run's summary with terse rollup for mixed outcomes. */
-function summarizeGroup(runs: RunRecord[], form: TaskDefinition): string {
+function summarizeGroup(runs: RunRecord[], taskDef: TaskDefinition): string {
   if (runs.length === 0) return "";
 
   const latest = runs[0];
-  const latestSummary = summarize(form, latest.inputs, latest);
+  const latestSummary = summarize(taskDef, latest.inputs, latest);
 
   // Single run — just use its summary
   if (runs.length === 1) return latestSummary;
@@ -91,7 +91,7 @@ function summarizeGroup(runs: RunRecord[], form: TaskDefinition): string {
 
 export default function TaskCard({
   runs,
-  form,
+  taskDef,
   meta,
   outputType,
   chunks = {},
@@ -130,7 +130,7 @@ export default function TaskCard({
     if (!autoFill || fillRequestedRef.current) return;
     fillRequestedRef.current = true;
     const magicFields: Record<string, string> = {};
-    for (const f of form.fields) {
+    for (const f of taskDef.fields) {
       if (f.magic?.prompt) magicFields[f.id] = f.magic.prompt;
     }
     const ids = Object.keys(magicFields);
@@ -151,11 +151,11 @@ export default function TaskCard({
         setFillFailed(true);
       }
     });
-  }, [autoFill, form.fields, meta.slug]);
+  }, [autoFill, taskDef.fields, meta.slug]);
 
   const canSubmit = useMemo(
-    () => form.fields.every((f) => !f.required || isFilled(values[f.id])),
-    [form.fields, values],
+    () => taskDef.fields.every((f) => !f.required || isFilled(values[f.id])),
+    [taskDef.fields, values],
   );
 
   const setValue = (id: string, value: unknown) => {
@@ -174,7 +174,7 @@ export default function TaskCard({
 
   const submitPayload = () => ({
     ...values,
-    ...(form.aiPromptField && aiPrompt ? { __aiPrompt: aiPrompt } : {}),
+    ...(taskDef.aiPromptField && aiPrompt ? { __aiPrompt: aiPrompt } : {}),
   });
 
   return (
@@ -185,10 +185,10 @@ export default function TaskCard({
     >
       <TaskCardHeader
         meta={meta}
-        form={form}
+        taskDef={taskDef}
         run={run}
         statusCounts={statusCounts}
-        summary={summarizeGroup(runs, form)}
+        summary={summarizeGroup(runs, taskDef)}
         expanded={shouldExpand}
         onToggle={toggleable ? () => setExpanded((e) => !e) : undefined}
         aiPrompt={aiPrompt}
@@ -216,7 +216,7 @@ export default function TaskCard({
             // Grouped: show accordion — each run is independently expandable.
             <SubmissionAccordion
               runs={runs}
-              form={form}
+              taskDef={taskDef}
               outputType={outputType}
               chunks={chunks}
               activeTab={activeTab}
@@ -236,13 +236,13 @@ export default function TaskCard({
                   <div className="px-5 py-3 text-[13px] text-white/40">No results.</div>
                 )
               ) : (
-                <SubmittedSummary form={form} run={run} />
+                <SubmittedSummary taskDef={taskDef} run={run} />
               )}
             </>
           ) : (
-            // Single idle run: editable form body.
+            // Single idle run: editable task body.
             <TaskCardBody
-              form={form}
+              taskDef={taskDef}
               values={values}
               onChange={setValue}
               disabled={!editable}

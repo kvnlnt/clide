@@ -163,7 +163,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 111 | Interview-First Onboarding            | First-run opens with an interview; detects AI/project state and tailors flow + starter checklist  | ✅ Done⁶      |
 | 112 | Task List Kebab → Edit Form           | Remove the misaligned row kebab; Adopt/Version History/Edit Steps move into the edit surface      | ✅ Done       |
 | 113 | Task List Row Click Behavior          | Clicking a row manages the task instead of dropping a draft run card into the thread              | ✅ Done       |
-| 114 | Finish Forms→Tasks Rename & Seeder    | Rename leftover `form` identifiers (AppContext etc.); fixes `dev:*` NOT NULL form_slug crash      | ⬜ Open       |
+| 114 | Finish Forms→Tasks Rename & Seeder    | Rename leftover `form` identifiers (AppContext etc.); fixes `dev:*` NOT NULL form_slug crash      | ✅ Done⁷      |
 | 115 | Auto-Delete Empty Views               | Filterless views are cleaned up automatically (grace period while active; named views kept)       | ⬜ Open       |
 | 116 | AI View Naming + Manual Override      | AI names/renames views; double-click tab or inline rename; explicit names stop auto-naming        | ⬜ Open       |
 | 117 | Calendar Schedules Workflows          | Day-click composer picks tasks or workflows; scheduled workflow runs on the grid + scheduler      | ⬜ Open       |
@@ -209,3 +209,15 @@ in the AI wizard unless a service already exists. Starter relevance is
 copy-level (the checklist echoes the user's stated goal); AI-ranked
 starter selection would be a follow-up once a service exists at that
 point in the flow.
+⁷ Ticket 114: the seeder crash root cause (`formSlug` param vs. the
+renamed `taskSlug` CreateRunInput field) is fixed and all five
+`bun run dev:*` profiles verified seeding cleanly. The rename sweep
+covers `AppContext.tsx`'s state/API surface, the `TaskCard`/`TaskCardBody`/
+`SubmittedSummary`/`SubmissionAccordion*`/`GridCard`/`RunPicker` render
+family, the workflow engine/draft/trigger modules, and comments/prompt
+copy throughout `src/bun` and `src/mainview`. Left untouched by design:
+the on-disk `forms/` directory, `form.json`, `meta.json`, the
+`form_slug`/`form_version` DB columns, and the `type: "form"` workflow
+step discriminant (reused by `workflowDraft.ts` for the AI response
+parser) — all firewalled per the ticket-96 disk-format boundary and
+already documented as such in `history.ts`/`store.ts`/`loader.ts`.

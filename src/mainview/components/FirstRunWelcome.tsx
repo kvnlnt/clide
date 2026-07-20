@@ -22,7 +22,7 @@ import { useUIFeedback } from "./UIFeedback";
  * (Settings → Profile) starts ahead.
  */
 export default function FirstRunWelcome() {
-  const { openAIWizard, completeOnboarding, activeProject, refreshForms, recentProjects } = useApp();
+  const { openAIWizard, completeOnboarding, activeProject, refreshTasks, recentProjects } = useApp();
   const { toast } = useUIFeedback();
 
   type Step = "detect" | "interview" | "project" | "starters";
@@ -128,7 +128,7 @@ export default function FirstRunWelcome() {
       toast(res.error ?? "Couldn't add the starter tasks", "error");
       return;
     }
-    await refreshForms();
+    await refreshTasks();
     toast(`${checked.size} starter ${checked.size === 1 ? "task" : "tasks"} added`);
     finish();
   };

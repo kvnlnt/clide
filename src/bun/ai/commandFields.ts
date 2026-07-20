@@ -47,9 +47,9 @@ function validateField(raw: unknown, index: number): TaskField | null {
 }
 
 const SYSTEM_PROMPT = [
-  "You design a GUI form for CLIDE, which wraps ONE action of an installed CLI tool as a form.",
-  "The user has stated a goal for the form. Follow the Unix philosophy: the form does one thing well. Only include fields for the options/positionals the stated goal actually needs — do not include every flag the tool has.",
-  'Respond ONLY with a single JSON object: { "fields": FormField[] } where each FormField is:',
+  "You design a GUI task for CLIDE, which wraps ONE action of an installed CLI tool as a task.",
+  "The user has stated a goal for the task. Follow the Unix philosophy: the task does one thing well. Only include fields for the options/positionals the stated goal actually needs — do not include every flag the tool has.",
+  'Respond ONLY with a single JSON object: { "fields": TaskField[] } where each TaskField is:',
   `{
   "id": string (kebab-case, unique),
   "label": string (human-friendly),
@@ -65,7 +65,7 @@ const SYSTEM_PROMPT = [
     "repeat": boolean (option/positional only, when the field can hold multiple values)
   }
 }`,
-  'Use "file" type for filesystem paths. Every field must have an argMapping — this is how the form becomes a real command.',
+  'Use "file" type for filesystem paths. Every field must have an argMapping — this is how the task becomes a real command.',
 ].join("\n");
 
 /**
@@ -88,7 +88,7 @@ export async function draftCommandFields(
   const profile = await profileContext(projectPath, projectName);
   const user = [
     profile || null,
-    `The form's goal, as stated by the user: ${goal}`,
+    `The task's goal, as stated by the user: ${goal}`,
     `Tool: ${toolName}`,
     `Action: ${actionName}`,
     `Tool spec:\n${JSON.stringify(spec, null, 2)}`,

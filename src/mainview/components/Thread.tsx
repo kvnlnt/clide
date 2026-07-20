@@ -10,7 +10,7 @@ import { useUIFeedback } from "./UIFeedback";
 export default function Thread() {
   const {
     drafts,
-    formsBySlug,
+    tasksBySlug,
     chunks,
     submitRun,
     scheduleRun,
@@ -39,14 +39,14 @@ export default function Thread() {
   };
 
   const renderGroup = (group: RunGroup) => {
-    const folder = formsBySlug.get(group.taskSlug);
+    const folder = tasksBySlug.get(group.taskSlug);
     if (!folder) return null;
     const latestRun = group.runs[0];
     return (
       <TaskCard
         key={group.key}
         runs={group.runs}
-        form={folder.task}
+        taskDef={folder.task}
         meta={folder.meta}
         outputType={folder.task.outputType}
         chunks={chunks}
@@ -70,7 +70,7 @@ export default function Thread() {
         ) : (
           <>
             {drafts.map((draft) => {
-              const folder = formsBySlug.get(draft.taskSlug);
+              const folder = tasksBySlug.get(draft.taskSlug);
               if (!folder) return null;
               const slug = draft.taskSlug;
               const synthetic: RunRecord = {
@@ -92,7 +92,7 @@ export default function Thread() {
                 <TaskCard
                   key={draft.id}
                   runs={[synthetic]}
-                  form={folder.task}
+                  taskDef={folder.task}
                   meta={folder.meta}
                   defaultExpanded
                   autoFill

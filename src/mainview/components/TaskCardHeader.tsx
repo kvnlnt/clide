@@ -9,9 +9,9 @@ const TABS = [
   { id: "submitted", label: "Submitted", icon: Braces },
 ] as const;
 
-interface FormCardHeaderProps {
+interface TaskCardHeaderProps {
   meta: TaskMeta;
-  form: TaskDefinition;
+  taskDef: TaskDefinition;
   run: RunRecord;
   /** Count of runs in the group by status — renders one badge per nonzero status. */
   statusCounts: Partial<Record<RunStatus, number>>;
@@ -40,9 +40,9 @@ function formatTime(iso: string | null): string {
   });
 }
 
-export default function FormCardHeader({
+export default function TaskCardHeader({
   meta,
-  form,
+  taskDef,
   run,
   statusCounts,
   summary,
@@ -59,7 +59,7 @@ export default function FormCardHeader({
   showTabs,
   activeTab,
   onTabChange,
-}: FormCardHeaderProps) {
+}: TaskCardHeaderProps) {
   const { activeViewId } = useApp();
   // Pinning only has meaning inside saved views (ticket 27) — hide the
   // affordance entirely on the chronological title tab.
@@ -95,7 +95,7 @@ export default function FormCardHeader({
 
       {!expanded && <span className="min-w-0 flex-1 truncate text-[12px] text-clide-muted">{summary}</span>}
 
-      {expanded && form.aiPromptField && (
+      {expanded && taskDef.aiPromptField && (
         <input
           className="flex-1 bg-transparent text-[12px] italic text-white outline-none placeholder:text-white/30"
           placeholder="✦ Describe your post..."

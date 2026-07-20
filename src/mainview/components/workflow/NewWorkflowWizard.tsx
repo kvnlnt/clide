@@ -26,11 +26,11 @@ function emptyWorkflow(name: string, description: string): Workflow {
 
 /**
  * Workflow creation wizard (ticket 92): describe the goal → the AI drafts
- * steps and wiring against the project's EXISTING forms → fine-tune in the
+ * steps and wiring against the project's EXISTING tasks → fine-tune in the
  * editor. AI accelerates, never gates — "Start empty" always works.
  */
 export default function NewWorkflowWizard({ onClose }: { onClose: () => void }) {
-  const { activeProject, forms } = useApp();
+  const { activeProject, tasks } = useApp();
   const [goal, setGoal] = useState("");
   const [name, setName] = useState("");
   const [serviceModel, setServiceModel] = useState<ServiceModelValue>({ serviceId: "", model: "" });
@@ -38,7 +38,7 @@ export default function NewWorkflowWizard({ onClose }: { onClose: () => void }) 
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ workflow: Workflow; notes: string[] } | null>(null);
 
-  const projectForms = forms.filter((f) => f.meta.project === activeProject);
+  const projectTasks = tasks.filter((t) => t.meta.project === activeProject);
 
   useEscapeToClose(onClose, draft === null);
 
@@ -62,7 +62,7 @@ export default function NewWorkflowWizard({ onClose }: { onClose: () => void }) 
     setDraft({
       workflow: res.workflow,
       notes: [
-        `AI drafted ${stepCount} step${stepCount === 1 ? "" : "s"} from your forms — review the wiring before saving.`,
+        `AI drafted ${stepCount} step${stepCount === 1 ? "" : "s"} from your tasks — review the wiring before saving.`,
         ...(res.notes ?? []),
       ],
     });
@@ -89,17 +89,17 @@ export default function NewWorkflowWizard({ onClose }: { onClose: () => void }) 
 
       <div className="clide-scroll min-h-0 flex-1 overflow-y-auto px-8 pb-4">
         <div className="mx-auto flex w-full max-w-[640px] flex-col gap-4">
-          {projectForms.length === 0 && (
+          {projectTasks.length === 0 && (
             <div className="rounded border border-amber-500/40 bg-amber-500/5 p-3 text-[13px] text-amber-200">
-              This project has no forms yet — workflows orchestrate existing forms, so create a form first.
+              This project has no tasks yet — workflows orchestrate existing tasks, so create a task first.
             </div>
           )}
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[14px] font-bold text-white/70">What should this workflow do?</label>
             <span className="text-[12px] text-white/40">
-              Describe the goal — CLIDE will assemble steps from this project's {projectForms.length} form
-              {projectForms.length === 1 ? "" : "s"} and wire their outputs to inputs.
+              Describe the goal — CLIDE will assemble steps from this project's {projectTasks.length} task
+              {projectTasks.length === 1 ? "" : "s"} and wire their outputs to inputs.
             </span>
             <textarea
               autoFocus
@@ -130,7 +130,7 @@ export default function NewWorkflowWizard({ onClose }: { onClose: () => void }) 
           {drafting && (
             <div className="flex items-center gap-2 text-[13px] text-white/60">
               <Loader size={14} className="animate-spin" />
-              Drafting a workflow from your forms…
+              Drafting a workflow from your tasks…
             </div>
           )}
           {error && (
@@ -147,7 +147,7 @@ export default function NewWorkflowWizard({ onClose }: { onClose: () => void }) 
           Start empty
         </button>
         <button
-          disabled={drafting || !goal.trim() || !serviceModel.serviceId || projectForms.length === 0}
+          disabled={drafting || !goal.trim() || !serviceModel.serviceId || projectTasks.length === 0}
           onClick={() => void runDraft()}
           className="flex items-center gap-1.5 rounded-md bg-white/10 px-4 py-1.5 text-[13px] font-medium text-white hover:bg-white/20 disabled:opacity-40"
         >

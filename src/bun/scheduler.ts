@@ -60,7 +60,7 @@ function arm(projectPath: string, run: RunRecord): void {
 function fire(projectPath: string, run: RunRecord, late: boolean): void {
   timers.delete(run.id);
   if (late) {
-    console.log(`[scheduler] Running late scheduled form: ${run.taskSlug}`);
+    console.log(`[scheduler] Running late scheduled task: ${run.taskSlug}`);
   }
   trigger?.(projectPath, run.id, run.taskSlug, run.inputs);
 

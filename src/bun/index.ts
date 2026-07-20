@@ -105,7 +105,7 @@ import {
 import {
   disposeWorkflowTriggers,
   initWorkflowTriggers,
-  onFormRunCompleted,
+  onTaskRunCompleted,
   refreshWorkflowTriggers,
 } from "./workflows/triggers";
 
@@ -116,7 +116,7 @@ const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
 // Bootstrap on-disk state. Projects are folders on disk; a genuinely empty
 // registry is now a real, reachable state — the first-project takeover
 // (ticket 78) owns that experience, so we no longer auto-seed demo projects
-// on top of it (see forms/seed.ts, kept for dev-profile fixtures, ticket 79).
+// on top of it (see tasks/seed.ts, kept for dev-profile fixtures, ticket 79).
 // ---------------------------------------------------------------------------
 await loadProjects();
 indexRuns(await projectPaths());
@@ -191,7 +191,7 @@ function startWorkflow(
 
 // Standalone task completions feed task-submitted triggers (never cascades —
 // workflow-internal steps use execTaskOnce, which bypasses this listener).
-setRunCompletionListener(onFormRunCompleted);
+setRunCompletionListener(onTaskRunCompleted);
 initWorkflowTriggers((project, workflow, trigger, env) => {
   startWorkflow(project, workflow, trigger, env);
 });
@@ -1604,7 +1604,7 @@ ApplicationMenu.setApplicationMenu([
   {
     label: "View",
     submenu: [
-      { label: "Tasks", action: "view:forms", accelerator: "CommandOrControl+P" },
+      { label: "Tasks", action: "view:tasks", accelerator: "CommandOrControl+P" },
       { label: "Calendar", action: "view:calendar", accelerator: "CommandOrControl+Shift+C" },
       { label: "Views", action: "view:views", accelerator: "CommandOrControl+Shift+V" },
       { label: "Workflows", action: "view:workflows", accelerator: "CommandOrControl+Shift+U" },
