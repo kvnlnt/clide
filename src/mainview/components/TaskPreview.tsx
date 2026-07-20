@@ -2,7 +2,7 @@ import { AlertTriangle } from "lucide-react";
 import TaskField from "./TaskField";
 import type { TaskField as FieldDef } from "../types/tasks";
 
-interface FormPreviewProps {
+interface TaskPreviewProps {
   fields: FieldDef[];
   /** Wizard-local scratch values — typed here to see them materialize in the command preview; never persisted. */
   sampleValues: Record<string, unknown>;
@@ -19,7 +19,7 @@ interface FormPreviewProps {
  * values feed the featured command preview. Two views of one list: the
  * open editor card is ringed here, and clicking a field jumps to its card.
  */
-export default function FormPreview({ fields, sampleValues, onSampleChange, openId, onOpen }: FormPreviewProps) {
+export default function TaskPreview({ fields, sampleValues, onSampleChange, openId, onOpen }: TaskPreviewProps) {
   return (
     <div className="flex flex-col gap-2">
       <span className="text-[11px] font-bold uppercase tracking-wider text-white/30">How it will look</span>

@@ -66,9 +66,18 @@ interface StatusIconProps {
 
 export default function StatusIcon({ status, size = 18, mode = "default" }: StatusIconProps) {
   const meta = STATUS_META[status];
+  // clide-status-pulse (ticket 122): keyed by status so a CHANGE (e.g.
+  // running → success) remounts the icon and replays the pulse; re-renders
+  // at the same status don't retrigger it.
   if (mode === "dot") {
-    return <Circle size={8} fill="currentColor" className={meta.textClass} />;
+    return <Circle key={status} size={8} fill="currentColor" className={`clide-status-pulse ${meta.textClass}`} />;
   }
   const Icon = meta.icon;
-  return <Icon size={size} className={`${meta.textClass} ${meta.spin ? "animate-spin" : ""}`} />;
+  return (
+    <Icon
+      key={status}
+      size={size}
+      className={`clide-status-pulse ${meta.textClass} ${meta.spin ? "animate-spin" : ""}`}
+    />
+  );
 }

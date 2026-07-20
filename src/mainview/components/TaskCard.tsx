@@ -178,8 +178,11 @@ export default function TaskCard({
   });
 
   return (
+    // clide-card-enter (ticket 122): plays once on mount only — a new card
+    // entering the thread, not a re-render — React keeps the same DOM node
+    // alive across re-renders unless its key changes.
     <div
-      className={`overflow-hidden rounded-lg border bg-clide-surface ${
+      className={`clide-card-enter overflow-hidden rounded-lg border bg-clide-surface ${
         running ? "animate-pulse border-white/20" : "border-clide-border"
       }`}
     >

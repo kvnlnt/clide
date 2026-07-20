@@ -2,7 +2,7 @@ import type { TaskMeta, RunRecord } from "../types/tasks";
 import EllipsisMenu from "./EllipsisMenu";
 import StatusIcon from "./statusIcon";
 
-interface FormCardCollapsedProps {
+interface TaskCardCollapsedProps {
   meta: TaskMeta;
   run: RunRecord;
   summary: string;
@@ -19,7 +19,7 @@ function formatTime(iso: string | null): string {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-export default function FormCardCollapsed({
+export default function TaskCardCollapsed({
   meta,
   run,
   summary,
@@ -28,7 +28,7 @@ export default function FormCardCollapsed({
   onSchedule,
   onRerun,
   onDelete,
-}: FormCardCollapsedProps) {
+}: TaskCardCollapsedProps) {
   const time =
     run.status === "scheduled" && run.scheduledAt
       ? new Date(run.scheduledAt).toLocaleString([], {

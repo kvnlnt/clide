@@ -44,6 +44,35 @@ Each task belongs to exactly one **project**, recorded as a `project` field in `
 - Icons: Lucide icon set
 - Command input placeholder: `✦ At your command...` (italic, 30% white)
 
+### Motion (ticket 122)
+
+- **One signature easing**: `cubic-bezier(0.16, 1, 0.3, 1)` — a fast-out,
+  gentle-settle curve already used by the ticket-29 welcome entrance and
+  the ticket-121 surface transitions. Every new animation reuses it
+  (`--clide-ease` in `index.css`) rather than inventing a new curve —
+  consistency of *feel* is the whole point of a "signature."
+- **Duration bands**, fastest to slowest, matched to how much the eye
+  needs to track: micro-interactions (hover/press) 100–150ms; content
+  entering/leaving (cards, surface switches) 180–220ms; ambient/looping
+  effects (glows, pulses) 1.4–4.5s, always slow enough to read as
+  "alive," never "loading."
+- **The ✦ mark is the delight motif** — it already appears in the command
+  input placeholder; ticket 122 extends it as the visual signature for
+  "something just happened" moments (e.g. a run finishing) rather than
+  introducing an unrelated new symbol.
+- **Status changes get a moment, not a snap** — a run's status badge
+  transitions with a brief pulse instead of an instant color swap, cross-
+  referencing `STATUS_META`'s existing color language so the animation
+  reinforces the palette instead of competing with it.
+- **New content entering the thread earns more motion than everyday
+  navigation** — a freshly submitted run card entering the thread is a
+  bigger moment than switching tabs, so it gets a marginally more
+  pronounced entrance than the ticket-121 surface fade, not a different
+  vocabulary.
+- Every rule above is subordinate to `prefers-reduced-motion` and to
+  input responsiveness — motion is `opacity`/`transform` only, never
+  something a slow network/AI call can block on.
+
 ## Ticket index
 
 Completed implementation tickets are archived in [`tickets/done/`](done/). Open tickets live at the top level of [`tickets/`](.). On-hold tickets sit in [`tickets/hold/`](hold/); raw idea notes in [`tickets/ideas/`](ideas/).
@@ -171,7 +200,7 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 119 | Compact Density Pass                  | Tighten margins/padding across surfaces; compact presentation where a tight default isn't enough  | ✅ Done⁹      |
 | 120 | Full-Width Screens                    | App/project pages drop centered max-width columns and use the full window width                   | ✅ Done¹⁰     |
 | 121 | Loading States & Smooth Transitions   | No FOUC: branded launch loader, animated surface/tab transitions, skeletons for async content     | ✅ Done¹¹     |
-| 122 | Signature Motion & UX Flair           | Motion identity: signature easing, elevated run/status/delight moments, motion-design note        | ⬜ Open       |
+| 122 | Signature Motion & UX Flair           | Motion identity: signature easing, elevated run/status/delight moments, motion-design note        | ✅ Done¹²     |
 | 123 | Speech Mode                           | Wave icon toggles voice mode: speak commands through the command surface, app speaks results      | ⬜ Open       |
 | 124 | Diagnostics Screen                    | App/machine/workload health: memory, CPU, disk, running work, scheduler/watcher status, copy      | ⬜ Open       |
 | 125 | Transparency Reveal                   | All collected user data in one folder with a generated manifest and a Reveal-in-Finder button     | ⬜ Open       |
@@ -248,3 +277,12 @@ server) and verified the boot shell + first-run onboarding render
 correctly live with no console errors; Tasks/Views/Calendar need a real
 project (native bridge) so those surfaces' transitions weren't
 click-tested, only `tsc`-checked and code-read.
+¹² Ticket 122: motion note added to the Visual language section above;
+`--clide-ease` consolidates every animation's easing. Card-enter
+(`TaskCard.tsx`), status-pulse (`StatusIcon`, keyed by status so only
+real changes retrigger it), and a `.clide-press` send-button delight
+moment all ship. Also fixed three more ticket-96/114 rename stragglers
+found along the way (`FormCardFooter`/`FormCardMenu`/`FormPreview`).
+App verified booting error-free via the Vite preview; the animations
+themselves need a real run in the thread (native bridge) to see, so
+not eyes-on verified.
