@@ -1,3 +1,5 @@
+2026/07/20
+
 - No clear button for "new" badge. Also, badge maybe shouldn't be colored because it should jsut be the total "new" count. Also, the "new" badges on the result list should be in bold if unread, or at least should be something different than the normal badge once it's been read.
 - There's no workflow examples in the Seeds. Need to add some for all the profiles.
 - The Calendar view needs to see a list of all tasks/workflows that are recurring, else it's difficult to know what is going on. Also, the calendar should be able to pick/schedule a task or workflow.
@@ -6,7 +8,16 @@
 - The package managers are correctly detected. But there's no way to disable them or pick the preferred one. It would be nice to have a way to disable the ones you don't want to use, or pick the preferred one. Also, the sorting buttons on the right of the list is weird. I'd prefer it to be drag and drop.
 - The files in the main apps settings don't show the project files. I'd like to see all files from this view. However I'd also like to keep the project files separate from the app files, so maybe a toggle to show/hide project files would be nice. Also, I want to make the app level files available to tasks and workflows in case a user wants to I/O outside of a project.
 - I'd like compact mode to apply to the the project view tabs and toolbars as well as the toolbar tools (maybe only show their icon but provide a tooltip on hover). Also, the project view tabs should be full width and not have a max width.
+- It'd be nice to have a way to create "reports" that are a collection of tasks, workflows, and files that can be exported to a PDF or other format. This would be useful for sharing progress with team members or stakeholders.
+- In the advanced settings for registering an AI, list the available models and put them in the drop down in the app settings.
+- In the registered tools, there should be a simple "test" button that allows the user to open up a modal and test the tool with a simple input and output. This would be useful for debugging and ensuring that the tool is working correctly. It should guide the user, offering a raw terminal for a REPL experience, but also some clear documentation reference they can see while testing.
+- There needs to be some settings around the speech-recognition feature. Put something in settings again to help configure andz test this feature.
+- I'd like the speech mode, when enabled still require a short key to be pressed to activate it. This would prevent accidental activation and allow the user to control when they want to use it.
+- I'd like CLIDE to be able to talk. On opening the app, it should by default say "Hello, welcome to CLIDE. How can I help you today?" and then wait for a response. It should also be able to read back the results of commands and workflows, and provide feedback on errors or issues. If muted, there should be a dialog box that pops up and printing out what CLIDE is saying. It might be interesting to have this as a separate chromeless window, almost like a floating action button that can be moved around the screen. It would be cool if it showed an animated waveform when speaking.
+- Logo ideas: https://www.pinterest.com/pin/283093526569869402/. Example: https://www.pinterest.com/pin/338262622023456701/. Design vibe: https://www.pinterest.com/pin/1017109897075470629/. https://www.pinterest.com/pin/1110841064336218349/
+- It'd be great to group all the workflows into an "app" UI that helps the user hyperfocus on a set of tasks. Maybe it opens another window and is styled/branded?
 
+2026/07/19
 AI Profile Interviews (ProfileInterviewPage, app + project scope)
 Model picker — Let the user choose which model powers the interview.
 Error recovery & cancel — An "Error: RPC request timed out." during an interview is a dead end with no retry, no cancel, and no way out short of force-quitting. Interviews need a cancel action and error states need recovery paths.

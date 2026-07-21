@@ -204,6 +204,20 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 123 | Speech Mode                           | Wave icon toggles voice mode: speak commands through the command surface, app speaks results      | ✅ Done¹³     |
 | 124 | Diagnostics Screen                    | App/machine/workload health: memory, CPU, disk, running work, scheduler/watcher status, copy      | ✅ Done¹⁴     |
 | 125 | Transparency Reveal                   | All collected user data in one folder with a generated manifest and a Reveal-in-Finder button     | ✅ Done¹⁵     |
+| 126 | Sidebar Project Status Rows           | Two-line project rows: type-split unread badges (✓/✗), recency, explicit clear, unread bolding    | ⬜ Open       |
+| 127 | Seed Example Workflows                | Starter catalog + all five dev profiles seed real workflows (incl. recurring for calendar demo)   | ⬜ Open       |
+| 128 | Calendar Views                        | Day/Week/Month/Agenda switcher, Today + keyboard paging, +N overflow, filters, drag-reschedule    | ⬜ Open       |
+| 129 | Recurring Series Model                | Real series concept: delete one occurrence vs. delete the series (standard calendar pattern)      | ⬜ Open       |
+| 130 | File Picker New Folder                | chooseDirectory can create folders (native option or in-app fallback) — no Finder round-trip      | ⬜ Open       |
+| 131 | Package Manager Controls              | Real enable/disable toggle, preference via order, drag-and-drop reorder replaces arrow buttons    | ⬜ Open       |
+| 132 | App Files Project Toggle              | App-level Files view can include project locations (grouped); confirm/surface app-level task I/O  | ⬜ Open       |
+| 133 | Compact Tabs, Toolbars & V-Labels     | Compact mode reaches view tabs/toolbars (icon-only + tooltips); full-width tabs; vertical dates   | ⬜ Open       |
+| 134 | Reports                               | Epic: curated collections of tasks/workflows/files exported to PDF for sharing progress           | ⬜ Open       |
+| 135 | AI Service Model Dropdown             | AIServiceEditor reuses ServiceModelPicker: live model list instead of free-text override          | ⬜ Open       |
+| 136 | Tool Test Modal                       | Per-tool Test button: consent-gated REPL-style run surface with the tool's docs alongside         | ⬜ Open       |
+| 137 | Speech Settings & Push-to-Talk        | Speech section in Settings (status, voice, tests, persisted prefs); key press gates each listen   | ⬜ Open       |
+| 138 | Voice Companion Window                | Epic: floating chromeless "Jarvis" circle — animated waveform, greeting, talk-back, transcript    | ⬜ Open       |
+| 139 | Workflow Apps                         | Branded workflow bundles opening as a hyperfocused surface/window (builds on 138's plumbing)      | ⬜ Open       |
 
 ¹ Ticket 54: create flow (all 4 steps) is complete; reopening the wizard to
 edit an existing command-backed form (section 5) is not wired — "Edit" on
