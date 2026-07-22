@@ -1,9 +1,10 @@
-import { AlertTriangle, ChevronDown, ChevronRight, Terminal, Trash2, Upload, Wrench } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, PlayCircle, Terminal, Trash2, Upload, Wrench } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../rpc";
 import type { ToolRegistryEntry } from "../types/tasks";
 import ServiceModelPicker, { type ServiceModelValue } from "./ServiceModelPicker";
 import ToolDropZone, { fileToBase64 } from "./ToolDropZone";
+import ToolTestModal from "./ToolTestModal";
 import { useUIFeedback } from "./UIFeedback";
 
 const inputBase =
@@ -39,6 +40,8 @@ export default function ToolsSection() {
   const [pending, setPending] = useState<PendingRun | null>(null);
   const [pendingBusy, setPendingBusy] = useState(false);
   const [pendingError, setPendingError] = useState<string | null>(null);
+
+  const [testTool, setTestTool] = useState<ToolRegistryEntry | null>(null);
 
   const [pasteFor, setPasteFor] = useState<string | null>(null);
   const [pasteText, setPasteText] = useState("");
@@ -383,6 +386,13 @@ export default function ToolsSection() {
                     </div>
                   </button>
                   <button
+                    onClick={() => setTestTool(tool)}
+                    title="Run this tool with your own arguments"
+                    className="flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-[12px] text-white/60 hover:bg-white/5 hover:text-white"
+                  >
+                    <PlayCircle size={12} /> Test
+                  </button>
+                  <button
                     onClick={() => startReinspect(tool)}
                     className="shrink-0 rounded-md px-2.5 py-1 text-[12px] text-white/60 hover:bg-white/5 hover:text-white"
                   >
@@ -487,6 +497,8 @@ export default function ToolsSection() {
           })}
         </div>
       )}
+
+      {testTool && <ToolTestModal tool={testTool} onClose={() => setTestTool(null)} />}
     </ToolDropZone>
   );
 }

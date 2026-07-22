@@ -1,8 +1,11 @@
 import { Electroview } from "electrobun/view";
 import type {
   AIService,
+  AIServiceKind,
   ClideRPC,
   CommandSpec,
+  CompanionSpeechEvent,
+  CompanionTranscriptLine,
   InterviewTurn,
   OutputChunk,
   OutputDefinition,
@@ -15,10 +18,12 @@ import type {
   ProjectLayout,
   ProjectProfile,
   RepeatInterval,
+  Report,
   RunRecord,
   RunStatusUpdate,
   ScheduledWorkflowRun,
   StarterTask,
+  StarterWorkflow,
   TaskField,
   TaskFolder,
   TaskMetaPatch,
@@ -47,6 +52,9 @@ type EventMap = {
   menuAction: string;
   /** Live workflow-run state (full record) on every step transition. */
   workflowRun: WorkflowRun;
+  /** Companion enabled/muted changed, possibly from the companion window's own UI (ticket 138). */
+  companionEnabled: boolean;
+  companionMuted: boolean;
 };
 
 type Listener<K extends keyof EventMap> = (payload: EventMap[K]) => void;
@@ -58,6 +66,8 @@ const listeners: { [K in keyof EventMap]: Set<Listener<K>> } = {
   status: new Set(),
   menuAction: new Set(),
   workflowRun: new Set(),
+  companionEnabled: new Set(),
+  companionMuted: new Set(),
 };
 
 function emit<K extends keyof EventMap>(key: K, payload: EventMap[K]): void {
@@ -83,6 +93,8 @@ const rpcDef = Electroview.defineRPC<ClideRPC>({
       onRunStatus: (update) => emit("status", update),
       onMenuAction: ({ action }) => emit("menuAction", action),
       onWorkflowRunUpdate: ({ run }) => emit("workflowRun", run),
+      onCompanionEnabledChanged: ({ enabled }) => emit("companionEnabled", enabled),
+      onCompanionMutedChanged: ({ muted }) => emit("companionMuted", muted),
     },
   },
 });
@@ -481,6 +493,17 @@ export const api = {
     }
   },
 
+  async deleteOccurrence(runId: string, occurrenceAt: string): Promise<boolean> {
+    const r = request();
+    if (!r) return false;
+    try {
+      const { ok } = await r.deleteOccurrence({ runId, occurrenceAt });
+      return ok;
+    } catch {
+      return false;
+    }
+  },
+
   async getLayout(projectSlug: string): Promise<ProjectLayout> {
     const r = request();
     if (!r) return { cards: [] };
@@ -553,6 +576,26 @@ export const api = {
     }
   },
 
+  async listStarterWorkflows(): Promise<StarterWorkflow[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.listStarterWorkflows({});
+    } catch {
+      return [];
+    }
+  },
+
+  async installStarterWorkflows(projectName: string, ids: string[]): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.installStarterWorkflows({ projectName, ids });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
   async chooseDirectory(startingFolder?: string): Promise<string | null> {
     const r = request();
     if (!r) return null;
@@ -562,6 +605,16 @@ export const api = {
     } catch (err) {
       api.log(`Error choosing directory: ${err}`, "error");
       return null;
+    }
+  },
+
+  async createDirectory(parent: string, name: string): Promise<{ ok: boolean; path?: string; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.createDirectory({ parent, name });
+    } catch (err) {
+      return { ok: false, error: String(err) };
     }
   },
 
@@ -874,6 +927,26 @@ export const api = {
     }
   },
 
+  async runToolTest(execPath: string, args: string): Promise<{ ok: boolean; runId?: string; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.runToolTest({ execPath, args });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async cancelToolTest(runId: string): Promise<{ ok: boolean }> {
+    const r = request();
+    if (!r) return { ok: false };
+    try {
+      return await r.cancelToolTest({ runId });
+    } catch {
+      return { ok: false };
+    }
+  },
+
   async setToolInstalledVia(
     id: string,
     installedVia: { manager: string; package: string; version?: string },
@@ -906,6 +979,22 @@ export const api = {
     if (!r) return { ok: false, error: "Bridge unavailable" };
     try {
       return await r.listServiceModels({ serviceId });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async previewServiceModels(config: {
+    kind: AIServiceKind;
+    baseUrl?: string;
+    credential?: string;
+    existingServiceId?: string;
+    preferredModel?: string;
+  }): Promise<{ ok: boolean; models?: string[]; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.previewServiceModels(config);
     } catch (err) {
       return { ok: false, error: String(err) };
     }
@@ -995,6 +1084,18 @@ export const api = {
     }
   },
 
+  async listAllProjectVfsLocations(): Promise<
+    { location: import("../shared/types").VfsLocation; projectName: string }[]
+  > {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.listAllProjectVfsLocations({});
+    } catch {
+      return [];
+    }
+  },
+
   async addVfsLocation(location: import("../shared/types").VfsLocation): Promise<{ ok: boolean; error?: string }> {
     const r = request();
     if (!r) return { ok: false, error: "Bridge unavailable" };
@@ -1048,6 +1149,18 @@ export const api = {
     if (!r) return null;
     try {
       return await r.vfsStat({ locationId, path, project });
+    } catch {
+      return null;
+    }
+  },
+
+  /** Resolve a location+path to a self-contained provider URI (ticket 134: Report file members). */
+  async vfsResolveUri(locationId: string, path: string, project?: string): Promise<string | null> {
+    const r = request();
+    if (!r) return null;
+    try {
+      const res = await r.vfsResolveUri({ locationId, path, project });
+      return res.uri;
     } catch {
       return null;
     }
@@ -1265,6 +1378,42 @@ export const api = {
     }
   },
 
+  // Reports (ticket 134) -------------------------------------------------------
+
+  async listReports(project: string): Promise<Report[]> {
+    const r = request();
+    if (!r) return [];
+    try {
+      return await r.listReports({ project });
+    } catch {
+      return [];
+    }
+  },
+
+  async saveReport(project: string, report: Report): Promise<{ ok: boolean; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.saveReport({ project, report });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
+  async deleteReport(project: string, id: string): Promise<void> {
+    await request()?.deleteReport({ project, id });
+  },
+
+  async exportReportMarkdown(project: string, id: string): Promise<{ ok: boolean; path?: string; error?: string }> {
+    const r = request();
+    if (!r) return { ok: false, error: "Bridge unavailable" };
+    try {
+      return await r.exportReportMarkdown({ project, id });
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+
   // Calendar workflow scheduling (ticket 117) ----------------------------------
 
   async getScheduledWorkflows(project: string): Promise<ScheduledWorkflowRun[]> {
@@ -1311,6 +1460,17 @@ export const api = {
 
   async cancelScheduledWorkflowRun(project: string, id: string): Promise<void> {
     await request()?.cancelScheduledWorkflowRun({ project, id });
+  },
+
+  async deleteScheduledWorkflowOccurrence(project: string, id: string, occurrenceAt: string): Promise<boolean> {
+    const r = request();
+    if (!r) return false;
+    try {
+      const { ok } = await r.deleteScheduledWorkflowOccurrence({ project, id, occurrenceAt });
+      return ok;
+    } catch {
+      return false;
+    }
   },
 
   async runScheduledWorkflowRunNow(project: string, id: string): Promise<{ ok: boolean }> {
@@ -1417,5 +1577,41 @@ export const api = {
     } catch (err) {
       return { ok: false, error: String(err) };
     }
+  },
+
+  // Voice companion (ticket 138) ---------------------------------------------
+
+  async initCompanion(): Promise<{ shouldGreet: boolean; greeting: string }> {
+    const r = request();
+    if (!r) return { shouldGreet: false, greeting: "" };
+    try {
+      return await r.initCompanion({});
+    } catch {
+      return { shouldGreet: false, greeting: "" };
+    }
+  },
+
+  async showCompanion(): Promise<void> {
+    await request()?.showCompanion(null);
+  },
+
+  async hideCompanion(): Promise<void> {
+    await request()?.hideCompanion(null);
+  },
+
+  async setCompanionMuted(muted: boolean): Promise<void> {
+    await request()?.setCompanionMuted({ muted });
+  },
+
+  async relayCompanionSpeechPhase(event: CompanionSpeechEvent): Promise<void> {
+    await request()?.relayCompanionSpeechPhase(event);
+  },
+
+  async relayCompanionTranscriptLine(line: CompanionTranscriptLine): Promise<void> {
+    await request()?.relayCompanionTranscriptLine(line);
+  },
+
+  async relayCompanionListening(listening: boolean): Promise<void> {
+    await request()?.relayCompanionListening({ listening });
   },
 };

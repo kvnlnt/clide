@@ -6,6 +6,7 @@ import {
   getPendingScheduledRuns,
   getRun,
   resolveRunProject,
+  setSkipDates,
   updateRunSchedule,
 } from "./db/history";
 import { loadTaskFolder } from "./tasks/loader";
@@ -27,6 +28,17 @@ function nextOccurrence(from: Date, interval: RepeatInterval): Date {
   if (interval === "daily") d.setDate(d.getDate() + 1);
   else if (interval === "weekly") d.setDate(d.getDate() + 7);
   return d;
+}
+
+/** Steps forward from `base` past any occurrence that's already due or explicitly skipped (ticket 129). */
+function advanceOccurrence(base: Date, interval: RepeatInterval, skipDates: string[]): Date {
+  let next = nextOccurrence(base, interval);
+  let guard = 0;
+  while (guard < 1000 && (next.getTime() <= Date.now() || skipDates.includes(next.toISOString()))) {
+    next = nextOccurrence(next, interval);
+    guard++;
+  }
+  return next;
 }
 
 function clearTimer(runId: string): void {
@@ -67,11 +79,7 @@ function fire(projectPath: string, run: RunRecord, late: boolean): void {
   // Schedule the next occurrence for recurring runs.
   if (run.repeatInterval && run.repeatInterval !== "none") {
     const base = run.scheduledAt ? new Date(run.scheduledAt) : new Date();
-    let next = nextOccurrence(base, run.repeatInterval);
-    // Skip past any missed occurrences.
-    while (next.getTime() <= Date.now()) {
-      next = nextOccurrence(next, run.repeatInterval);
-    }
+    const next = advanceOccurrence(base, run.repeatInterval, run.skipDates);
     const nextId = crypto.randomUUID();
     const created = createRun(projectPath, {
       id: nextId,
@@ -82,6 +90,8 @@ function fire(projectPath: string, run: RunRecord, late: boolean): void {
       scheduledAt: next.toISOString(),
       repeatInterval: run.repeatInterval,
       taskVersion: run.taskVersion, // Keep the same version for recurring runs (ticket 105)
+      // Carry forward still-future skips (ticket 129) — past ones are moot once their date has gone by.
+      skipDates: run.skipDates.filter((d) => new Date(d).getTime() > Date.now()),
     });
     arm(projectPath, created);
   }
@@ -125,6 +135,37 @@ export async function schedule(
 export function cancelScheduled(runId: string): void {
   clearTimer(runId);
   deleteRun(runId);
+}
+
+/**
+ * Delete one occurrence of a recurring scheduled run rather than the whole
+ * series (ticket 129). If `occurrenceAt` is the row's own pending fire
+ * time, the row is advanced to its next occurrence instead of removed —
+ * the series lives on. Otherwise `occurrenceAt` names a not-yet-materialized
+ * future occurrence (a projected calendar chip); it's recorded in
+ * `skip_dates` so the projector stops offering it, and the pending row is
+ * left untouched. Returns false if the run isn't a pending recurring
+ * schedule.
+ */
+export function deleteOccurrence(runId: string, occurrenceAt: string): boolean {
+  const run = getRun(runId);
+  if (!run || run.status !== "scheduled" || !run.scheduledAt || !run.repeatInterval || run.repeatInterval === "none") {
+    return false;
+  }
+  const projectPath = resolveRunProject(runId);
+  if (!projectPath) return false;
+
+  if (new Date(occurrenceAt).getTime() === new Date(run.scheduledAt).getTime()) {
+    clearTimer(runId);
+    const next = advanceOccurrence(new Date(run.scheduledAt), run.repeatInterval, run.skipDates);
+    updateRunSchedule(runId, next.toISOString(), run.repeatInterval);
+    arm(projectPath, { ...run, scheduledAt: next.toISOString() });
+    return true;
+  }
+
+  const skipDates = run.skipDates.includes(occurrenceAt) ? run.skipDates : [...run.skipDates, occurrenceAt];
+  setSkipDates(runId, skipDates);
+  return true;
 }
 
 /** Change a pending scheduled run's fire time/repeat and re-arm its timer. Returns false if the run isn't a pending schedule. */

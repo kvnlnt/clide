@@ -121,6 +121,37 @@ async function queryOpenAICompatibleModels(baseUrl: string, key: string | null):
   return (json.data ?? []).map((m) => m.id).filter((id): id is string => typeof id === "string");
 }
 
+export interface ModelPreviewConfig {
+  kind: AIServiceKind;
+  baseUrl?: string;
+  /** Ad-hoc credential typed but not yet saved (registration time, ticket 135). */
+  credential?: string;
+  /** Falls back to this service's saved credential when `credential` is omitted (e.g. editing with the key field left blank). */
+  existingServiceId?: string;
+  preferredModel?: string;
+}
+
+async function queryModelsForConfig(config: ModelPreviewConfig): Promise<string[]> {
+  const preferred = config.preferredModel?.trim() || DEFAULT_MODEL_FOR_KIND[config.kind];
+  let credential = config.credential?.trim() || null;
+  if (!credential && config.existingServiceId) credential = await getCredential(config.existingServiceId);
+
+  let fetched: string[] = [];
+  try {
+    if (config.kind === "ollama") {
+      fetched = await queryOllamaModels(config.baseUrl?.trim() || "http://localhost:11434");
+    } else if (config.kind === "openai-compatible" && config.baseUrl?.trim()) {
+      fetched = await queryOpenAICompatibleModels(config.baseUrl.trim(), credential);
+    } else {
+      fetched = CURATED_MODELS[config.kind as "anthropic" | "openai"] ?? [];
+    }
+  } catch {
+    fetched = [];
+  }
+
+  return [preferred, ...fetched.filter((m) => m !== preferred)];
+}
+
 /**
  * Models to offer in a service's model `<select>` (ticket 59). The service's
  * configured model (or kind default) always leads the list and is included
@@ -130,22 +161,21 @@ async function queryOpenAICompatibleModels(baseUrl: string, key: string | null):
 export async function listServiceModels(serviceId: string): Promise<string[]> {
   const service = await getAIService(serviceId);
   if (!service) return [];
+  return queryModelsForConfig({
+    kind: service.kind,
+    baseUrl: service.baseUrl,
+    existingServiceId: service.id,
+    preferredModel: service.model,
+  });
+}
 
-  const preferred = service.model?.trim() || DEFAULT_MODEL_FOR_KIND[service.kind];
-  let fetched: string[] = [];
-  try {
-    if (service.kind === "ollama") {
-      fetched = await queryOllamaModels(service.baseUrl?.trim() || "http://localhost:11434");
-    } else if (service.kind === "openai-compatible" && service.baseUrl?.trim()) {
-      fetched = await queryOpenAICompatibleModels(service.baseUrl.trim(), await getCredential(service.id));
-    } else {
-      fetched = CURATED_MODELS[service.kind as "anthropic" | "openai"] ?? [];
-    }
-  } catch {
-    fetched = [];
-  }
-
-  return [preferred, ...fetched.filter((m) => m !== preferred)];
+/**
+ * Same model listing, but for a service that hasn't been saved yet (ticket
+ * 135) — the registration form passes kind/base URL/credential directly
+ * instead of a serviceId.
+ */
+export async function previewServiceModels(config: ModelPreviewConfig): Promise<string[]> {
+  return queryModelsForConfig(config);
 }
 
 /** Fires a minimal completion against a service to verify it's reachable and credentialed. */

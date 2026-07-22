@@ -4,10 +4,13 @@ import { useApp } from "../context/AppContext";
 import { api } from "../rpc";
 import type { AIService, AIServiceKind } from "../types/tasks";
 import { AI_SERVICE_KIND_LABEL, AI_SERVICE_KIND_NEEDS_BASE_URL } from "../types/tasks";
+import CompanionSettingsSection from "./CompanionSettingsSection";
 import { FilesPage } from "./files/FilesPage";
 import { useEscapeToClose } from "./Modal";
 import PackageManagersSection from "./PackageManagersSection";
 import ProfileSettingsSection from "./ProfileSettingsSection";
+import ServiceModelPicker from "./ServiceModelPicker";
+import SpeechSettingsSection from "./SpeechSettingsSection";
 import ToolsSection from "./ToolsSection";
 import { useUIFeedback } from "./UIFeedback";
 
@@ -224,6 +227,12 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
           <div className="mt-6">
             <PackageManagersSection />
           </div>
+
+          {/* Speech mode's settings home (ticket 137) — support status, voice picker, push-to-talk key. */}
+          <SpeechSettingsSection />
+
+          {/* Voice companion window (ticket 138) — show/hide + mute. */}
+          <CompanionSettingsSection />
 
           {/* Files (ticket 102) — app-scoped VFS locations. */}
           <div className="mt-6">
@@ -476,11 +485,15 @@ export function AIServiceEditor({ existing, hasSavedKey, initialKind, onSave, on
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-medium text-white/50">Model override</label>
-            <input
-              className={inputBase}
-              placeholder="Uses a sensible default when blank"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
+            <ServiceModelPicker
+              value={{ serviceId: existing?.id ?? "", model }}
+              onChange={(v) => setModel(v.model)}
+              serviceOverride={{
+                kind,
+                baseUrl: baseUrl.trim() || undefined,
+                credential: apiKey.trim() || undefined,
+                existingServiceId: existing?.id,
+              }}
             />
           </div>
           {!requiresBaseUrl && (

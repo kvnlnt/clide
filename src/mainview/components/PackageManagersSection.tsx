@@ -1,11 +1,13 @@
-import { Plus, RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { GripVertical, Plus, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../rpc";
 
 export default function PackageManagersSection() {
   const [list, setList] = useState<any[] | null>(null);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ id: "", name: "", path: "" });
+  const dragIndex = useRef<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const refresh = async () => {
     setList(await api.listPackageManagers());
@@ -41,6 +43,25 @@ export default function PackageManagersSection() {
     await api.savePackageManagers(next);
   };
 
+  const reorder = async (from: number, to: number) => {
+    if (!list || from === to) return;
+    const next = [...list];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    setList(next);
+    await api.savePackageManagers(next);
+  };
+
+  const toggleEnabled = async (index: number) => {
+    if (!list) return;
+    const next = [...list];
+    next[index] = { ...next[index], enabled: !next[index].enabled };
+    setList(next);
+    await api.savePackageManagers(next);
+  };
+
+  const firstEnabledIndex = list?.findIndex((m) => m.enabled) ?? -1;
+
   return (
     <div className="mt-6">
       <div className="flex items-center justify-between">
@@ -62,7 +83,8 @@ export default function PackageManagersSection() {
       </div>
 
       <div className="mt-2 text-[12px] text-white/30">
-        Detects Homebrew, npm/bun, pipx, and cargo. Register a custom manager with an absolute binary path.
+        Detects Homebrew, npm/bun, pipx, and cargo. Register a custom manager with an absolute binary path. Disabled
+        managers are skipped during search and install. Drag rows to set the preferred order — top of the list wins.
       </div>
 
       {adding && (
@@ -97,20 +119,83 @@ export default function PackageManagersSection() {
       <div className="mt-3 flex flex-col gap-2">
         {list === null && <div className="text-[13px] italic text-white/30">Loading…</div>}
         {list?.map((m, idx) => (
-          <div key={m.id} className="flex items-center justify-between rounded-md border border-clide-border p-2">
-            <div>
-              <div className="text-white">{m.name}</div>
-              <div className="text-[12px] text-white/40">
-                {m.path ?? "(not detected)"} {m.version ? ` · ${m.version}` : null}
+          <div
+            key={m.id}
+            draggable
+            onDragStart={() => {
+              dragIndex.current = idx;
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOverIndex(idx);
+            }}
+            onDragLeave={() => setDragOverIndex((cur) => (cur === idx ? null : cur))}
+            onDrop={(e) => {
+              e.preventDefault();
+              const from = dragIndex.current;
+              dragIndex.current = null;
+              setDragOverIndex(null);
+              if (from !== null) void reorder(from, idx);
+            }}
+            onDragEnd={() => {
+              dragIndex.current = null;
+              setDragOverIndex(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                void move(idx, -1);
+              } else if (e.key === "ArrowDown") {
+                e.preventDefault();
+                void move(idx, 1);
+              }
+            }}
+            tabIndex={0}
+            className={`flex items-center justify-between rounded-md border p-2 outline-none focus:border-white/30 ${
+              dragOverIndex === idx ? "border-white/40 bg-white/5" : "border-clide-border"
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="cursor-grab text-white/30 hover:text-white/60" aria-hidden="true">
+                <GripVertical size={14} />
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-white">
+                  {m.name}
+                  {idx === firstEnabledIndex && (
+                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-white/50">
+                      Preferred
+                    </span>
+                  )}
+                </div>
+                <div className="text-[12px] text-white/40">
+                  {m.path ?? "(not detected)"} {m.version ? ` · ${m.version}` : null}
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-[12px] text-white/40 mr-2">{m.enabled ? "Enabled" : "Disabled"}</label>
-              <div className="flex flex-col">
-                <button onClick={() => void move(idx, -1)} className="text-[12px] text-white/40 hover:text-white/70">
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 text-[12px] text-white/40">
+                <input
+                  type="checkbox"
+                  checked={!!m.enabled}
+                  onChange={() => void toggleEnabled(idx)}
+                  className="accent-white/70"
+                />
+                {m.enabled ? "Enabled" : "Disabled"}
+              </label>
+              <div className="flex flex-col opacity-30 hover:opacity-80 transition-opacity">
+                <button
+                  onClick={() => void move(idx, -1)}
+                  aria-label="Move up"
+                  className="text-[11px] text-white/40 hover:text-white/70"
+                >
                   ▲
                 </button>
-                <button onClick={() => void move(idx, 1)} className="text-[12px] text-white/40 hover:text-white/70">
+                <button
+                  onClick={() => void move(idx, 1)}
+                  aria-label="Move down"
+                  className="text-[11px] text-white/40 hover:text-white/70"
+                >
                   ▼
                 </button>
               </div>

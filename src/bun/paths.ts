@@ -138,6 +138,20 @@ export function projectScheduledWorkflowsPath(projectPath: string): string {
   return join(projectWorkflowsDir(projectPath), ".schedules.json");
 }
 
+/** Report definitions (ticket 134): one human-readable JSON file per report. */
+export function projectReportsDir(projectPath: string): string {
+  return join(projectPath, "reports");
+}
+
+export function reportPath(projectPath: string, slug: string): string {
+  return join(projectReportsDir(projectPath), `${slug}.json`);
+}
+
+/** Generated Markdown/PDF exports of a report, kept separate from its definition. */
+export function projectReportExportsDir(projectPath: string): string {
+  return join(projectReportsDir(projectPath), "exports");
+}
+
 export function runDir(projectPath: string, runId: string): string {
   return join(projectRunsDir(projectPath), runId);
 }
@@ -152,6 +166,7 @@ export function ensureProjectDirs(projectPath: string): void {
     projectLayoutsDir(projectPath),
     projectWorkflowsDir(projectPath),
     projectWorkflowRunsDir(projectPath),
+    projectReportsDir(projectPath),
   ]) {
     ensureDir(dir);
   }

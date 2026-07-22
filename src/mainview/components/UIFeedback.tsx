@@ -19,6 +19,15 @@ export interface ConfirmResult {
   checked: boolean;
 }
 
+export interface PromptOptions {
+  title: string;
+  message?: string;
+  placeholder?: string;
+  defaultValue?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+}
+
 type ToastKind = "success" | "error";
 
 interface ToastItem {
@@ -33,20 +42,29 @@ interface PendingConfirm {
   resolve: (result: ConfirmResult) => void;
 }
 
+interface PendingPrompt {
+  key: number;
+  opts: PromptOptions;
+  resolve: (value: string | null) => void;
+}
+
 interface UIFeedbackValue {
   /** Popup confirmation dialog — resolves when the user chooses. Never throws. */
   confirm: (opts: ConfirmOptions) => Promise<ConfirmResult>;
+  /** Popup text-input dialog — resolves with the entered value, or null if cancelled. */
+  prompt: (opts: PromptOptions) => Promise<string | null>;
   /** Transient result notice, bottom-center, auto-dismissing. */
   toast: (message: string, kind?: ToastKind) => void;
   /** Layer internals. */
   _pending: PendingConfirm | null;
+  _pendingPrompt: PendingPrompt | null;
   _toasts: ToastItem[];
   _dismissToast: (id: number) => void;
 }
 
 const UIFeedbackContext = createContext<UIFeedbackValue | null>(null);
 
-export function useUIFeedback(): Pick<UIFeedbackValue, "confirm" | "toast"> {
+export function useUIFeedback(): Pick<UIFeedbackValue, "confirm" | "prompt" | "toast"> {
   const ctx = useContext(UIFeedbackContext);
   if (!ctx) throw new Error("useUIFeedback must be used within UIFeedbackProvider");
   return ctx;
@@ -56,6 +74,7 @@ const TOAST_DURATION_MS = 3500;
 
 export function UIFeedbackProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
+  const [pendingPrompt, setPendingPrompt] = useState<PendingPrompt | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const seq = useRef(0);
 
@@ -79,6 +98,23 @@ export function UIFeedbackProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const prompt = useCallback((opts: PromptOptions) => {
+    return new Promise<string | null>((resolve) => {
+      setPendingPrompt((cur) => {
+        cur?.resolve(null);
+        const key = ++seq.current;
+        return {
+          key,
+          opts,
+          resolve: (value: string | null) => {
+            setPendingPrompt((p) => (p?.key === key ? null : p));
+            resolve(value);
+          },
+        };
+      });
+    });
+  }, []);
+
   const dismissToast = useCallback((id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
@@ -93,7 +129,17 @@ export function UIFeedbackProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <UIFeedbackContext.Provider value={{ confirm, toast, _pending: pending, _toasts: toasts, _dismissToast: dismissToast }}>
+    <UIFeedbackContext.Provider
+      value={{
+        confirm,
+        prompt,
+        toast,
+        _pending: pending,
+        _pendingPrompt: pendingPrompt,
+        _toasts: toasts,
+        _dismissToast: dismissToast,
+      }}
+    >
       {children}
     </UIFeedbackContext.Provider>
   );
@@ -108,11 +154,12 @@ export function UIFeedbackProvider({ children }: { children: ReactNode }) {
 export function UIFeedbackLayer() {
   const ctx = useContext(UIFeedbackContext);
   if (!ctx) return null;
-  const { _pending, _toasts, _dismissToast } = ctx;
+  const { _pending, _pendingPrompt, _toasts, _dismissToast } = ctx;
 
   return (
     <>
       {_pending && <ConfirmDialog key={_pending.key} pending={_pending} />}
+      {_pendingPrompt && <PromptDialog key={_pendingPrompt.key} pending={_pendingPrompt} />}
 
       {_toasts.length > 0 && (
         <div className="pointer-events-none absolute bottom-5 left-1/2 z-[110] flex -translate-x-1/2 flex-col items-center gap-2">
@@ -187,6 +234,59 @@ function ConfirmDialog({ pending }: { pending: PendingConfirm }) {
               danger ? "bg-red-500/80 text-white hover:bg-red-500" : "bg-white/10 text-white hover:bg-white/20"
             }`}
           >
+            {opts.confirmLabel ?? "Confirm"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PromptDialog({ pending }: { pending: PendingPrompt }) {
+  const { opts, resolve } = pending;
+  const [value, setValue] = useState(opts.defaultValue ?? "");
+
+  const cancel = () => resolve(null);
+  const ok = () => resolve(value);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        cancel();
+      }
+    };
+    // Capture phase so overlays underneath (Settings/wizard Escape handlers) don't also close.
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="absolute inset-0 z-[100] flex items-start justify-center bg-black/50 pt-28" onMouseDown={cancel}>
+      <div
+        className="w-[420px] overflow-hidden rounded-lg border border-clide-border bg-clide-panel shadow-2xl"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex flex-col gap-2 px-5 pb-2 pt-4">
+          <span className="text-[14px] font-bold text-white">{opts.title}</span>
+          {opts.message && <span className="text-[13px] text-white/60">{opts.message}</span>}
+          <input
+            autoFocus
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") ok();
+            }}
+            placeholder={opts.placeholder}
+            className="mt-1 w-full rounded-md border border-clide-border bg-clide-surface px-2.5 py-1.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-white/30"
+          />
+        </div>
+        <div className="flex items-center justify-end gap-2 px-5 py-3.5">
+          <button onClick={cancel} className="rounded-md px-3 py-1.5 text-[13px] text-white/50 hover:bg-white/5 hover:text-white">
+            {opts.cancelLabel ?? "Cancel"}
+          </button>
+          <button onClick={ok} className="rounded-md bg-white/10 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-white/20">
             {opts.confirmLabel ?? "Confirm"}
           </button>
         </div>

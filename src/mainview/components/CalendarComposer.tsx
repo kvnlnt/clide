@@ -37,6 +37,8 @@ type Picked = { kind: "task"; folder: TaskFolder } | { kind: "workflow"; workflo
 interface CalendarComposerProps {
   /** The day the user clicked — the point of the whole flow. */
   date: Date;
+  /** Exact "HH:MM" to prefill, e.g. from an hour-slot click in Day/Week view — overrides the default-time heuristic. */
+  initialTime?: string;
   onClose: () => void;
 }
 
@@ -48,7 +50,7 @@ interface CalendarComposerProps {
  * body pane so long forms scroll inside it instead of running off the
  * bottom of the page.
  */
-export default function CalendarComposer({ date, onClose }: CalendarComposerProps) {
+export default function CalendarComposer({ date, initialTime, onClose }: CalendarComposerProps) {
   const { tasks, workflows, activeProject, recentSlugs, scheduleRun, scheduleWorkflowRun, openNewTask } = useApp();
   const { toast } = useUIFeedback();
   const scopedTasks = activeProject ? tasks.filter((f) => f.meta.project === activeProject) : tasks;
@@ -62,7 +64,7 @@ export default function CalendarComposer({ date, onClose }: CalendarComposerProp
   const touchedRef = useRef<Set<string>>(new Set());
 
   const [dateStr, setDateStr] = useState(isoDate(date));
-  const [time, setTime] = useState(() => defaultTime(date));
+  const [time, setTime] = useState(() => initialTime ?? defaultTime(date));
   const [repeat, setRepeat] = useState<RepeatInterval>("none");
   const [saving, setSaving] = useState(false);
 

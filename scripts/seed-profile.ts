@@ -26,7 +26,21 @@ import { writeProjectProfile } from "../src/bun/projectProfile";
 import { writeViews } from "../src/bun/tasks/views";
 import { slugify } from "../src/bun/tasks/writer";
 import { writeUIState } from "../src/bun/uiState";
-import type { RepeatInterval, RunStatus, TaskDefinition, TaskField, TaskMeta, ThreadView } from "../src/shared/types";
+import { seedScheduledWorkflowRun } from "../src/bun/workflows/schedules";
+import { saveWorkflow } from "../src/bun/workflows/store";
+import type {
+  OutputDefinition,
+  RepeatInterval,
+  RunStatus,
+  ScheduledWorkflowRun,
+  TaskDefinition,
+  TaskField,
+  TaskMeta,
+  ThreadView,
+  Workflow,
+  WorkflowStep,
+  WorkflowTrigger,
+} from "../src/shared/types";
 
 const profile = process.env.CLIDE_PROFILE?.trim();
 if (!profile) {
@@ -70,6 +84,8 @@ interface TaskTemplate {
   tags: string[];
   fields: TaskField[];
   outputType: TaskDefinition["outputType"];
+  /** Named output definitions (ticket 86) — e.g. so a workflow fixture can loop over a real list. */
+  outputs?: OutputDefinition[];
   aiPromptField?: boolean;
   script: string;
   /** Skip writing the script file / chmod — used by the "edge" profile to seed a broken task. */
@@ -100,9 +116,17 @@ done
     tags: ["system"],
     fields: [],
     outputType: "json",
+    outputs: [
+      {
+        id: "checks",
+        name: "checks",
+        kind: "json",
+        extraction: { source: "stdout", selector: { type: "jsonPath", path: "checks" } },
+      },
+    ],
     script: `#!/bin/bash
 cat <<EOF
-{ "hostname": "$(hostname)", "os": "$(uname -s)", "date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)" }
+{ "hostname": "$(hostname)", "os": "$(uname -s)", "date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "checks": ["disk", "memory", "network"] }
 EOF
 `,
   },
@@ -171,6 +195,7 @@ async function writeTemplateTask(
     fields: template.fields,
     aiPromptField: template.aiPromptField,
     outputType: template.outputType,
+    outputs: template.outputs,
     scriptFile: template.brokenScript ? undefined : "script.sh",
   };
   await Bun.write(join(dir, "meta.json"), JSON.stringify(meta, null, 2));
@@ -231,6 +256,58 @@ function makeView(name: string, opts: { hidden?: boolean } = {}): ThreadView {
 }
 
 // ---------------------------------------------------------------------------
+// Workflow fixtures (ticket 127) — composes the task templates above into
+// example workflows, per profile. Persisted via the same store.ts the app
+// uses, so fixtures can't drift from the on-disk format.
+// ---------------------------------------------------------------------------
+
+/** Builds and persists one workflow, returning it (its id is needed to schedule a run against it). */
+async function seedWorkflow(
+  projectPath: string,
+  now: string,
+  opts: {
+    name: string;
+    description: string;
+    steps: WorkflowStep[];
+    triggers?: WorkflowTrigger[];
+    params?: string[];
+    enabled?: boolean;
+  },
+): Promise<Workflow> {
+  const workflow: Workflow = {
+    id: crypto.randomUUID(),
+    name: opts.name,
+    description: opts.description,
+    params: opts.params,
+    steps: opts.steps,
+    triggers: opts.triggers ?? [{ type: "manual" }],
+    enabled: opts.enabled ?? true,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await saveWorkflow(projectPath, workflow);
+  return workflow;
+}
+
+/** Persists a calendar-visible scheduled workflow run (ticket 117), without arming a live timer. */
+function seedScheduledWorkflow(
+  projectPath: string,
+  workflow: Workflow,
+  opts: { hoursFromNow: number; repeatInterval?: RepeatInterval; params?: Record<string, string> },
+): Promise<void> {
+  const item: ScheduledWorkflowRun = {
+    id: crypto.randomUUID(),
+    workflowId: workflow.id,
+    workflowName: workflow.name,
+    params: opts.params ?? {},
+    scheduledAt: futureISO(opts.hoursFromNow),
+    repeatInterval: opts.repeatInterval ?? "none",
+    skipDates: [],
+  };
+  return seedScheduledWorkflowRun(projectPath, item);
+}
+
+// ---------------------------------------------------------------------------
 // Profile: reset the app-data dir (unless kept), then hand off to the
 // profile-specific seeder.
 // ---------------------------------------------------------------------------
@@ -264,6 +341,23 @@ async function seedBeginner(): Promise<void> {
         daysAgo: i,
         status: i === 5 ? "error" : "success",
         exitCode: i === 5 ? 1 : 0,
+      });
+    }
+    // One simple workflow on the first project — a task feeding a decision,
+    // just enough for a beginner to see the shape of the workflow system.
+    if (p === 0) {
+      await seedWorkflow(project.path, now, {
+        name: "Morning Check",
+        description: "Lists a folder, then checks system info if it worked.",
+        steps: [
+          { type: "form", name: "list_files", taskSlug: slugs[0]!, inputs: { dir: "~" } },
+          {
+            type: "decision",
+            name: "files_ok",
+            condition: "list_files.exitCode == 0",
+            then: [{ type: "form", name: "check_system", taskSlug: slugs[1]!, inputs: {} }],
+          },
+        ],
       });
     }
   }
@@ -318,6 +412,45 @@ async function seedRegular(): Promise<void> {
     // A couple of upcoming schedules, one recurring.
     seedRun(project.path, pick(slugs, 0), { status: "scheduled", scheduledInHours: 6 + p * 4 });
     seedRun(project.path, pick(slugs, 1), { status: "scheduled", scheduledInHours: 30, repeatInterval: "daily" });
+
+    // A decision workflow on the first project, armed with a weekly cron
+    // trigger plus a matching calendar entry — demo data for the Calendar
+    // and the workflow-schedules module (ticket 127).
+    if (p === 0) {
+      const backupWorkflow = await seedWorkflow(project.path, now, {
+        name: "Weekly Backup Check",
+        description: "Backs up a folder, then notifies success or failure.",
+        triggers: [{ type: "manual" }, { type: "schedule", cron: "0 2 * * 0" }],
+        steps: [
+          { type: "form", name: "backup", taskSlug: slugs[3]!, inputs: { source: "~/Documents" } },
+          {
+            type: "decision",
+            name: "notify_needed",
+            condition: "backup.exitCode == 0",
+            then: [{ type: "form", name: "notify_success", taskSlug: slugs[4]!, inputs: { message: "Backup completed successfully." } }],
+            else: [{ type: "form", name: "notify_failure", taskSlug: slugs[4]!, inputs: { message: "Backup failed — check logs." } }],
+          },
+        ],
+      });
+      await seedScheduledWorkflow(project.path, backupWorkflow, { hoursFromNow: 60, repeatInterval: "weekly" });
+    }
+    // A loop workflow on the second project — iterates over a real
+    // list-typed output (system-info's "checks").
+    if (p === 1) {
+      await seedWorkflow(project.path, now, {
+        name: "Check Systems",
+        description: "Checks system info, then lists a directory once per reported check.",
+        steps: [
+          { type: "form", name: "sys_info", taskSlug: slugs[1]!, inputs: {} },
+          {
+            type: "loop",
+            name: "for_each_check",
+            over: "sys_info.outputs.checks",
+            steps: [{ type: "form", name: "list_files_for_check", taskSlug: slugs[0]!, inputs: { dir: "~" } }],
+          },
+        ],
+      });
+    }
 
     await writeViews(project.path, [makeView("Failures"), makeView("Pinned"), makeView("This week")]);
   }
@@ -390,6 +523,46 @@ async function seedPower(): Promise<void> {
       });
     }
 
+    // The heavy-treatment projects also get the full workflow picture:
+    // a decision workflow and a loop workflow, plus several stacked
+    // scheduled runs (mirrors the run-schedule stacking above).
+    if (big) {
+      const backupWorkflow = await seedWorkflow(project.path, now, {
+        name: "Weekly Backup Check",
+        description: "Backs up a folder, then notifies success or failure.",
+        triggers: [{ type: "manual" }, { type: "schedule", cron: "0 2 * * 0" }],
+        steps: [
+          { type: "form", name: "backup", taskSlug: slugs[3]!, inputs: { source: "~/Documents" } },
+          {
+            type: "decision",
+            name: "notify_needed",
+            condition: "backup.exitCode == 0",
+            then: [{ type: "form", name: "notify_success", taskSlug: slugs[4]!, inputs: { message: "Backup completed successfully." } }],
+            else: [{ type: "form", name: "notify_failure", taskSlug: slugs[4]!, inputs: { message: "Backup failed — check logs." } }],
+          },
+        ],
+      });
+      await seedWorkflow(project.path, now, {
+        name: "Check Systems",
+        description: "Checks system info, then lists a directory once per reported check.",
+        steps: [
+          { type: "form", name: "sys_info", taskSlug: slugs[1]!, inputs: {} },
+          {
+            type: "loop",
+            name: "for_each_check",
+            over: "sys_info.outputs.checks",
+            steps: [{ type: "form", name: "list_files_for_check", taskSlug: slugs[0]!, inputs: { dir: "~" } }],
+          },
+        ],
+      });
+      for (let s = 0; s < 3; s++) {
+        await seedScheduledWorkflow(project.path, backupWorkflow, {
+          hoursFromNow: 12 + s * 3, // stacked into the same day/window as the run schedules above
+          repeatInterval: s === 0 ? "weekly" : "none",
+        });
+      }
+    }
+
     const views: ThreadView[] = [makeView("Errors"), makeView("Pinned"), makeView("Archive", { hidden: true })];
     if (big) views.push(makeView("Old experiment", { hidden: true }), makeView("Needs review"));
     await writeViews(project.path, views);
@@ -441,6 +614,53 @@ async function seedEdge(): Promise<void> {
     // 45 chips stacked on the exact same future day, to exercise "+N more" overflow.
     for (let i = 0; i < 45; i++) {
       seedRun(project.path, pick(slugs, i), { status: "scheduled", scheduledInHours: 48 + i * 0.1 });
+    }
+
+    if (p === 0) {
+      // Pathological workflow (ticket 127): a step referencing a task slug
+      // that doesn't exist in this project — the workflow layer's version of
+      // the "deleted-task-slug" orphaned schedule above.
+      await seedWorkflow(project.path, now, {
+        name: "Orphaned Step Workflow",
+        description: "One step points at a task that no longer exists.",
+        steps: [{ type: "form", name: "ghost_step", taskSlug: "deleted-task-slug", inputs: {} }],
+      });
+      // Orphaned scheduled run: workflowId doesn't match any saved
+      // workflow — exercises the calendar/detail UI's denormalized-name
+      // fallback (ScheduledWorkflowRun carries workflowName precisely so it
+      // never needs a lookup that could fail here).
+      await seedScheduledWorkflowRun(project.path, {
+        id: crypto.randomUUID(),
+        workflowId: crypto.randomUUID(),
+        workflowName: "Deleted Workflow",
+        params: {},
+        scheduledAt: futureISO(4),
+        repeatInterval: "none",
+        skipDates: [],
+      });
+    }
+
+    if (p === pathologicalNames.length - 1) {
+      // A normal-shaped decision workflow on the one "Normal Project" —
+      // system-info here is the seeded-broken task (index 1 above), so
+      // running this for real would surface a failed step; fine for a
+      // definition-only fixture, and a realistic edge case to have on hand.
+      const report = await seedWorkflow(project.path, now, {
+        name: "System Report",
+        description: "Lists a directory, then checks system info if it worked.",
+        steps: [
+          { type: "form", name: "list_files", taskSlug: slugs[0]!, inputs: { dir: "~" } },
+          {
+            type: "decision",
+            name: "files_ok",
+            condition: "list_files.exitCode == 0",
+            then: [{ type: "form", name: "check_system", taskSlug: slugs[1]!, inputs: {} }],
+          },
+        ],
+      });
+      // One more scheduled run stacked into the same overflowing day as the
+      // 45 run chips above, so the calendar has to merge both entity kinds.
+      await seedScheduledWorkflow(project.path, report, { hoursFromNow: 48 + 45 * 0.1 });
     }
   }
   await saveAIServices([

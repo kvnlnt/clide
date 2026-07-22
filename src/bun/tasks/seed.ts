@@ -118,6 +118,16 @@ done
     task: {
       fields: [],
       outputType: "json",
+      // Named "checks" output (ticket 86) so the "Directory Loop" starter
+      // workflow (workflows/seed.ts, ticket 127) has a real list to loop over.
+      outputs: [
+        {
+          id: "checks",
+          name: "checks",
+          kind: "json",
+          extraction: { source: "stdout", selector: { type: "jsonPath", path: "checks" } },
+        },
+      ],
       scriptFile: "script.sh",
     },
     script: `#!/bin/bash
@@ -128,7 +138,8 @@ cat <<EOF
   "os": "$(uname -s)",
   "arch": "$(uname -m)",
   "shell": "$SHELL",
-  "date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  "date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "checks": ["disk", "memory", "network"]
 }
 EOF
 `,

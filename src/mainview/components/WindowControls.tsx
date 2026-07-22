@@ -1,14 +1,23 @@
 import { AudioWaveform, PanelLeft, Settings2 } from "lucide-react";
+import { useMemo } from "react";
 import { useApp } from "../context/AppContext";
-import { isSpeechRecognitionSupported, isSpeechSynthesisSupported } from "../speech";
+import { formatSpeechActivationShortcut, isSpeechRecognitionSupported, isSpeechSynthesisSupported } from "../speech";
 import TrafficLights from "./TrafficLights";
 import ViewTabs from "./ViewTabs";
 
-/** Ticket 123: entry point for speech mode — clear active/listening state, honest about degraded support. */
+/**
+ * Ticket 123: entry point for speech mode. Ticket 137 makes the mic
+ * push-to-talk — the button only arms/disarms the mode; a key press (the
+ * configured `speechActivationKey`) opens each listen session, so the
+ * button's "armed" (on, mic closed) and "listening" (mic open) states need
+ * to read distinctly at a glance, not just via the title tooltip.
+ */
 function SpeechModeButton() {
-  const { speechModeActive, speechListening, speechError, toggleSpeechMode } = useApp();
+  const { speechModeActive, speechListening, speechError, toggleSpeechMode, speechActivationKey } = useApp();
   const canListen = isSpeechRecognitionSupported();
   const canSpeak = isSpeechSynthesisSupported();
+  const isMac = useMemo(() => /mac/i.test(navigator.platform || navigator.userAgent), []);
+  const shortcut = formatSpeechActivationShortcut(speechActivationKey, isMac);
 
   const title = speechError
     ? speechError
@@ -18,9 +27,9 @@ function SpeechModeButton() {
         ? "Speech mode (voice output only — voice input isn't supported here)"
         : speechModeActive
           ? speechListening
-            ? "Listening… click to stop"
-            : "Speech mode on — click to speak a command"
-          : "Turn on speech mode";
+            ? `Listening… press ${shortcut} or click to stop`
+            : `Speech mode armed — press ${shortcut} to talk`
+          : `Turn on speech mode (push-to-talk: ${shortcut})`;
 
   return (
     <button
@@ -29,7 +38,7 @@ function SpeechModeButton() {
       title={title}
       className={`relative flex items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
         speechModeActive ? "text-amber-300" : "text-white/30 hover:text-white"
-      }`}
+      } ${speechModeActive && !speechListening ? "ring-1 ring-amber-300/40" : ""}`}
     >
       <AudioWaveform size={18} className={speechListening ? "animate-pulse" : ""} />
       {speechListening && (

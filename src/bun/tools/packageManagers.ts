@@ -470,11 +470,22 @@ export async function savePackageManagersOrder(list: any[]): Promise<void> {
   writeCache(list);
 }
 
+/** Builtin adapters that are currently enabled, in the user's preferred order (list order == preference). */
+async function getOrderedEnabledAdapters(): Promise<PackageManagerAdapter[]> {
+  const cfg = await listPackageManagers();
+  const adapterById = new Map(builtinAdapters.map((a) => [a.id, a]));
+  return cfg
+    .filter((c) => c.enabled !== false)
+    .map((c) => adapterById.get(c.id))
+    .filter((a): a is PackageManagerAdapter => !!a);
+}
+
 export async function searchPackageManagers(_query: string): Promise<{ ok: boolean; results: any[] }> {
   const results: any[] = [];
   const q = (_query || "").trim();
   if (!q) return { ok: true, results: [] };
-  const promises = builtinAdapters.map(async (a) => {
+  const enabledAdapters = await getOrderedEnabledAdapters();
+  const promises = enabledAdapters.map(async (a) => {
     try {
       const r = await a.search(q);
       return { id: a.id, name: a.name, ok: r.ok, results: r.results };
@@ -515,6 +526,11 @@ export async function installPackage(
   if (!adapter) {
     onChunk(`Unknown package manager: ${managerId}\n`);
     return { ok: false, error: "Unknown manager" };
+  }
+  const enabledAdapters = await getOrderedEnabledAdapters();
+  if (!enabledAdapters.some((a) => a.id === managerId)) {
+    onChunk(`${adapter.name} is disabled\n`);
+    return { ok: false, error: "Package manager is disabled" };
   }
   return await withInstallLock(async () => {
     try {

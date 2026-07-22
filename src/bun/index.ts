@@ -1,8 +1,9 @@
 import { ApplicationMenu, BrowserView, BrowserWindow, Updater, Utils } from "electrobun/bun";
-import { rmSync, statSync } from "node:fs";
+import { existsSync, rmSync, statSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
 import type {
   AIService,
+  ClideCompanionRPC,
   ClideRPC,
   OutputChunk,
   ProfileScope,
@@ -19,6 +20,7 @@ import {
   getDefaultAIService,
   listAIServices,
   listServiceModels,
+  previewServiceModels,
   saveAIServices,
   testAIService,
 } from "./ai/aiServices";
@@ -46,7 +48,7 @@ import {
   resolveProjectByName,
 } from "./config";
 import { deleteRun as dbDeleteRun, getAllRuns, getRun, getRunHistory, indexRuns, setPinned } from "./db/history";
-import { formDir, projectFormsDir } from "./paths";
+import { ensureDir, formDir, projectFormsDir } from "./paths";
 import {
   appendUserSelfNote,
   deleteUserProfile as deleteUserProfileFile,
@@ -62,6 +64,7 @@ import {
 import { cancelRun, readRunOutputs, setRunCompletionListener, startRun, type RunEmitters } from "./runner/execute";
 import {
   cancelScheduled,
+  deleteOccurrence,
   disposeScheduler,
   initScheduler,
   rescheduleRun,
@@ -83,6 +86,7 @@ import {
   saveTool,
 } from "./tools/registry";
 import { installStarterTasks, listStarterTasks } from "./tasks/seed";
+import { installStarterWorkflows, listStarterWorkflows } from "./workflows/seed";
 import { readUIState, writeUIState } from "./uiState";
 import {
   cancelWorkflowRun as engineCancelRun,
@@ -97,6 +101,7 @@ import {
 } from "./workflows/runStore";
 import {
   cancelScheduledWorkflowRun,
+  deleteWorkflowOccurrence,
   disposeWorkflowSchedules,
   getScheduledWorkflows,
   initWorkflowSchedules,
@@ -112,6 +117,14 @@ import {
   saveWorkflow as storeSaveWorkflow,
   validateForSave,
 } from "./workflows/store";
+import { exportReportToFile } from "./reports/export";
+import {
+  deleteReport as storeDeleteReport,
+  getReport,
+  listReports as storeListReports,
+  saveReport as storeSaveReport,
+  validateForSave as validateReportForSave,
+} from "./reports/store";
 import {
   disposeWorkflowTriggers,
   initWorkflowTriggers,
@@ -158,6 +171,7 @@ async function projectForSlug(slug: string): Promise<Project | null> {
 // Renderer emitters — push streaming output/status to the webview.
 // ---------------------------------------------------------------------------
 let mainWindow: BrowserWindow | null = null;
+let companionWindow: BrowserWindow | null = null;
 
 function sendToView(name: string, payload: unknown): void {
   try {
@@ -168,10 +182,137 @@ function sendToView(name: string, payload: unknown): void {
   }
 }
 
+function sendToCompanion(name: string, payload: unknown): void {
+  try {
+    const send = (companionWindow?.webview?.rpc as { send?: Record<string, (p: unknown) => void> } | undefined)
+      ?.send;
+    send?.[name]?.(payload);
+  } catch (err) {
+    console.warn(`[rpc] Failed to send ${name} to companion:`, err);
+  }
+}
+
 const emitters: RunEmitters = {
   emitChunk: (chunk: OutputChunk) => sendToView("onOutputChunk", chunk),
   emitStatus: (update: RunStatusUpdate) => sendToView("onRunStatus", update),
 };
+
+// ---------------------------------------------------------------------------
+// Voice companion (ticket 138): a second, small chromeless "Jarvis" window.
+// It owns no speech APIs itself — the main window's existing
+// speechSynthesis/SpeechRecognition calls (tickets 123/137) stay the single
+// source of truth, and their lifecycle events are relayed here so the
+// companion can animate. Position/enabled/muted persist via UIState; the
+// window itself does not — every launch creates it fresh when enabled.
+// ---------------------------------------------------------------------------
+const COMPANION_GREETING = "Hello, welcome to CLIDE. How can I help you today?";
+const COMPANION_SIZE = { width: 220, height: 220 };
+/** Only speak the greeting on the first companion window of this process lifetime — re-showing after a manual hide never re-greets. */
+let companionGreetedThisSession = false;
+let companionMoveDebounce: ReturnType<typeof setTimeout> | null = null;
+
+async function getCompanionUrl(): Promise<string> {
+  const channel = await Updater.localInfo.channel();
+  if (channel === "dev") {
+    try {
+      const url = `${DEV_SERVER_URL}/companion/index.html`;
+      await fetch(url, { method: "HEAD" });
+      return url;
+    } catch {
+      // fall through to the packaged view
+    }
+  }
+  return "views://mainview/companion.html";
+}
+
+/** Creates the companion window on first call; otherwise just shows/activates the existing one. */
+async function ensureCompanionWindow(): Promise<void> {
+  if (companionWindow) {
+    companionWindow.show();
+    companionWindow.activate();
+    return;
+  }
+  const ui = await readUIState();
+  const pos = ui.companionPosition;
+  const url = await getCompanionUrl();
+
+  companionWindow = new BrowserWindow({
+    title: "CLIDE Companion",
+    url,
+    frame: {
+      x: pos?.x ?? 40,
+      y: pos?.y ?? 40,
+      width: COMPANION_SIZE.width,
+      height: COMPANION_SIZE.height,
+    },
+    titleBarStyle: "hidden",
+    transparent: true,
+    passthrough: false,
+    rpc: companionRpc,
+  });
+  companionWindow.setAlwaysOnTop(true);
+
+  companionWindow.on("move", (event) => {
+    const { x, y } = (event as { data: { x: number; y: number } }).data;
+    if (companionMoveDebounce) clearTimeout(companionMoveDebounce);
+    companionMoveDebounce = setTimeout(() => {
+      void readUIState().then((state) => writeUIState({ ...state, companionPosition: { x, y } }));
+    }, 400);
+  });
+
+  companionWindow.on("close", () => {
+    companionWindow = null;
+  });
+}
+
+async function showCompanionWindow(): Promise<void> {
+  const state = await readUIState();
+  await writeUIState({ ...state, companionEnabled: true });
+  await ensureCompanionWindow();
+  sendToView("onCompanionEnabledChanged", { enabled: true });
+}
+
+async function hideCompanionWindow(): Promise<void> {
+  companionWindow?.hide();
+  const state = await readUIState();
+  await writeUIState({ ...state, companionEnabled: false });
+  sendToView("onCompanionEnabledChanged", { enabled: false });
+}
+
+async function setCompanionMutedState(muted: boolean): Promise<void> {
+  const state = await readUIState();
+  await writeUIState({ ...state, companionMuted: muted });
+  sendToView("onCompanionMutedChanged", { muted });
+}
+
+const companionRpc = BrowserView.defineRPC<ClideCompanionRPC>({
+  maxRequestTime: 10000,
+  handlers: {
+    requests: {
+      companionReady: async () => {
+        const ui = await readUIState();
+        return { muted: ui.companionMuted === true };
+      },
+      setCompanionMuted: async ({ muted }) => {
+        await setCompanionMutedState(muted);
+      },
+      hideCompanion: async () => {
+        await hideCompanionWindow();
+      },
+      resizeCompanion: async ({ width, height }) => {
+        companionWindow?.setSize(width, height);
+      },
+    },
+    messages: {
+      logToBun: ({ msg, type }) => {
+        const tag = "[companion]";
+        if (type === "error") console.error(tag, msg);
+        else if (type === "warn") console.warn(tag, msg);
+        else console.log(tag, msg);
+      },
+    },
+  },
+});
 
 async function pushTasksChanged(): Promise<void> {
   const tasks = await listTasks();
@@ -683,6 +824,44 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
+      // Tool test modal REPL (ticket 136) -------------------------------------
+      runToolTest: async ({ execPath, args }) => {
+        try {
+          const { runToolTest, parseArgs } = await import("./tools/testRun");
+          const runId = `tooltest:${crypto.randomUUID()}`;
+          const argv = parseArgs(args);
+          sendToView("onRunStatus", { runId, status: "running", exitCode: null, finishedAt: null });
+          void runToolTest(
+            runId,
+            execPath,
+            argv,
+            (type, data) => sendToView("onOutputChunk", { runId, type, data, timestamp: Date.now() }),
+            (exitCode, timedOut, truncated) => {
+              const summary = timedOut ? "Timed out" : truncated ? "Output truncated" : undefined;
+              sendToView("onRunStatus", {
+                runId,
+                status: timedOut || exitCode !== 0 ? "error" : "success",
+                exitCode,
+                finishedAt: new Date().toISOString(),
+                summary,
+              });
+            },
+          );
+          return { ok: true, runId };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
+      cancelToolTest: async ({ runId }) => {
+        try {
+          const { cancelToolTest } = await import("./tools/testRun");
+          return { ok: cancelToolTest(runId) };
+        } catch {
+          return { ok: false };
+        }
+      },
+
       redistillTool: async ({ id, helpText, serviceId, model }) => {
         const existing = await getTool(id);
         if (!existing) return { ok: false, error: "Tool not found." };
@@ -877,6 +1056,15 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
+      previewServiceModels: async ({ kind, baseUrl, credential, existingServiceId, preferredModel }) => {
+        try {
+          const models = await previewServiceModels({ kind, baseUrl, credential, existingServiceId, preferredModel });
+          return { ok: true, models };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
       draftCommandFields: async ({ goal, toolName, actionName, spec, serviceId, model, project }) => {
         const service = await getAIService(serviceId);
         if (!service) return { ok: false, error: "Selected AI service not found." };
@@ -962,6 +1150,11 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         return [...appLocs, ...projLocs];
       },
 
+      listAllProjectVfsLocations: async () => {
+        const { listAllProjectLocations } = await import("./vfs/registry");
+        return await listAllProjectLocations();
+      },
+
       addVfsLocation: async ({ location }) => {
         try {
           const { addLocation } = await import("./vfs/registry");
@@ -1039,6 +1232,26 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           return await provider.stat(uri);
         } catch {
           return null;
+        }
+      },
+
+      vfsResolveUri: async ({ locationId, path, project }) => {
+        try {
+          const { getLocation, getProvider } = await import("./vfs/registry");
+          const { LocalProvider } = await import("./vfs/local");
+          const projectPath = project ? (await pathForProjectName(project))?.path : undefined;
+          const location = await getLocation(locationId, projectPath);
+          if (!location) return { uri: null };
+          const provider = getProvider(location.provider);
+          if (!provider) return { uri: null };
+
+          if (provider instanceof LocalProvider) {
+            const root = location.config.root as string;
+            return { uri: provider.pathToUri(join(root, path)) };
+          }
+          return { uri: `${location.provider}://${path}` };
+        } catch {
+          return { uri: null };
         }
       },
 
@@ -1281,6 +1494,42 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         }
       },
 
+      // Reports (ticket 134) ---------------------------------------------------
+
+      listReports: async ({ project }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return [];
+        return await storeListReports(resolved.path);
+      },
+
+      saveReport: async ({ project, report }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return { ok: false, error: "Project not found" };
+        const problem = validateReportForSave(report);
+        if (problem) return { ok: false, error: problem };
+        await storeSaveReport(resolved.path, report);
+        return { ok: true };
+      },
+
+      deleteReport: async ({ project, id }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return;
+        await storeDeleteReport(resolved.path, id);
+      },
+
+      exportReportMarkdown: async ({ project, id }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return { ok: false, error: "Project not found" };
+        const report = await getReport(resolved.path, id);
+        if (!report) return { ok: false, error: "Report not found" };
+        try {
+          const path = await exportReportToFile(resolved.path, resolved.name, report);
+          return { ok: true, path };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
+      },
+
       getScheduledWorkflows: async ({ project }) => {
         const resolved = await pathForProjectName(project);
         if (!resolved) return [];
@@ -1317,6 +1566,13 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         const resolved = await pathForProjectName(project);
         if (!resolved) return;
         await cancelScheduledWorkflowRun(resolved.path, id);
+      },
+
+      deleteScheduledWorkflowOccurrence: async ({ project, id, occurrenceAt }) => {
+        const resolved = await pathForProjectName(project);
+        if (!resolved) return { ok: false };
+        const ok = await deleteWorkflowOccurrence(resolved.path, resolved.name, id, occurrenceAt);
+        return { ok };
       },
 
       runScheduledWorkflowRunNow: async ({ project, id }) => {
@@ -1364,6 +1620,10 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         return { ok: runScheduledNow(runId) };
       },
 
+      deleteOccurrence: async ({ runId, occurrenceAt }) => {
+        return { ok: deleteOccurrence(runId, occurrenceAt) };
+      },
+
       getLayout: async ({ projectSlug }) => {
         const project = await pathForProjectName(projectSlug);
         if (!project) return { cards: [] };
@@ -1400,12 +1660,21 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
       getUIState: async () => await readUIState(),
 
       saveUIState: async (state) => {
-        await writeUIState(state);
+        // Merge rather than overwrite (ticket 138): the companion window's
+        // enabled/muted/position fields are written by its own dedicated
+        // handlers and never round-trip through the renderer's UIState
+        // payload, so a blind overwrite here would silently drop them.
+        const current = await readUIState();
+        await writeUIState({ ...current, ...state });
       },
 
       listStarterTasks: async () => listStarterTasks(),
 
       installStarterTasks: async ({ projectName, slugs }) => await installStarterTasks(projectName, slugs),
+
+      listStarterWorkflows: async () => listStarterWorkflows(),
+
+      installStarterWorkflows: async ({ projectName, ids }) => await installStarterWorkflows(projectName, ids),
 
       chooseDirectory: async ({ startingFolder }) => {
         const paths = await Utils.openFileDialog({
@@ -1416,6 +1685,27 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
         });
         const path = paths?.[0] ?? null;
         return path;
+      },
+
+      // Ticket 130: Electrobun's native dialog has no can-create-directories
+      // option, so the picker flow falls back to mkdir-ing a named subfolder
+      // of an already-picked parent.
+      createDirectory: async ({ parent, name }) => {
+        const trimmed = name.trim();
+        if (!trimmed) return { ok: false, error: "Name required" };
+        if (trimmed.includes("/") || trimmed.includes("\\") || trimmed === "." || trimmed === "..") {
+          return { ok: false, error: "Invalid folder name" };
+        }
+        const path = join(parent, trimmed);
+        if (existsSync(path)) {
+          return { ok: false, error: "That already exists" };
+        }
+        try {
+          ensureDir(path);
+          return { ok: true, path };
+        } catch (err) {
+          return { ok: false, error: String(err) };
+        }
       },
 
       openFolder: async ({ path }) => {
@@ -1643,6 +1933,44 @@ const rpc = BrowserView.defineRPC<ClideRPC>({
           return { ok: false, error: String(err) };
         }
       },
+
+      // Voice companion (ticket 138) -------------------------------------------
+      initCompanion: async () => {
+        const ui = await readUIState();
+        const enabled = ui.companionEnabled !== false;
+        // Guards React StrictMode's double-invoked mount effect in dev — the
+        // window still gets (re-)shown either way, it just won't re-greet.
+        const shouldGreet = enabled && !companionGreetedThisSession;
+        if (enabled) {
+          await ensureCompanionWindow();
+          companionGreetedThisSession = true;
+        }
+        return { shouldGreet, greeting: COMPANION_GREETING };
+      },
+
+      showCompanion: async () => {
+        await showCompanionWindow();
+      },
+
+      hideCompanion: async () => {
+        await hideCompanionWindow();
+      },
+
+      setCompanionMuted: async ({ muted }) => {
+        await setCompanionMutedState(muted);
+      },
+
+      relayCompanionSpeechPhase: async (event) => {
+        sendToCompanion("onCompanionSpeechPhase", event);
+      },
+
+      relayCompanionTranscriptLine: async (line) => {
+        sendToCompanion("onCompanionTranscriptLine", line);
+      },
+
+      relayCompanionListening: async ({ listening }) => {
+        sendToCompanion("onCompanionListening", { listening });
+      },
     },
     messages: {
       logToBun: ({ msg, type }) => {
@@ -1695,9 +2023,10 @@ async function getMainViewUrl(): Promise<string> {
   const channel = await Updater.localInfo.channel();
   if (channel === "dev") {
     try {
-      await fetch(DEV_SERVER_URL, { method: "HEAD" });
+      const url = `${DEV_SERVER_URL}/mainview/index.html`;
+      await fetch(url, { method: "HEAD" });
       console.log(`HMR enabled: Using Vite dev server at ${DEV_SERVER_URL}`);
-      return DEV_SERVER_URL;
+      return url;
     } catch {
       console.log("Vite dev server not running. Run 'bun run dev:hmr' for HMR support.");
     }
@@ -1780,6 +2109,8 @@ mainWindow.on("close", () => {
   disposeScheduler();
   disposeWorkflowTriggers();
   disposeWorkflowSchedules();
+  if (companionMoveDebounce) clearTimeout(companionMoveDebounce);
+  companionWindow?.close();
 });
 
 console.log("CLIDE started.");

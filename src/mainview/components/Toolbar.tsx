@@ -8,7 +8,9 @@ import type { ReactNode } from "react";
  */
 export default function Toolbar({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`flex shrink-0 flex-wrap items-center gap-1.5 rounded-lg bg-clide-bg px-3 py-2 ${className}`}>
+    <div
+      className={`flex shrink-0 flex-wrap items-center gap-1.5 rounded-lg bg-clide-bg px-3 py-2 [.clide-compact_&]:gap-1 [.clide-compact_&]:px-2 [.clide-compact_&]:py-1.5 ${className}`}
+    >
       {children}
     </div>
   );

@@ -36,6 +36,8 @@ export function migrate(db: Database): void {
     summary: "ALTER TABLE runs ADD COLUMN summary TEXT",
     // Ticket 105: version of the task that was executed (defaults to 1 for legacy runs).
     form_version: "ALTER TABLE runs ADD COLUMN form_version INTEGER DEFAULT 1",
+    // Ticket 129: JSON array of future occurrence ISO timestamps excluded from a recurring series.
+    skip_dates: "ALTER TABLE runs ADD COLUMN skip_dates TEXT",
   };
 
   for (const [column, sql] of Object.entries(additions)) {

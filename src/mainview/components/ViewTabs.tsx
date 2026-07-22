@@ -27,20 +27,23 @@ export default function ViewTabs() {
   const visibleViews = views.filter((v) => !v.hidden);
 
   // View tabs: browser-style, merging into the content pane when active.
+  // flex-1 so tabs share the row and stretch to fill available width;
+  // truncation (min-w-0 + truncate on the label) only kicks in once the
+  // row genuinely runs out of space.
   const tabShape =
-    "flex min-w-0 items-center gap-2 rounded-tl-lg rounded-tr-lg px-4 pb-1.5 pt-2 text-sm transition-colors";
+    "flex min-w-0 flex-1 items-center gap-2 rounded-tl-lg rounded-tr-lg px-4 pb-1.5 pt-2 text-sm transition-colors [.clide-compact_&]:px-3 [.clide-compact_&]:pb-1 [.clide-compact_&]:pt-1.5";
   const activeShape = "relative z-10 bg-white/10 bg-clide-bg text-white";
   const inactiveShape = "text-white/30 hover:bg-white/[0.03] hover:text-white";
   const titleTabActive = activeViewId === null;
 
   return (
-    <div className="relative flex min-w-0 flex-1 items-end justify-start gap-1 pl-2 pr-2">
+    <div className="relative flex min-w-0 flex-1 items-end justify-start gap-1 pl-2 pr-2 [.clide-compact_&]:gap-0.5">
       {activeProject && (
         <>
           <button
             onClick={() => setActiveProject(null)}
             title="Home"
-            className="flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+            className="flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white [.clide-compact_&]:h-6 [.clide-compact_&]:w-6"
           >
             <House size={16} />
           </button>
@@ -48,7 +51,7 @@ export default function ViewTabs() {
           <button
             onClick={() => setActiveView(null)}
             title={`All ${activeProject} threads`}
-            className={`${tabShape} max-w-[200px] ${titleTabActive ? activeShape : inactiveShape}`}
+            className={`${tabShape} ${titleTabActive ? activeShape : inactiveShape}`}
           >
             <Folder size={13} className="shrink-0 opacity-70" />
             <span className="min-w-0 truncate text-left">{activeProject}</span>
@@ -91,7 +94,7 @@ export default function ViewTabs() {
                 openViewSettings();
               }}
               title={`${view.name} (double-click to rename)`}
-              className="min-w-0 max-w-[120px] truncate text-left group-hover:text-white"
+              className="min-w-0 truncate text-left group-hover:text-white"
             >
               {view.name}
             </button>
@@ -103,7 +106,7 @@ export default function ViewTabs() {
         disabled={!activeProject}
         onClick={() => createView()}
         title={activeProject ? "New view" : "Select a project to create views"}
-        className={`ml-1.5 h-6 w-6 shrink-0 items-center justify-center self-center rounded-full text-white/30 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-white/30 ${
+        className={`ml-1.5 h-6 w-6 shrink-0 items-center justify-center self-center rounded-full text-white/30 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-white/30 [.clide-compact_&]:h-5 [.clide-compact_&]:w-5 ${
           activeProject ? "flex" : "hidden"
         }`}
       >

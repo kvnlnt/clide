@@ -89,6 +89,10 @@ export default function SubmissionAccordionRow({
   const summaryPending =
     (run.status === "success" || run.status === "error") && run.finishedAt && !run.summary && !run.triggeredBy;
 
+  // Unread rows read bolder than normal; clears once expanded (ticket 97) or
+  // explicitly marked read (ticket 126 sidebar "mark all read").
+  const isUnread = (run.status === "success" || run.status === "error") && !run.readAt;
+
   const handleToggle = () => {
     onToggle();
     // Mark read when expanding (ticket 97). Already-read runs are harmless.
@@ -127,10 +131,10 @@ export default function SubmissionAccordionRow({
         <span className="flex h-4 w-4 shrink-0 items-center justify-center">
           <StatusIcon status={run.status} size={14} />
         </span>
-        <span className="shrink-0 text-[12px] text-white/40">{time}</span>
+        <span className="clide-vertical-label shrink-0 text-[12px] text-white/40">{time}</span>
         {summary && (
           <span
-            className={`min-w-0 flex-1 truncate text-[12px] text-clide-muted ${
+            className={`min-w-0 flex-1 truncate text-[12px] ${isUnread ? "font-semibold text-white" : "text-clide-muted"} ${
               summaryPending ? "animate-pulse opacity-60" : ""
             }`}
           >

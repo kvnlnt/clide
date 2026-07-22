@@ -1,0 +1,280 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Ticket 138: the companion window is transparent at the OS level — only
+   what's drawn here shows against the desktop. Reuses the app's signature
+   easing (see src/mainview/index.css) so the two windows feel like one
+   product. */
+:root {
+  --clide-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html,
+body {
+  background: transparent;
+}
+
+.companion-root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.companion-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.companion-root--expanded .companion-card {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(28, 26, 26, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.companion-header {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 0;
+}
+
+.companion-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.companion-header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.companion-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.4);
+  transition:
+    color 120ms var(--clide-ease),
+    background 120ms var(--clide-ease);
+}
+
+.companion-icon-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.companion-face {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 148px;
+  height: 148px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.companion-root--expanded .companion-face {
+  width: 96px;
+  height: 96px;
+}
+
+.companion-orb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.1), rgba(21, 18, 18, 0.92) 70%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  animation: companion-breathe 3.6s var(--clide-ease) infinite;
+  transition:
+    border-color 200ms var(--clide-ease),
+    box-shadow 200ms var(--clide-ease);
+}
+
+.companion-orb--listening {
+  border-color: rgba(252, 211, 77, 0.55);
+  box-shadow: 0 0 0 6px rgba(252, 211, 77, 0.08), 0 8px 30px rgba(0, 0, 0, 0.45);
+  animation: companion-pulse-ring 1.5s var(--clide-ease) infinite;
+}
+
+.companion-orb--speaking {
+  border-color: rgba(255, 255, 255, 0.3);
+  animation: none;
+}
+
+.companion-mic-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  color: #fcd34d;
+}
+
+@keyframes companion-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.035);
+    opacity: 1;
+  }
+}
+
+@keyframes companion-pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(252, 211, 77, 0.08), 0 8px 30px rgba(0, 0, 0, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 9px rgba(252, 211, 77, 0.14), 0 8px 30px rgba(0, 0, 0, 0.45);
+  }
+}
+
+.companion-face--pulse .companion-orb {
+  animation: companion-attention-pulse 900ms var(--clide-ease);
+}
+
+@keyframes companion-attention-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.12);
+  }
+}
+
+/* Waveform bars ------------------------------------------------------- */
+
+.companion-waveform {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 36px;
+}
+
+.companion-bar {
+  width: 4px;
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  transform: scaleY(var(--bar-scale, 0.3));
+  transition: transform 200ms var(--clide-ease);
+}
+
+.companion-waveform--listening .companion-bar {
+  background: #fcd34d;
+}
+
+.companion-waveform--speaking .companion-bar {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.companion-waveform--muted .companion-bar {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Transcript ------------------------------------------------------------ */
+
+.companion-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 2px 4px;
+}
+
+.companion-transcript-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+  text-align: center;
+  margin-top: 12px;
+}
+
+.companion-line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  animation: companion-line-in 200ms var(--clide-ease) both;
+}
+
+.companion-line--clide {
+  align-self: flex-start;
+  max-width: 92%;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.companion-line--user {
+  align-self: flex-end;
+  max-width: 92%;
+  background: rgba(252, 211, 77, 0.14);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.companion-line-time {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+@keyframes companion-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .companion-orb,
+  .companion-orb--listening,
+  .companion-face--pulse .companion-orb {
+    animation: none !important;
+  }
+  .companion-bar {
+    transition: none;
+  }
+  .companion-line {
+    animation: none;
+  }
+}

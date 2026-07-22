@@ -1,3 +1,5 @@
+- Path aliasing might help the AI for refactoring
+
 2026/07/20
 
 - No clear button for "new" badge. Also, badge maybe shouldn't be colored because it should jsut be the total "new" count. Also, the "new" badges on the result list should be in bold if unread, or at least should be something different than the normal badge once it's been read.

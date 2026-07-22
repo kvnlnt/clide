@@ -1,7 +1,7 @@
 import { FolderOpen, FolderPlus } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
-import { api } from "../rpc";
+import { useDirectoryPicker } from "../hooks/useDirectoryPicker";
 
 const basename = (p: string) => p.split("/").filter(Boolean).pop() ?? p;
 
@@ -17,6 +17,7 @@ const SEARCH_THRESHOLD = 8;
  */
 export default function WelcomeScreen() {
   const { projects, recentProjects, setActiveProject, openNewProject, createProject } = useApp();
+  const chooseDirectory = useDirectoryPicker();
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -36,7 +37,7 @@ export default function WelcomeScreen() {
   const openExisting = async () => {
     setError(null);
     setOpening(true);
-    const picked = await api.chooseDirectory();
+    const picked = await chooseDirectory();
     if (!picked) {
       setOpening(false);
       return;

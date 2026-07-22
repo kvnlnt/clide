@@ -7,6 +7,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, realpath } from "node:fs/promises";
 import { dirname, join, normalize, resolve as pathResolve, relative } from "node:path";
+import { listProjects } from "../config";
 import { appDataDir } from "../paths";
 import { DropboxProvider } from "./dropbox";
 import { GDriveProvider } from "./gdrive";
@@ -89,6 +90,23 @@ export async function listAppLocations(): Promise<VfsLocation[]> {
 /** List all project-scoped locations for a project. */
 export async function listProjectLocations(projectPath: string): Promise<VfsLocation[]> {
   return loadLocations(projectLocationsPath(projectPath));
+}
+
+/**
+ * List project-scoped locations across every registered project, each
+ * tagged with the owning project's display name (ticket 132: app Files view
+ * cross-project toggle).
+ */
+export async function listAllProjectLocations(): Promise<{ location: VfsLocation; projectName: string }[]> {
+  const projects = await listProjects();
+  const results: { location: VfsLocation; projectName: string }[] = [];
+  for (const project of projects) {
+    const locs = await listProjectLocations(project.path);
+    for (const location of locs) {
+      results.push({ location, projectName: project.name });
+    }
+  }
+  return results;
 }
 
 /** Get a specific location by id (checks both scopes). */

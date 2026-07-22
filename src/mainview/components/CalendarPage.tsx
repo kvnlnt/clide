@@ -1,63 +1,36 @@
-import { ChevronLeft, ChevronRight, Play, Plus, Trash2, Workflow as WorkflowIcon, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, Play, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import CalendarComposer from "./CalendarComposer";
 import Modal from "./Modal";
 import MonthYearPicker from "./MonthYearPicker";
 import { useUIFeedback } from "./UIFeedback";
-import type { RepeatInterval, RunRecord, ScheduledWorkflowRun } from "../types/tasks";
+import AgendaView from "./calendar/AgendaView";
+import DayView from "./calendar/DayView";
+import MonthView from "./calendar/MonthView";
+import WeekView from "./calendar/WeekView";
+import {
+  addDays,
+  buildAgendaChips,
+  buildChipsByDay,
+  endOfDay,
+  startOfDay,
+  startOfGrid,
+  startOfMonth,
+  startOfWeek,
+} from "./calendar/calendarUtils";
+import type { Chip, ChipFilter, Selected } from "./calendar/calendarUtils";
+import type { CalendarViewMode, RepeatInterval } from "../types/tasks";
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MAX_CHIPS_PER_DAY = 4;
+/** How far forward the Agenda view looks (ticket 128) — enough to surface weekly-recurring items several cycles out. */
+const AGENDA_WINDOW_DAYS = 90;
 
-function startOfMonth(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
-}
-
-function startOfGrid(d: Date): Date {
-  const s = startOfMonth(d);
-  const grid = new Date(s);
-  grid.setDate(grid.getDate() - s.getDay());
-  return grid;
-}
-
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
-}
-
-function isSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-function isoDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** One calendar chip — a task run or a scheduled workflow (ticket 117), visually distinguished. */
-type Chip =
-  | { key: string; date: Date; projected: boolean; kind: "task"; item: RunRecord }
-  | { key: string; date: Date; projected: boolean; kind: "workflow"; item: ScheduledWorkflowRun };
-
-/** Computes visual-only future occurrences of a recurring schedule within a date range. */
-function projectOccurrences(scheduledAt: string, repeatInterval: RepeatInterval, rangeStart: Date, rangeEnd: Date): Date[] {
-  if (!repeatInterval || repeatInterval === "none") return [];
-  const stepDays = repeatInterval === "daily" ? 1 : 7;
-  let current = addDays(new Date(scheduledAt), stepDays);
-  const occurrences: Date[] = [];
-  let guard = 0;
-  while (current < rangeStart && guard < 1000) {
-    current = addDays(current, stepDays);
-    guard++;
-  }
-  while (current <= rangeEnd && guard < 2000) {
-    occurrences.push(current);
-    current = addDays(current, stepDays);
-    guard++;
-  }
-  return occurrences;
-}
+const VIEWS: { id: CalendarViewMode; label: string }[] = [
+  { id: "day", label: "Day" },
+  { id: "week", label: "Week" },
+  { id: "month", label: "Month" },
+  { id: "agenda", label: "Agenda" },
+];
 
 export default function CalendarPage() {
   const {
@@ -67,17 +40,22 @@ export default function CalendarPage() {
     updateScheduledRun,
     runScheduledNow,
     deleteRun,
+    deleteOccurrence,
     scheduledWorkflows,
     rescheduleWorkflowRun,
     runScheduledWorkflowRunNow,
     cancelScheduledWorkflowRun,
+    deleteScheduledWorkflowOccurrence,
+    calendarView: view,
+    setCalendarView: setView,
   } = useApp();
   const { confirm, toast } = useUIFeedback();
-  const [month, setMonth] = useState(() => startOfMonth(new Date()));
-  const [selected, setSelected] = useState<
-    { kind: "task"; id: string } | { kind: "workflow"; id: string } | null
-  >(null);
-  /** Day being composed for (ticket 69). Composer and ScheduleDetail are mutually exclusive. */
+
+  /** Where the current view is positioned — reset to "now" on mount, like the old month-only state. */
+  const [anchorDate, setAnchorDate] = useState(() => new Date());
+  const [filter, setFilter] = useState<ChipFilter>({ tasks: true, workflows: true });
+  const [selected, setSelected] = useState<Selected>(null);
+  /** Day (optionally with an hour, from a Day/Week slot click) being composed for (ticket 69/128). */
   const [composeDate, setComposeDate] = useState<Date | null>(null);
 
   const openComposer = (day: Date) => {
@@ -87,7 +65,11 @@ export default function CalendarPage() {
 
   const openDetail = (chip: Chip) => {
     setComposeDate(null);
-    setSelected(chip.kind === "task" ? { kind: "task", id: chip.item.id } : { kind: "workflow", id: chip.item.id });
+    setSelected(
+      chip.kind === "task"
+        ? { kind: "task", id: chip.item.id, occurrenceAt: chip.date.toISOString() }
+        : { kind: "workflow", id: chip.item.id, occurrenceAt: chip.date.toISOString() },
+    );
   };
 
   const scheduledTasks = useMemo(
@@ -95,138 +77,238 @@ export default function CalendarPage() {
     [runs, tasksBySlug, activeProject],
   );
 
-  const gridStart = useMemo(() => startOfGrid(month), [month]);
-  const days = useMemo(() => Array.from({ length: 42 }, (_, i) => addDays(gridStart, i)), [gridStart]);
-  const rangeEnd = days[days.length - 1]!;
+  const anchorMonth = useMemo(() => startOfMonth(anchorDate), [anchorDate]);
+  const anchorWeekStart = useMemo(() => startOfWeek(anchorDate), [anchorDate]);
+  const anchorDay = useMemo(() => startOfDay(anchorDate), [anchorDate]);
 
-  const chipsByDay = useMemo(() => {
-    const map = new Map<string, Chip[]>();
-    const push = (chip: Chip) => {
-      const key = isoDate(chip.date);
-      const list = map.get(key) ?? [];
-      list.push(chip);
-      map.set(key, list);
+  const { rangeStart, rangeEnd } = useMemo(() => {
+    if (view === "month") {
+      const gridStart = startOfGrid(anchorMonth);
+      return { rangeStart: gridStart, rangeEnd: endOfDay(addDays(gridStart, 41)) };
+    }
+    if (view === "week") {
+      return { rangeStart: anchorWeekStart, rangeEnd: endOfDay(addDays(anchorWeekStart, 6)) };
+    }
+    if (view === "day") {
+      return { rangeStart: anchorDay, rangeEnd: endOfDay(anchorDay) };
+    }
+    const today = startOfDay(new Date());
+    return { rangeStart: today, rangeEnd: endOfDay(addDays(today, AGENDA_WINDOW_DAYS)) };
+  }, [view, anchorMonth, anchorWeekStart, anchorDay]);
+
+  const chipsByDay = useMemo(
+    () => buildChipsByDay(scheduledTasks, scheduledWorkflows, rangeStart, rangeEnd, filter),
+    [scheduledTasks, scheduledWorkflows, rangeStart, rangeEnd, filter],
+  );
+  const agendaChips = useMemo(
+    () => (view === "agenda" ? buildAgendaChips(scheduledTasks, scheduledWorkflows, rangeStart, rangeEnd, filter) : []),
+    [view, scheduledTasks, scheduledWorkflows, rangeStart, rangeEnd, filter],
+  );
+
+  const periodLabel = useMemo(() => {
+    if (view === "month") return anchorMonth.toLocaleDateString([], { month: "long", year: "numeric" });
+    if (view === "week") {
+      const end = addDays(anchorWeekStart, 6);
+      const sameMonth = anchorWeekStart.getMonth() === end.getMonth();
+      const startStr = anchorWeekStart.toLocaleDateString([], { month: "short", day: "numeric" });
+      const endStr = end.toLocaleDateString(
+        [],
+        sameMonth ? { day: "numeric", year: "numeric" } : { month: "short", day: "numeric", year: "numeric" },
+      );
+      return `${startStr} – ${endStr}`;
+    }
+    if (view === "day") {
+      return anchorDay.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+    }
+    return `Next ${AGENDA_WINDOW_DAYS} days`;
+  }, [view, anchorMonth, anchorWeekStart, anchorDay]);
+
+  const page = useCallback(
+    (dir: number) => {
+      if (view === "month") setAnchorDate((d) => new Date(d.getFullYear(), d.getMonth() + dir, 1));
+      else if (view === "week") setAnchorDate((d) => addDays(d, dir * 7));
+      else if (view === "day") setAnchorDate((d) => addDays(d, dir));
+    },
+    [view],
+  );
+  const goToday = () => setAnchorDate(new Date());
+
+  // Keyboard paging between periods (ticket 128) — inert while a modal is open
+  // (the same overlay-guard convention App.tsx uses for its shortcuts), while
+  // typing into a field, or in Agenda (which has no discrete "period").
+  useEffect(() => {
+    if (view === "agenda") return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (composeDate || selected) return;
+      const target = e.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      if (e.key === "ArrowLeft" || e.key === "[") {
+        e.preventDefault();
+        page(-1);
+      } else if (e.key === "ArrowRight" || e.key === "]") {
+        e.preventDefault();
+        page(1);
+      }
     };
-    for (const run of scheduledTasks) {
-      if (!run.scheduledAt) continue;
-      push({ key: `${run.id}-real`, date: new Date(run.scheduledAt), projected: false, kind: "task", item: run });
-      for (const occ of projectOccurrences(run.scheduledAt, run.repeatInterval ?? "none", gridStart, rangeEnd)) {
-        push({ key: `${run.id}-${occ.getTime()}`, date: occ, projected: true, kind: "task", item: run });
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [view, composeDate, selected, page]);
+
+  const rescheduleChip = useCallback(
+    async (chip: Chip, slot: Date) => {
+      if (chip.projected) return;
+      if (slot.getTime() <= Date.now()) {
+        toast("That's in the past — pick a future time.", "error");
+        return;
       }
-    }
-    for (const sw of scheduledWorkflows) {
-      push({ key: `${sw.id}-real`, date: new Date(sw.scheduledAt), projected: false, kind: "workflow", item: sw });
-      for (const occ of projectOccurrences(sw.scheduledAt, sw.repeatInterval, gridStart, rangeEnd)) {
-        push({ key: `${sw.id}-${occ.getTime()}`, date: occ, projected: true, kind: "workflow", item: sw });
+      if (chip.kind === "task") {
+        await updateScheduledRun(chip.item.id, slot.toISOString(), chip.item.repeatInterval ?? "none");
+      } else {
+        await rescheduleWorkflowRun(chip.item.id, slot.toISOString(), chip.item.repeatInterval);
       }
-    }
-    return map;
-  }, [scheduledTasks, scheduledWorkflows, gridStart, rangeEnd]);
+      const when = slot.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+      toast(`Rescheduled to ${when}`);
+    },
+    [toast, updateScheduledRun, rescheduleWorkflowRun],
+  );
+
+  /** Month's drop target is a whole day cell — keep the chip's original time-of-day. */
+  const handleDropOnDay = useCallback(
+    (chip: Chip, day: Date) => {
+      const slot = new Date(day);
+      slot.setHours(chip.date.getHours(), chip.date.getMinutes(), 0, 0);
+      void rescheduleChip(chip, slot);
+    },
+    [rescheduleChip],
+  );
 
   const selectedTask = selected?.kind === "task" ? scheduledTasks.find((r) => r.id === selected.id) : undefined;
   const selectedWorkflow =
     selected?.kind === "workflow" ? scheduledWorkflows.find((s) => s.id === selected.id) : undefined;
 
+  const composeInitialTime = useMemo(() => {
+    if (!composeDate) return undefined;
+    if (composeDate.getHours() === 0 && composeDate.getMinutes() === 0) return undefined;
+    return `${String(composeDate.getHours()).padStart(2, "0")}:${String(composeDate.getMinutes()).padStart(2, "0")}`;
+  }, [composeDate]);
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-3 px-[var(--clide-page-x)] pb-4 pt-[var(--clide-page-top)]">
+      <div className="flex shrink-0 flex-wrap items-center gap-3 px-[var(--clide-page-x)] pb-4 pt-[var(--clide-page-top)]">
         <h1 className="text-[20px] font-bold text-white">Calendar</h1>
         <span className="text-[13px] text-white/40">{activeProject}</span>
+
+        <div className="flex items-center gap-1 rounded-md border border-clide-border bg-clide-surface px-2 py-1 text-[11px]">
+          <FilterToggle active={filter.tasks} swatch="bg-white/50" label="Tasks" onClick={() => setFilter((f) => ({ ...f, tasks: !f.tasks }))} />
+          <FilterToggle
+            active={filter.workflows}
+            swatch="bg-orange-400"
+            label="Workflows"
+            onClick={() => setFilter((f) => ({ ...f, workflows: !f.workflows }))}
+          />
+        </div>
+
         <div className="flex-1" />
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
-            className="flex h-7 w-7 items-center justify-center rounded text-white/50 hover:bg-white/5 hover:text-white"
-          >
-            <ChevronLeft size={15} />
-          </button>
-          <button
-            onClick={() => setMonth(startOfMonth(new Date()))}
-            className="rounded px-2 py-1 text-[12px] text-white/50 hover:bg-white/5 hover:text-white"
-          >
+
+        <div className="flex items-center rounded-md border border-clide-border bg-clide-surface p-0.5">
+          {VIEWS.map((v) => (
+            <button
+              key={v.id}
+              onClick={() => setView(v.id)}
+              className={`rounded px-2.5 py-1 text-[12px] font-medium ${
+                view === v.id ? "bg-white/10 text-white" : "text-white/50 hover:text-white"
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+
+        {view !== "agenda" && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => page(-1)}
+              className="flex h-7 w-7 items-center justify-center rounded text-white/50 hover:bg-white/5 hover:text-white"
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <button onClick={goToday} className="rounded px-2 py-1 text-[12px] text-white/50 hover:bg-white/5 hover:text-white">
+              Today
+            </button>
+            <button
+              onClick={() => page(1)}
+              className="flex h-7 w-7 items-center justify-center rounded text-white/50 hover:bg-white/5 hover:text-white"
+            >
+              <ChevronRight size={15} />
+            </button>
+          </div>
+        )}
+        {view === "agenda" && (
+          <button onClick={goToday} className="rounded px-2 py-1 text-[12px] text-white/50 hover:bg-white/5 hover:text-white">
             Today
           </button>
-          <button
-            onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
-            className="flex h-7 w-7 items-center justify-center rounded text-white/50 hover:bg-white/5 hover:text-white"
-          >
-            <ChevronRight size={15} />
-          </button>
-        </div>
-        <MonthYearPicker value={month} onChange={setMonth} />
+        )}
+
+        {view === "month" ? (
+          <MonthYearPicker value={anchorMonth} onChange={setAnchorDate} />
+        ) : (
+          <span className="text-[13px] font-medium text-white/70">{periodLabel}</span>
+        )}
       </div>
 
       <div className="clide-scroll flex-1 overflow-y-auto px-[var(--clide-page-x)] pb-[var(--clide-page-bottom)]">
-        <div className="grid grid-cols-7 gap-px overflow-hidden rounded-md border border-clide-border bg-clide-border">
-          {DAY_NAMES.map((d) => (
-            <div key={d} className="bg-clide-panel px-2 py-1.5 text-center text-[11px] font-medium text-white/40">
-              {d}
-            </div>
-          ))}
-          {days.map((day) => {
-            const inMonth = day.getMonth() === month.getMonth();
-            const chips = chipsByDay.get(isoDate(day)) ?? [];
-            const visible = chips.slice(0, MAX_CHIPS_PER_DAY);
-            const overflow = chips.length - visible.length;
-            return (
-              <div
-                key={day.toISOString()}
-                onClick={() => openComposer(day)}
-                className={`group flex min-h-[92px] cursor-pointer flex-col gap-1 bg-clide-bg p-1.5 hover:bg-white/[0.02] ${inMonth ? "" : "opacity-40"}`}
-              >
-                <span className="flex items-center justify-between">
-                  <span
-                    className={`text-[11px] ${isSameDay(day, new Date()) ? "font-bold text-white" : "text-white/40"}`}
-                  >
-                    {day.getDate()}
-                  </span>
-                  {/* Hover affordance (ticket 69): schedule a task or workflow for this day. */}
-                  <span
-                    title="Schedule a task or workflow for this day"
-                    className="flex h-4 w-4 items-center justify-center rounded text-white/40 opacity-0 transition-opacity group-hover:opacity-100"
-                  >
-                    <Plus size={11} />
-                  </span>
-                </span>
-                {visible.map((chip) => {
-                  const name =
-                    chip.kind === "task"
-                      ? tasksBySlug.get(chip.item.taskSlug)?.meta.name ?? chip.item.taskSlug
-                      : chip.item.workflowName;
-                  const isSelected = selected?.kind === chip.kind && selected.id === chip.item.id;
-                  return (
-                    <button
-                      key={chip.key}
-                      disabled={chip.projected}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openDetail(chip);
-                      }}
-                      title={`${name} — ${chip.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
-                      className={`flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-left text-[11px] ${
-                        chip.projected
-                          ? "border border-dashed border-white/10 text-white/30"
-                          : chip.kind === "workflow"
-                            ? `text-orange-200/90 hover:bg-orange-400/20 ${isSelected ? "bg-orange-400/25" : "bg-orange-400/10"}`
-                            : `text-white/80 hover:bg-white/10 ${isSelected ? "bg-white/15" : "bg-white/5"}`
-                      }`}
-                    >
-                      {chip.kind === "workflow" && <WorkflowIcon size={10} className="shrink-0" />}
-                      <span className="truncate">
-                        {chip.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} {name}
-                      </span>
-                    </button>
-                  );
-                })}
-                {overflow > 0 && <span className="text-[10px] text-white/30">+{overflow} more</span>}
-              </div>
-            );
-          })}
-        </div>
+        {view === "month" && (
+          <MonthView
+            month={anchorMonth}
+            chipsByDay={chipsByDay}
+            tasksBySlug={tasksBySlug}
+            selected={selected}
+            onSelectChip={openDetail}
+            onDayClick={openComposer}
+            onOverflowClick={(day) => {
+              setAnchorDate(day);
+              setView("day");
+            }}
+            onDropChip={handleDropOnDay}
+          />
+        )}
+        {view === "week" && (
+          <WeekView
+            anchor={anchorWeekStart}
+            chipsByDay={chipsByDay}
+            tasksBySlug={tasksBySlug}
+            selected={selected}
+            onSelectChip={openDetail}
+            onSlotClick={openComposer}
+            onDropChip={(chip, slot) => void rescheduleChip(chip, slot)}
+          />
+        )}
+        {view === "day" && (
+          <DayView
+            day={anchorDay}
+            chipsByDay={chipsByDay}
+            tasksBySlug={tasksBySlug}
+            selected={selected}
+            onSelectChip={openDetail}
+            onSlotClick={openComposer}
+            onDropChip={(chip, slot) => void rescheduleChip(chip, slot)}
+          />
+        )}
+        {view === "agenda" && (
+          <AgendaView
+            chips={agendaChips}
+            tasksBySlug={tasksBySlug}
+            selected={selected}
+            onSelectChip={openDetail}
+            onScheduleForDate={openComposer}
+          />
+        )}
 
-        {composeDate && <CalendarComposer date={composeDate} onClose={() => setComposeDate(null)} />}
+        {composeDate && (
+          <CalendarComposer date={composeDate} initialTime={composeInitialTime} onClose={() => setComposeDate(null)} />
+        )}
 
-        {selectedTask && (
+        {selectedTask && selected?.kind === "task" && (
           <ScheduleDetail
             label={tasksBySlug.get(selectedTask.taskSlug)?.meta.name ?? selectedTask.taskSlug}
             scheduledAt={selectedTask.scheduledAt ?? new Date().toISOString()}
@@ -242,23 +324,28 @@ export default function CalendarPage() {
               toast("Run started");
               setSelected(null);
             }}
-            onCancel={async () => {
+            onCancel={async (scope) => {
               const name = tasksBySlug.get(selectedTask.taskSlug)?.meta.name ?? selectedTask.taskSlug;
+              const recurring = !!selectedTask.repeatInterval && selectedTask.repeatInterval !== "none";
               const res = await confirm({
-                title: "Cancel this scheduled run?",
-                message: `"${name}" will no longer run${selectedTask.repeatInterval && selectedTask.repeatInterval !== "none" ? ", including future repeats" : ""}.`,
-                confirmLabel: "Cancel run",
+                title: !recurring ? "Cancel this scheduled run?" : scope === "series" ? "Delete the entire series?" : "Delete this occurrence?",
+                message:
+                  scope === "series"
+                    ? `"${name}" will no longer run${recurring ? ", including future repeats" : ""}.`
+                    : `Only this occurrence of "${name}" is removed — the rest of the series stays scheduled.`,
+                confirmLabel: !recurring ? "Cancel run" : scope === "series" ? "Delete series" : "Delete occurrence",
                 cancelLabel: "Keep it",
               });
               if (!res.ok) return;
-              await deleteRun(selectedTask.id);
-              toast("Schedule cancelled");
+              if (scope === "series") await deleteRun(selectedTask.id);
+              else await deleteOccurrence(selectedTask.id, selected.occurrenceAt);
+              toast(scope === "series" ? "Schedule cancelled" : "Occurrence deleted");
               setSelected(null);
             }}
           />
         )}
 
-        {selectedWorkflow && (
+        {selectedWorkflow && selected?.kind === "workflow" && (
           <ScheduleDetail
             label={selectedWorkflow.workflowName}
             scheduledAt={selectedWorkflow.scheduledAt}
@@ -274,22 +361,27 @@ export default function CalendarPage() {
               toast("Workflow run started");
               setSelected(null);
             }}
-            onCancel={async () => {
+            onCancel={async (scope) => {
+              const recurring = selectedWorkflow.repeatInterval !== "none";
               const res = await confirm({
-                title: "Cancel this scheduled run?",
-                message: `"${selectedWorkflow.workflowName}" will no longer run${selectedWorkflow.repeatInterval !== "none" ? ", including future repeats" : ""}.`,
-                confirmLabel: "Cancel run",
+                title: !recurring ? "Cancel this scheduled run?" : scope === "series" ? "Delete the entire series?" : "Delete this occurrence?",
+                message:
+                  scope === "series"
+                    ? `"${selectedWorkflow.workflowName}" will no longer run${recurring ? ", including future repeats" : ""}.`
+                    : `Only this occurrence of "${selectedWorkflow.workflowName}" is removed — the rest of the series stays scheduled.`,
+                confirmLabel: !recurring ? "Cancel run" : scope === "series" ? "Delete series" : "Delete occurrence",
                 cancelLabel: "Keep it",
               });
               if (!res.ok) return;
-              await cancelScheduledWorkflowRun(selectedWorkflow.id);
-              toast("Schedule cancelled");
+              if (scope === "series") await cancelScheduledWorkflowRun(selectedWorkflow.id);
+              else await deleteScheduledWorkflowOccurrence(selectedWorkflow.id, selected.occurrenceAt);
+              toast(scope === "series" ? "Schedule cancelled" : "Occurrence deleted");
               setSelected(null);
             }}
           />
         )}
 
-        {scheduledTasks.length === 0 && scheduledWorkflows.length === 0 && !composeDate && (
+        {view !== "agenda" && scheduledTasks.length === 0 && scheduledWorkflows.length === 0 && !composeDate && (
           <div className="mt-6 text-center text-[13px] text-white/30">
             Nothing scheduled. Click a day to schedule a task or workflow, or use a task's ⋯ menu.
           </div>
@@ -299,6 +391,21 @@ export default function CalendarPage() {
   );
 }
 
+function FilterToggle({ active, swatch, label, onClick }: { active: boolean; swatch: string; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 ${active ? "text-white/80" : "text-white/30"}`}
+    >
+      <span className={`h-2 w-2 rounded-full ${active ? swatch : "bg-white/15"}`} />
+      {label}
+    </button>
+  );
+}
+
+/** "occurrence" drops just the instance being viewed; "series" ends the whole recurrence (ticket 129). */
+type CancelScope = "occurrence" | "series";
+
 interface ScheduleDetailProps {
   label: string;
   scheduledAt: string;
@@ -306,12 +413,14 @@ interface ScheduleDetailProps {
   onClose: () => void;
   onSave: (scheduledAt: string, repeat: RepeatInterval) => Promise<void>;
   onRunNow: () => Promise<void>;
-  onCancel: () => Promise<void>;
+  onCancel: (scope: CancelScope) => Promise<void>;
 }
 
 function ScheduleDetail({ label, scheduledAt, repeatInterval, onClose, onSave, onRunNow, onCancel }: ScheduleDetailProps) {
   const scheduledDate = new Date(scheduledAt);
-  const [date, setDate] = useState(isoDate(scheduledDate));
+  const [date, setDate] = useState(
+    `${scheduledDate.getFullYear()}-${String(scheduledDate.getMonth() + 1).padStart(2, "0")}-${String(scheduledDate.getDate()).padStart(2, "0")}`,
+  );
   const [time, setTime] = useState(
     `${String(scheduledDate.getHours()).padStart(2, "0")}:${String(scheduledDate.getMinutes()).padStart(2, "0")}`,
   );
@@ -375,12 +484,29 @@ function ScheduleDetail({ label, scheduledAt, repeatInterval, onClose, onSave, o
         >
           <Play size={13} /> Run now
         </button>
-        <button
-          onClick={() => void onCancel()}
-          className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium text-red-400/70 hover:bg-red-500/10 hover:text-red-400"
-        >
-          <Trash2 size={13} /> Cancel
-        </button>
+        {repeatInterval !== "none" ? (
+          <>
+            <button
+              onClick={() => void onCancel("occurrence")}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium text-red-400/70 hover:bg-red-500/10 hover:text-red-400"
+            >
+              <Trash2 size={13} /> Delete this occurrence
+            </button>
+            <button
+              onClick={() => void onCancel("series")}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium text-red-400/70 hover:bg-red-500/10 hover:text-red-400"
+            >
+              <Trash2 size={13} /> Delete the series
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => void onCancel("series")}
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium text-red-400/70 hover:bg-red-500/10 hover:text-red-400"
+          >
+            <Trash2 size={13} /> Cancel
+          </button>
+        )}
       </div>
     </Modal>
   );

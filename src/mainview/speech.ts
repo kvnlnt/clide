@@ -9,7 +9,11 @@
  * Command-and-response only, per the ticket: a recognized transcript is
  * handed to the caller to run through the existing ⌘K command surface,
  * not fed to a conversational agent.
+ *
+ * Ticket 137 adds a Settings home for this: a synthesis voice picker and a
+ * configurable push-to-talk activation key, both persisted in UIState.
  */
+import type { CompanionSpeechPhase, SpeechActivationKey } from "../shared/types";
 
 // Minimal ambient shape for the non-standard SpeechRecognition API — no
 // @types package ships one, and this project only needs a few members.
@@ -49,13 +53,48 @@ export function isSpeechSynthesisSupported(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window;
 }
 
-/** Speak a line of text (voice out). No-ops silently when unsupported. */
-export function speak(text: string): void {
+/** Available synthesis voices. Empty until the browser loads them — see loadVoicesWhenReady. */
+export function listVoices(): SpeechSynthesisVoice[] {
+  if (!isSpeechSynthesisSupported()) return [];
+  return window.speechSynthesis.getVoices();
+}
+
+/**
+ * Voice lists load asynchronously in most engines. Calls `onVoicesChanged`
+ * once now (in case they're already loaded) and again whenever the
+ * `voiceschanged` event fires; returns an unsubscribe function.
+ */
+export function loadVoicesWhenReady(onVoicesChanged: (voices: SpeechSynthesisVoice[]) => void): () => void {
+  if (!isSpeechSynthesisSupported()) return () => {};
+  const handler = () => onVoicesChanged(window.speechSynthesis.getVoices());
+  handler();
+  window.speechSynthesis.addEventListener("voiceschanged", handler);
+  return () => window.speechSynthesis.removeEventListener("voiceschanged", handler);
+}
+
+/**
+ * Speak a line of text (voice out). No-ops silently when unsupported.
+ * `voiceURI` picks a specific voice (ticket 137); absent/unmatched falls
+ * back to the platform default. `onPhase` (ticket 138) fires on the
+ * utterance's start/boundary/end lifecycle — the voice companion window
+ * relays these over IPC to drive its procedural waveform, since WebKit
+ * exposes no audio buffer to sample real amplitude from.
+ */
+export function speak(text: string, voiceURI?: string, onPhase?: (phase: CompanionSpeechPhase, charIndex?: number) => void): void {
   const trimmed = text.trim();
   if (!trimmed || !isSpeechSynthesisSupported()) return;
   // Don't queue over whatever's already being said — the newest result wins.
   window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(new SpeechSynthesisUtterance(trimmed));
+  const utterance = new SpeechSynthesisUtterance(trimmed);
+  const voice = voiceURI ? window.speechSynthesis.getVoices().find((v) => v.voiceURI === voiceURI) : undefined;
+  if (voice) utterance.voice = voice;
+  if (onPhase) {
+    utterance.onstart = () => onPhase("start");
+    utterance.onboundary = (e) => onPhase("boundary", e.charIndex);
+    utterance.onend = () => onPhase("end");
+    utterance.onerror = () => onPhase("end");
+  }
+  window.speechSynthesis.speak(utterance);
 }
 
 export function stopSpeaking(): void {
@@ -106,4 +145,23 @@ export function startListening(
   }
 
   return { stop: () => recognition.stop() };
+}
+
+/**
+ * Push-to-talk activation key presets (ticket 137). Each is always chorded
+ * with Cmd (mac) / Ctrl (other) + Shift, matching the app's existing
+ * modifier-chord shortcut scheme (see App.tsx's onKeyDown) — a bare key
+ * would fire while typing anywhere else in the app.
+ */
+export const SPEECH_ACTIVATION_KEYS: { value: SpeechActivationKey; eventKey: string; label: string }[] = [
+  { value: "l", eventKey: "l", label: "L" },
+  { value: "m", eventKey: "m", label: "M" },
+  { value: "space", eventKey: " ", label: "Space" },
+  { value: "grave", eventKey: "`", label: "`" },
+];
+
+/** Human-readable chord for the given activation key, e.g. "⌘⇧L" on mac, "Ctrl+Shift+L" elsewhere. */
+export function formatSpeechActivationShortcut(key: SpeechActivationKey, isMac: boolean): string {
+  const preset = SPEECH_ACTIVATION_KEYS.find((k) => k.value === key) ?? SPEECH_ACTIVATION_KEYS[0]!;
+  return isMac ? `⌘⇧${preset.label}` : `Ctrl+Shift+${preset.label}`;
 }

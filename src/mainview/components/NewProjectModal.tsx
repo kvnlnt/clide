@@ -1,7 +1,7 @@
 import { FolderOpen, FolderPlus, X } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
-import { api } from "../rpc";
+import { useDirectoryPicker } from "../hooks/useDirectoryPicker";
 import Modal from "./Modal";
 
 interface NewProjectModalProps {
@@ -29,6 +29,7 @@ interface NewProjectFormProps {
  */
 export function NewProjectForm({ onDone, onCancel }: NewProjectFormProps) {
   const { createProject } = useApp();
+  const chooseDirectory = useDirectoryPicker();
   const [mode, setMode] = useState<Mode>("new");
   const [name, setName] = useState("");
   // "new" mode: optional parent location to create the folder in.
@@ -46,14 +47,14 @@ export function NewProjectForm({ onDone, onCancel }: NewProjectFormProps) {
 
   const chooseLocation = async () => {
     setBrowsing(true);
-    const picked = await api.chooseDirectory(location || undefined);
+    const picked = await chooseDirectory(location || undefined);
     setBrowsing(false);
     if (picked) setLocation(picked);
   };
 
   const chooseFolder = async () => {
     setBrowsing(true);
-    const picked = await api.chooseDirectory(path || undefined);
+    const picked = await chooseDirectory(path || undefined);
     setBrowsing(false);
     if (picked) {
       setPath(picked);

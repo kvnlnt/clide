@@ -1,0 +1,1 @@
+I'd be great to creat a "focus" or "monitoring" feature that was cross-project/view that was some type of a highly customizable and visualizable dashboard. It should be it's own distinct window. I think "distinct windows" here are the true "custom apps" of the system.

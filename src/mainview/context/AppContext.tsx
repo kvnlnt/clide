@@ -1,14 +1,25 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, on } from "../rpc";
 import { matchesView } from "../../shared/viewFilters";
-import { isSpeechRecognitionSupported, speak, startListening, stopSpeaking } from "../speech";
+import { blankReport } from "../reportUtils";
+import {
+  isSpeechRecognitionSupported,
+  SPEECH_ACTIVATION_KEYS,
+  speak,
+  startListening,
+  stopSpeaking,
+} from "../speech";
 import type {
+  CalendarViewMode,
+  CompanionTranscriptLine,
   FilterEntry,
   OutputChunk,
   Project,
   RepeatInterval,
+  Report,
   RunRecord,
   ScheduledWorkflowRun,
+  SpeechActivationKey,
   TaskFolder,
   TaskMetaPatch,
   ThreadView,
@@ -22,7 +33,15 @@ export interface DraftCard {
 }
 
 /** Which surface the title tab's body shows. Only meaningful when no view tab is active. */
-export type ProjectSurface = "thread" | "tasks" | "views" | "calendar" | "files" | "project-settings" | "workflows";
+export type ProjectSurface =
+  | "thread"
+  | "tasks"
+  | "views"
+  | "calendar"
+  | "files"
+  | "project-settings"
+  | "workflows"
+  | "reports";
 
 /** What the profile interview takeover (tickets 100/101) is interviewing about. */
 export type ProfileInterviewTarget =
@@ -48,6 +67,9 @@ interface AppState {
   /** Denser spacing across the main surfaces (ticket 119), persisted. */
   compactMode: boolean;
   setCompactMode: (next: boolean) => void;
+  /** Last-used Calendar view (ticket 128), persisted. */
+  calendarView: CalendarViewMode;
+  setCalendarView: (next: CalendarViewMode) => void;
 
   /** What the title tab's body shows (thread / Tasks / Views / Project Settings). */
   projectSurface: ProjectSurface;
@@ -84,16 +106,30 @@ interface AppState {
   openRunPicker: () => void;
   closeRunPicker: () => void;
 
-  /** Speech mode (ticket 123) — never persisted, always off on boot. */
+  /** Speech mode (ticket 123) — never persisted, always off on boot. Being "active" just arms it; see pressToTalk. */
   speechModeActive: boolean;
   toggleSpeechMode: () => void;
-  /** True while a voice-command recognition session is actively listening. */
+  /** True while a voice-command recognition session is actively listening (mic open). */
   speechListening: boolean;
   /** Last speech error (unsupported env, mic denied, recognition failure) — cleared on the next attempt. */
   speechError: string | null;
   /** Set once a voice command is recognized; RunPicker reads and clears it. */
   pendingSpeechQuery: string | null;
   consumePendingSpeechQuery: () => void;
+  /** Push-to-talk (ticket 137): opens one listen session while speech mode is armed, or stops an in-flight one. Also bound to speechActivationKey. */
+  pressToTalk: () => void;
+  /** Selected speechSynthesis voice (ticket 137), persisted. Undefined = platform default. */
+  speechVoiceURI: string | undefined;
+  setSpeechVoiceURI: (voiceURI: string | undefined) => void;
+  /** Push-to-talk activation key (ticket 137), persisted. */
+  speechActivationKey: SpeechActivationKey;
+  setSpeechActivationKey: (key: SpeechActivationKey) => void;
+
+  /** Voice companion window (ticket 138) — persisted, defaults to shown/unmuted. */
+  companionEnabled: boolean;
+  setCompanionEnabled: (enabled: boolean) => void;
+  companionMuted: boolean;
+  setCompanionMuted: (muted: boolean) => void;
 
   /** Full-window AI profile interview takeover (tickets 100/101). */
   profileInterview: ProfileInterviewTarget | null;
@@ -142,6 +178,18 @@ interface AppState {
   openWorkflowEditor: (workflow?: Workflow, focusName?: boolean) => void;
   closeWorkflowEditor: () => void;
 
+  /** Reports for the active project (ticket 134). */
+  reports: Report[];
+  refreshReports: () => Promise<void>;
+  saveReport: (report: Report) => Promise<{ ok: boolean; error?: string }>;
+  deleteReportById: (id: string) => Promise<void>;
+  /** Full-window report builder hosting (ticket 134). "new" still carries a
+   *  concrete (blank) Report, generated once at open time, so the editor's
+   *  dirty-check against `initial` stays stable across parent re-renders. */
+  reportEditor: { mode: "new" | "edit"; report: Report } | null;
+  openReportEditor: (report?: Report) => void;
+  closeReportEditor: () => void;
+
   /** Calendar-scheduled workflow runs for the active project (ticket 117). */
   scheduledWorkflows: ScheduledWorkflowRun[];
   scheduleWorkflowRun: (
@@ -153,6 +201,8 @@ interface AppState {
   ) => Promise<{ ok: boolean; id?: string; error?: string }>;
   rescheduleWorkflowRun: (id: string, scheduledAt: string, repeat: RepeatInterval) => Promise<void>;
   cancelScheduledWorkflowRun: (id: string) => Promise<void>;
+  /** Delete a single occurrence of a recurring scheduled workflow run, leaving the rest of the series intact (ticket 129). */
+  deleteScheduledWorkflowOccurrence: (id: string, occurrenceAt: string) => Promise<void>;
   runScheduledWorkflowRunNow: (id: string) => Promise<void>;
 
   setActiveProject: (p: string | null) => void;
@@ -186,8 +236,12 @@ interface AppState {
   rerun: (run: RunRecord) => Promise<void>;
   setPinned: (runId: string, pinned: boolean) => Promise<void>;
   deleteRun: (runId: string) => Promise<void>;
+  /** Delete a single occurrence of a recurring scheduled run, leaving the rest of the series intact (ticket 129). */
+  deleteOccurrence: (runId: string, occurrenceAt: string) => Promise<void>;
   /** Mark a run as read (ticket 97). Optimistically updates local state. */
   markRunRead: (runId: string) => Promise<void>;
+  /** Mark every unread run in a project as read (ticket 126 sidebar "mark all read"). */
+  markProjectRunsRead: (projectName: string) => Promise<void>;
 
   refreshTasks: () => Promise<void>;
   refreshRuns: () => Promise<void>;
@@ -283,6 +337,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   /** Denser spacing across the main surfaces (ticket 119), persisted in UIState. */
   const [compactMode, setCompactModeState] = useState(false);
+  /** Last-used Calendar view (ticket 128), persisted in UIState. */
+  const [calendarView, setCalendarViewState] = useState<CalendarViewMode>("month");
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newTaskOpen, setNewFormOpen] = useState(false);
   const [projectSurface, setProjectSurfaceState] = useState<ProjectSurface>("thread");
@@ -302,6 +358,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     speechModeActiveRef.current = speechModeActive;
   }, [speechModeActive]);
+  /** Selected synthesis voice (ticket 137), persisted in UIState. */
+  const [speechVoiceURI, setSpeechVoiceURIState] = useState<string | undefined>(undefined);
+  /** Mirrors speechVoiceURI for the mount-only push-event subscription below. */
+  const speechVoiceURIRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    speechVoiceURIRef.current = speechVoiceURI;
+  }, [speechVoiceURI]);
+  /** Push-to-talk activation key (ticket 137), persisted in UIState. */
+  const [speechActivationKey, setSpeechActivationKeyState] = useState<SpeechActivationKey>("l");
+  // Voice companion (ticket 138) — the floating window's enabled/muted flags
+  // live in bun-side UIState (see uiState.ts), since only bun can create the
+  // second BrowserWindow. Mirrored here (and kept live via onCompanionEnabled/
+  // MutedChanged pushes, since the companion's own UI can also toggle mute)
+  // so Settings and the boot-time greeting can read them synchronously.
+  const [companionEnabled, setCompanionEnabledState] = useState(true);
+  const [companionMuted, setCompanionMutedState] = useState(false);
+  const companionMutedRef = useRef(false);
+  useEffect(() => {
+    companionMutedRef.current = companionMuted;
+  }, [companionMuted]);
   const [viewSettingsOpen, setViewSettingsOpen] = useState(false);
   const [aiWizardOpen, setAiWizardOpen] = useState(false);
   const [aiWizardChained, setAiWizardChained] = useState(false);
@@ -318,6 +394,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [workflowEditor, setWorkflowEditor] = useState<
     { mode: "new" } | { mode: "edit"; workflow: Workflow; focusName?: boolean } | null
   >(null);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [reportEditor, setReportEditor] = useState<{ mode: "new" | "edit"; report: Report } | null>(null);
   /** Calendar-scheduled workflow runs for the active project (ticket 117). */
   const [scheduledWorkflows, setScheduledWorkflows] = useState<ScheduledWorkflowRun[]>([]);
 
@@ -386,10 +464,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       activeViewByProject: { ...viewByProjectRef.current },
       recentProjects: [...recentsRef.current],
       compactMode,
+      calendarView,
+      speechVoiceURI,
+      speechActivationKey,
     });
-  }, [activeProject, activeViewId, compactMode]);
+  }, [activeProject, activeViewId, compactMode, calendarView, speechVoiceURI, speechActivationKey]);
 
   const setCompactMode = useCallback((next: boolean) => setCompactModeState(next), []);
+  const setCalendarView = useCallback((next: CalendarViewMode) => setCalendarViewState(next), []);
+  const setSpeechVoiceURI = useCallback((next: string | undefined) => setSpeechVoiceURIState(next), []);
+  const setSpeechActivationKey = useCallback((next: SpeechActivationKey) => setSpeechActivationKeyState(next), []);
+
+  /** Companion window enable/disable and mute (ticket 138) — bun owns the window lifecycle, so these round-trip through it. */
+  const setCompanionEnabled = useCallback((next: boolean) => {
+    setCompanionEnabledState(next);
+    void (next ? api.showCompanion() : api.hideCompanion());
+  }, []);
+  const setCompanionMuted = useCallback((next: boolean) => {
+    setCompanionMutedState(next);
+    void api.setCompanionMuted(next);
+  }, []);
 
   const persistViews = useCallback(
     (next: ThreadView[]) => {
@@ -626,6 +720,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       recentsRef.current = ui.recentProjects;
       setRecentProjects(ui.recentProjects);
       setCompactModeState(ui.compactMode === true);
+      setCalendarViewState(ui.calendarView ?? "month");
+      setSpeechVoiceURIState(ui.speechVoiceURI);
+      setSpeechActivationKeyState(ui.speechActivationKey ?? "l");
+      setCompanionEnabledState(ui.companionEnabled !== false);
+      setCompanionMutedState(ui.companionMuted === true);
       bootedRef.current = true;
       // Zero projects = the onboarding flow (ticket 111) owns the whole
       // first-run sequence, including AI setup, until it completes.
@@ -636,6 +735,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void refreshTasks();
     void refreshRuns();
   }, [refreshTasks, refreshRuns]);
+
+  /**
+   * Voice companion talk-back (ticket 138): always relays a transcript line
+   * (so muted still reads as text), and speaks it too unless muted. Ticket
+   * 123's push-to-talk speech mode narrates instead when it's already on,
+   * so the two features never talk over each other.
+   */
+  const speakToCompanion = useCallback((text: string, kind: NonNullable<CompanionTranscriptLine["kind"]>) => {
+    void api.relayCompanionTranscriptLine({
+      id: crypto.randomUUID(),
+      role: "clide",
+      text,
+      timestamp: new Date().toISOString(),
+      kind,
+    });
+    if (!companionMutedRef.current && !speechModeActiveRef.current) {
+      speak(text, speechVoiceURIRef.current, (phase, charIndex) =>
+        void api.relayCompanionSpeechPhase({ phase, charIndex }),
+      );
+    }
+  }, []);
+
+  // Voice companion boot greeting (ticket 138): asks bun to show the window
+  // (when enabled) and greet exactly once per app launch.
+  useEffect(() => {
+    void api.initCompanion().then(({ shouldGreet, greeting }) => {
+      if (shouldGreet && greeting) speakToCompanion(greeting, "greeting");
+    });
+  }, [speakToCompanion]);
 
   // Push subscriptions.
   useEffect(() => {
@@ -664,15 +792,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Voice out (ticket 123): speak the ticket-98 run summary as it streams
       // in, while speech mode is on. Read the live ref, not the closed-over
       // state — this subscription is set up once on mount.
-      if (speechModeActiveRef.current && update.summary) speak(update.summary);
+      if (speechModeActiveRef.current && update.summary) speak(update.summary, speechVoiceURIRef.current);
+      // Voice companion (ticket 138): the same summary narrated/transcribed
+      // through the companion window, errors called out distinctly.
+      if (update.summary) speakToCompanion(update.summary, update.status === "error" ? "error" : "summary");
     });
+    const offCompanionEnabled = on("companionEnabled", (enabled) => setCompanionEnabledState(enabled));
+    const offCompanionMuted = on("companionMuted", (muted) => setCompanionMutedState(muted));
     return () => {
       offProjects();
       offTasks();
       offChunk();
       offStatus();
+      offCompanionEnabled();
+      offCompanionMuted();
     };
-  }, []);
+  }, [speakToCompanion]);
 
   const projects = useMemo(() => {
     const set = new Set<string>(projectList.map((p) => p.name));
@@ -727,6 +862,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       (transcript) => {
         setPendingSpeechQuery(transcript);
         setRunPickerOpen(true);
+        void api.relayCompanionTranscriptLine({
+          id: crypto.randomUUID(),
+          role: "user",
+          text: transcript,
+          timestamp: new Date().toISOString(),
+          kind: "heard",
+        });
       },
       (message) => setSpeechError(message),
       () => {
@@ -745,11 +887,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
         stopSpeaking();
         setSpeechListening(false);
         setSpeechError(null);
-      } else {
-        listenOnce();
       }
+      // Turning on only arms speech mode (ticket 137) — the mic stays closed
+      // until a push-to-talk key press, preventing accidental activation.
       return next;
     });
+  }, []);
+
+  /** Mirrors speechModeActive/speechListening for the mount-only keydown listener below. */
+  const speechListeningRef = useRef(false);
+  useEffect(() => {
+    speechListeningRef.current = speechListening;
+  }, [speechListening]);
+
+  // Voice companion (ticket 138): "listens for a response through the
+  // ticket-123/137 speech pipeline" — the mic itself stays owned by the main
+  // window (see listenOnce above); this just relays the open/closed state so
+  // the companion's face can show a listening ring.
+  useEffect(() => {
+    void api.relayCompanionListening(speechListening);
+  }, [speechListening]);
+
+  /** Push-to-talk (ticket 137): key press opens one listen session while armed, or stops an in-flight one early. */
+  const pressToTalk = useCallback(() => {
+    if (!speechModeActiveRef.current) return;
+    if (speechListeningRef.current) {
+      speechHandleRef.current?.stop();
+      return;
+    }
+    listenOnce();
   }, [listenOnce]);
 
   const consumePendingSpeechQuery = useCallback(() => {
@@ -763,6 +929,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
       stopSpeaking();
     };
   }, []);
+
+  // Ticket 137: global push-to-talk activation key, chorded with Cmd/Ctrl+Shift
+  // (see App.tsx's onKeyDown for the same modifier-chord convention). Reads
+  // the current overlay-open state via refs so this one mount-only listener
+  // stays inert while any blocking overlay is open, matching the guard used
+  // by every other app-wide shortcut.
+  const activeProjectRef = useRef<string | null>(null);
+  useEffect(() => {
+    activeProjectRef.current = activeProject;
+  }, [activeProject]);
+  const overlayOpenRef = useRef(false);
+  useEffect(() => {
+    overlayOpenRef.current =
+      newTaskOpen ||
+      appSettingsOpen ||
+      diagnosticsOpen ||
+      newProjectOpen ||
+      viewSettingsOpen ||
+      aiWizardOpen ||
+      onboardingActive ||
+      workflowEditor !== null ||
+      reportEditor !== null ||
+      profileInterview !== null;
+  });
+  const speechActivationKeyRef = useRef<SpeechActivationKey>("l");
+  useEffect(() => {
+    speechActivationKeyRef.current = speechActivationKey;
+  }, [speechActivationKey]);
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (overlayOpenRef.current || !activeProjectRef.current) return;
+      if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
+      const preset = SPEECH_ACTIVATION_KEYS.find((k) => k.value === speechActivationKeyRef.current);
+      if (!preset || e.key.toLowerCase() !== preset.eventKey) return;
+      e.preventDefault();
+      pressToTalk();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [pressToTalk]);
   const openProfileInterview = useCallback((target: ProfileInterviewTarget) => setProfileInterview(target), []);
   const closeProfileInterview = useCallback((saved: boolean) => {
     setProfileInterview(null);
@@ -810,6 +1016,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void refreshWorkflows();
   }, [refreshWorkflows]);
 
+  const refreshReports = useCallback(async () => {
+    if (!activeProject) {
+      setReports([]);
+      return;
+    }
+    setReports(await api.listReports(activeProject));
+  }, [activeProject]);
+
+  const saveReport = useCallback(
+    async (report: Report) => {
+      if (!activeProject) return { ok: false, error: "No active project" };
+      const res = await api.saveReport(activeProject, report);
+      if (res.ok) await refreshReports();
+      return res;
+    },
+    [activeProject, refreshReports],
+  );
+
+  const deleteReportById = useCallback(
+    async (id: string) => {
+      if (!activeProject) return;
+      await api.deleteReport(activeProject, id);
+      await refreshReports();
+    },
+    [activeProject, refreshReports],
+  );
+
+  const openReportEditor = useCallback((report?: Report) => {
+    setReportEditor(report ? { mode: "edit", report } : { mode: "new", report: blankReport() });
+  }, []);
+  const closeReportEditor = useCallback(() => setReportEditor(null), []);
+
+  // Reports load with the project (like workflows/views).
+  useEffect(() => {
+    void refreshReports();
+  }, [refreshReports]);
+
   const refreshScheduledWorkflows = useCallback(async () => {
     if (!activeProject) {
       setScheduledWorkflows([]);
@@ -851,6 +1094,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (id: string) => {
       if (!activeProject) return;
       await api.cancelScheduledWorkflowRun(activeProject, id);
+      await refreshScheduledWorkflows();
+    },
+    [activeProject, refreshScheduledWorkflows],
+  );
+
+  const deleteScheduledWorkflowOccurrence = useCallback(
+    async (id: string, occurrenceAt: string) => {
+      if (!activeProject) return;
+      await api.deleteScheduledWorkflowOccurrence(activeProject, id, occurrenceAt);
       await refreshScheduledWorkflows();
     },
     [activeProject, refreshScheduledWorkflows],
@@ -966,6 +1218,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         pinned: false,
         scheduledAt: null,
         repeatInterval: null,
+        skipDates: [],
         readAt: null,
         taskVersion: tasksBySlug.get(taskSlug)?.meta.version ?? 1,
       };
@@ -1020,6 +1273,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRuns((prev) => prev.filter((r) => r.id !== runId));
   }, []);
 
+  const deleteOccurrence = useCallback(
+    async (runId: string, occurrenceAt: string) => {
+      await api.deleteOccurrence(runId, occurrenceAt);
+      await refreshRuns();
+    },
+    [refreshRuns],
+  );
+
   const markRunRead = useCallback(async (runId: string) => {
     const now = new Date().toISOString();
     // Optimistic update
@@ -1027,6 +1288,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Background RPC
     await api.markRunsRead([runId]);
   }, []);
+
+  const markProjectRunsRead = useCallback(
+    async (projectName: string) => {
+      const unreadIds = runsRef.current
+        .filter(
+          (r) =>
+            (r.status === "success" || r.status === "error") &&
+            !r.readAt &&
+            tasksBySlug.get(r.taskSlug)?.meta.project === projectName,
+        )
+        .map((r) => r.id);
+      if (unreadIds.length === 0) return;
+      const now = new Date().toISOString();
+      const idSet = new Set(unreadIds);
+      setRuns((prev) => prev.map((r) => (idSet.has(r.id) ? { ...r, readAt: now } : r)));
+      await api.markRunsRead(unreadIds);
+    },
+    [tasksBySlug],
+  );
 
   const value: AppState = {
     tasks,
@@ -1044,6 +1324,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     newTaskOpen,
     compactMode,
     setCompactMode,
+    calendarView,
+    setCalendarView,
     projectSurface,
     setProjectSurface,
     appSettingsOpen,
@@ -1068,6 +1350,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     speechError,
     pendingSpeechQuery,
     consumePendingSpeechQuery,
+    pressToTalk,
+    speechVoiceURI,
+    setSpeechVoiceURI,
+    speechActivationKey,
+    setSpeechActivationKey,
+    companionEnabled,
+    setCompanionEnabled,
+    companionMuted,
+    setCompanionMuted,
     profileInterview,
     openProfileInterview,
     closeProfileInterview,
@@ -1096,10 +1387,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     workflowEditor,
     openWorkflowEditor,
     closeWorkflowEditor,
+    reports,
+    refreshReports,
+    saveReport,
+    deleteReportById,
+    reportEditor,
+    openReportEditor,
+    closeReportEditor,
     scheduledWorkflows,
     scheduleWorkflowRun,
     rescheduleWorkflowRun,
     cancelScheduledWorkflowRun,
+    deleteScheduledWorkflowOccurrence,
     runScheduledWorkflowRunNow,
     setActiveProject,
     toggleSidebar,
@@ -1122,7 +1421,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     rerun,
     setPinned,
     deleteRun,
+    deleteOccurrence,
     markRunRead,
+    markProjectRunsRead,
     refreshTasks,
     refreshRuns,
   };

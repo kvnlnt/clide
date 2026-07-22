@@ -7,6 +7,7 @@
 import { ChevronUp, File, Folder, FolderOpen, FolderPlus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context/AppContext";
+import { useDirectoryPicker } from "../../hooks/useDirectoryPicker";
 import { api } from "../../rpc";
 import type { VfsLocation, VfsStatResult } from "../../types/tasks";
 import { useUIFeedback } from "../UIFeedback";
@@ -14,6 +15,16 @@ import { useUIFeedback } from "../UIFeedback";
 interface FilesPageProps {
   projectName?: string;
   scope: "app" | "project";
+}
+
+/**
+ * A location plus the project it belongs to, when browsing cross-project
+ * (ticket 132) — `projectName` is undefined for app-scoped locations, and
+ * for the project-scoped instance (which only ever shows its own project).
+ */
+interface LocationEntry {
+  location: VfsLocation;
+  projectName?: string;
 }
 
 function formatSize(bytes: number): string {
@@ -25,14 +36,20 @@ function formatSize(bytes: number): string {
 export function FilesPage({ projectName, scope }: FilesPageProps) {
   const { projectMeta } = useApp();
   const { confirm, toast } = useUIFeedback();
-  const [locations, setLocations] = useState<VfsLocation[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<VfsLocation | null>(null);
+  const chooseDirectory = useDirectoryPicker();
+  const [locations, setLocations] = useState<LocationEntry[]>([]);
+  const [selectedEntry, setSelectedEntry] = useState<LocationEntry | null>(null);
   const [currentPath, setCurrentPath] = useState<string>("");
   const [entries, setEntries] = useState<VfsStatResult[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Ticket 132: app-scoped view can additionally show every project's
+  // locations, grouped by project so the two stay visually distinct.
+  const [includeProjectFiles, setIncludeProjectFiles] = useState(false);
+
+  const selectedLocation = selectedEntry?.location ?? null;
 
   // Ticket 118: project-scoped locations live under the project's real
   // folder path, not its display name — the registry keys .vfs.json by path.
@@ -41,20 +58,34 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
   useEffect(() => {
     void loadLocations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectName, scope]);
+  }, [projectName, scope, includeProjectFiles]);
 
   async function loadLocations() {
     const locs = await api.listVfsLocations(projectName);
-    const filtered =
-      scope === "app"
-        ? locs.filter((loc) => loc.scope === "app")
-        : locs.filter((loc) => loc.scope === "project" && loc.project === projectPath);
+    if (scope === "app") {
+      const appEntries: LocationEntry[] = locs
+        .filter((loc) => loc.scope === "app")
+        .map((location) => ({ location }));
+
+      if (!includeProjectFiles) {
+        setLocations(appEntries);
+        return;
+      }
+
+      const projectLocs = await api.listAllProjectVfsLocations();
+      setLocations([...appEntries, ...projectLocs.map(({ location, projectName: pName }) => ({ location, projectName: pName }))]);
+      return;
+    }
+
+    const filtered = locs
+      .filter((loc) => loc.scope === "project" && loc.project === projectPath)
+      .map((location) => ({ location, projectName }));
     setLocations(filtered);
   }
 
   async function handleAddLocation() {
     if (scope === "project" && !projectPath) return;
-    const folder = await api.chooseDirectory();
+    const folder = await chooseDirectory();
     if (!folder) return;
 
     const name = folder.split("/").pop() || "Unnamed Location";
@@ -77,7 +108,8 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
     }
   }
 
-  async function handleRemoveLocation(location: VfsLocation) {
+  async function handleRemoveLocation(entry: LocationEntry) {
+    const { location } = entry;
     const res = await confirm({
       title: `Remove "${location.name}"?`,
       message: "Past runs' artifact records are preserved — only the location itself is removed.",
@@ -85,10 +117,10 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
     });
     if (!res.ok) return;
 
-    const result = await api.removeVfsLocation(location.id, projectName);
+    const result = await api.removeVfsLocation(location.id, entry.projectName);
     if (result.ok) {
       if (selectedLocation?.id === location.id) {
-        setSelectedLocation(null);
+        setSelectedEntry(null);
         setEntries([]);
       }
       toast("Location removed");
@@ -98,19 +130,19 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
     }
   }
 
-  async function handleSelectLocation(location: VfsLocation) {
-    setSelectedLocation(location);
+  async function handleSelectLocation(entry: LocationEntry) {
+    setSelectedEntry(entry);
     setCurrentPath("");
     setSearchQuery("");
     setSearchResults([]);
     setError(null);
-    await loadEntries(location, "");
+    await loadEntries(entry, "");
   }
 
-  async function loadEntries(location: VfsLocation, path: string) {
+  async function loadEntries(entry: LocationEntry, path: string) {
     setLoading(true);
     setError(null);
-    const result = await api.vfsList(location.id, path, projectName);
+    const result = await api.vfsList(entry.location.id, path, entry.projectName);
     setLoading(false);
 
     if (result.error) {
@@ -123,27 +155,27 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
   }
 
   async function handleNavigate(entry: VfsStatResult) {
-    if (!selectedLocation) return;
+    if (!selectedEntry) return;
     if (!entry.isDirectory) return;
 
     const newPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
     setCurrentPath(newPath);
-    await loadEntries(selectedLocation, newPath);
+    await loadEntries(selectedEntry, newPath);
   }
 
   async function handleGoUp() {
-    if (!selectedLocation || !currentPath) return;
+    if (!selectedEntry || !currentPath) return;
 
     const parts = currentPath.split("/");
     parts.pop();
     const newPath = parts.join("/");
     setCurrentPath(newPath);
-    await loadEntries(selectedLocation, newPath);
+    await loadEntries(selectedEntry, newPath);
   }
 
   async function handleSearch(query: string) {
     setSearchQuery(query);
-    if (!selectedLocation || !query.trim()) {
+    if (!selectedEntry || !query.trim()) {
       setSearchResults([]);
       setError(null);
       return;
@@ -151,7 +183,7 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
 
     setLoading(true);
     setError(null);
-    const result = await api.vfsSearch(selectedLocation.id, query, projectName);
+    const result = await api.vfsSearch(selectedEntry.location.id, query, selectedEntry.projectName);
     setLoading(false);
 
     if (result.error) {
@@ -164,10 +196,10 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
   }
 
   async function handleOpenFile(entry: VfsStatResult, reveal = false) {
-    if (!selectedLocation) return;
+    if (!selectedEntry) return;
 
     const path = currentPath ? `${currentPath}/${entry.name}` : entry.name;
-    const result = await api.vfsOpen(selectedLocation.id, path, reveal, projectName);
+    const result = await api.vfsOpen(selectedEntry.location.id, path, reveal, selectedEntry.projectName);
 
     if (!result.ok) {
       toast(result.error ?? "Failed to open file", "error");
@@ -176,13 +208,64 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
 
   const rowClass = "flex items-center gap-3 px-4 py-2.5 text-[13px] hover:bg-white/5";
 
+  const appEntries = locations.filter((e) => !e.projectName);
+  const projectGroups: [string, LocationEntry[]][] = [];
+  for (const e of locations) {
+    if (!e.projectName) continue;
+    const group = projectGroups.find(([name]) => name === e.projectName);
+    if (group) group[1].push(e);
+    else projectGroups.push([e.projectName, [e]]);
+  }
+
+  function renderLocationRow(entry: LocationEntry) {
+    const { location } = entry;
+    return (
+      <button
+        key={location.id}
+        onClick={() => void handleSelectLocation(entry)}
+        className={`group flex w-full items-center gap-2 border-b border-white/5 px-4 py-3 text-left ${
+          selectedLocation?.id === location.id ? "bg-white/10" : "hover:bg-white/5"
+        }`}
+      >
+        <Folder size={14} className="shrink-0 text-white/40" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13px] font-medium text-white">{location.name}</div>
+          <div className="truncate text-[11px] text-white/40">{location.config.root as string}</div>
+        </div>
+        <span
+          onClick={(e) => {
+            e.stopPropagation();
+            void handleRemoveLocation(entry);
+          }}
+          title="Remove location"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-white/0 group-hover:text-white/40 hover:!text-red-400"
+        >
+          <Trash2 size={12} />
+        </span>
+      </button>
+    );
+  }
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-baseline gap-2 px-[var(--clide-page-x)] pb-4 pt-[var(--clide-page-top)]">
-        <h1 className="text-[20px] font-bold text-white">Files</h1>
-        <span className="text-[13px] text-white/40">
-          {scope === "app" ? "App locations" : (projectName ?? "Project locations")}
-        </span>
+      <div className="flex shrink-0 items-baseline justify-between gap-2 px-[var(--clide-page-x)] pb-4 pt-[var(--clide-page-top)]">
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-[20px] font-bold text-white">Files</h1>
+          <span className="text-[13px] text-white/40">
+            {scope === "app" ? "App locations" : (projectName ?? "Project locations")}
+          </span>
+        </div>
+        {scope === "app" && (
+          <label className="flex items-center gap-2 text-[12px] text-white/60">
+            <input
+              type="checkbox"
+              checked={includeProjectFiles}
+              onChange={(e) => setIncludeProjectFiles(e.target.checked)}
+              className="h-3.5 w-3.5 accent-white/70"
+            />
+            Include project files
+          </label>
+        )}
       </div>
 
       <div className="clide-scroll flex flex-1 overflow-hidden px-[var(--clide-page-x)] pb-[var(--clide-page-bottom)]">
@@ -207,30 +290,19 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
                   CLIDE only watches where you point it.
                 </div>
               )}
-              {locations.map((loc) => (
-                <button
-                  key={loc.id}
-                  onClick={() => void handleSelectLocation(loc)}
-                  className={`group flex w-full items-center gap-2 border-b border-white/5 px-4 py-3 text-left ${
-                    selectedLocation?.id === loc.id ? "bg-white/10" : "hover:bg-white/5"
-                  }`}
-                >
-                  <Folder size={14} className="shrink-0 text-white/40" />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-medium text-white">{loc.name}</div>
-                    <div className="truncate text-[11px] text-white/40">{loc.config.root as string}</div>
+
+              {includeProjectFiles && projectGroups.length > 0 && appEntries.length > 0 && (
+                <div className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wide text-white/30">App</div>
+              )}
+              {appEntries.map(renderLocationRow)}
+
+              {projectGroups.map(([pName, entries]) => (
+                <div key={pName}>
+                  <div className="flex items-center gap-1.5 border-t border-white/5 bg-white/[0.03] px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wide text-white/40">
+                    <Folder size={10} /> {pName}
                   </div>
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleRemoveLocation(loc);
-                    }}
-                    title="Remove location"
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-white/0 group-hover:text-white/40 hover:!text-red-400"
-                  >
-                    <Trash2 size={12} />
-                  </span>
-                </button>
+                  {entries.map(renderLocationRow)}
+                </div>
               ))}
             </div>
           </div>
@@ -268,6 +340,7 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
                 {/* Breadcrumb */}
                 {currentPath && !searchQuery && (
                   <div className="shrink-0 border-b border-clide-border bg-clide-panel/60 px-4 py-2 text-[12px] text-white/50">
+                    {selectedEntry?.projectName && <span className="text-white/30">{selectedEntry.projectName} / </span>}
                     {selectedLocation.name} / {currentPath}
                   </div>
                 )}
@@ -279,7 +352,7 @@ export function FilesPage({ projectName, scope }: FilesPageProps) {
                       <span>{error}</span>
                       <button
                         onClick={() =>
-                          searchQuery ? void handleSearch(searchQuery) : void loadEntries(selectedLocation, currentPath)
+                          searchQuery ? void handleSearch(searchQuery) : void (selectedEntry && loadEntries(selectedEntry, currentPath))
                         }
                         className="shrink-0 rounded px-2 py-0.5 font-medium text-red-200 hover:bg-red-400/20"
                       >

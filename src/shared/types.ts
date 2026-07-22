@@ -380,6 +380,8 @@ export interface RunRecord {
   pinned: boolean;
   scheduledAt: string | null;
   repeatInterval: RepeatInterval | null;
+  /** Exact future occurrence ISO timestamps excluded from this series' projection (ticket 129). */
+  skipDates: string[];
   /** Resolved tool + argv actually executed, for command-backed tasks (ticket 52). */
   command?: { tool: string; argv: string[] } | null;
   /** When the run was marked read (ticket 97). */
@@ -632,6 +634,12 @@ export interface ThreadView {
   namedByUser?: boolean;
 }
 
+/** Which layout the Calendar surface renders (ticket 128). */
+export type CalendarViewMode = "day" | "week" | "month" | "agenda";
+
+/** Push-to-talk activation shortcut (ticket 137) — always chorded with Cmd/Ctrl+Shift to stay safe while typing. */
+export type SpeechActivationKey = "l" | "m" | "space" | "grave";
+
 /** Globally persisted UI state — restores where the user was after a restart. */
 export interface UIState {
   activeProject: string | null;
@@ -641,6 +649,18 @@ export interface UIState {
   recentProjects: string[];
   /** Denser spacing across the main surfaces (ticket 119). */
   compactMode?: boolean;
+  /** Last-used Calendar view (ticket 128) — defaults to "month" when absent. */
+  calendarView?: CalendarViewMode;
+  /** Selected speechSynthesis voice URI (ticket 137) — absent means the platform default voice. */
+  speechVoiceURI?: string;
+  /** Push-to-talk key for speech mode (ticket 137) — defaults to "l" (Cmd/Ctrl+Shift+L) when absent. */
+  speechActivationKey?: SpeechActivationKey;
+  /** Floating voice companion window (ticket 138) — defaults to shown when absent. */
+  companionEnabled?: boolean;
+  /** Talk-back stays text-only in the companion transcript when muted (ticket 138). */
+  companionMuted?: boolean;
+  /** Last dragged position of the companion window (ticket 138), top-left in screen coordinates. */
+  companionPosition?: { x: number; y: number };
 }
 
 /** Catalog entry for a ready-to-go starter task offered during onboarding (ticket 111). */
@@ -649,6 +669,13 @@ export interface StarterTask {
   name: string;
   description: string;
   tags: string[];
+}
+
+/** Catalog entry for a ready-to-go starter workflow (ticket 127) — the workflow-layer parallel to StarterTask. */
+export interface StarterWorkflow {
+  id: string;
+  name: string;
+  description: string;
 }
 
 // Workflows (tickets 88-95) ---------------------------------------------------
@@ -759,6 +786,8 @@ export interface ScheduledWorkflowRun {
   params: Record<string, string>;
   scheduledAt: string;
   repeatInterval: RepeatInterval;
+  /** Exact future occurrence ISO timestamps excluded from this series' projection (ticket 129). */
+  skipDates: string[];
 }
 
 export interface WorkflowRun {
@@ -801,6 +830,58 @@ export interface ScheduleInput {
   inputs: Record<string, unknown>;
   scheduledAt: string;
   repeatInterval: RepeatInterval;
+}
+
+// Reports (ticket 134): curated, exportable collections ----------------------
+// A Report is a new, standalone entity — membership REFERENCES existing
+// tasks/workflows/files (by slug/id/uri), never copies their data, so a
+// report always renders fresh from current data at export time.
+
+interface ReportMemberBase {
+  /** Stable id for React keys/reordering — independent of what it references. */
+  id: string;
+  /** Free-text section note shown above this member in the exported report. */
+  note?: string;
+}
+
+export interface ReportTaskMember extends ReportMemberBase {
+  kind: "task";
+  taskSlug: string;
+  /** Denormalized so the builder/export still shows a name if the task is later renamed/removed. */
+  taskName: string;
+  /** Specific run ids to include; empty = "most recent run" at export time. */
+  runIds: string[];
+}
+
+export interface ReportWorkflowMember extends ReportMemberBase {
+  kind: "workflow";
+  workflowId: string;
+  workflowName: string;
+  /** Specific run ids to include; empty = "most recent run" at export time. */
+  runIds: string[];
+}
+
+export interface ReportFileMember extends ReportMemberBase {
+  kind: "file";
+  /** Self-contained provider-scoped URI (e.g. "local:///Users/..."), same shape as RunArtifact.uri. */
+  uri: string;
+  name: string;
+}
+
+export interface ReportNoteMember extends ReportMemberBase {
+  kind: "note";
+  text: string;
+}
+
+export type ReportMember = ReportTaskMember | ReportWorkflowMember | ReportFileMember | ReportNoteMember;
+
+export interface Report {
+  id: string;
+  name: string;
+  description: string;
+  members: ReportMember[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Task versioning (ticket 105) ------------------------------------------------
@@ -1044,10 +1125,39 @@ export type ClideRPC = {
         params: { serviceId: string };
         response: { ok: boolean; models?: string[]; error?: string };
       };
+      /** Same listing for a not-yet-saved service (ticket 135) — registration time, before there's a serviceId to look up. */
+      previewServiceModels: {
+        params: {
+          kind: AIServiceKind;
+          baseUrl?: string;
+          credential?: string;
+          existingServiceId?: string;
+          preferredModel?: string;
+        };
+        response: { ok: boolean; models?: string[]; error?: string };
+      };
       /** Compares a registry entry's stored version fingerprint to the binary's current one (ticket 60). */
       checkToolFreshness: {
         params: { id: string };
         response: { ok: boolean; stale?: boolean; entry?: ToolRegistryEntry; error?: string };
+      };
+
+      // Tool test modal REPL (ticket 136) --------------------------------------
+      /**
+       * Runs `execPath` with a raw, shell-like arg string (split server-side,
+       * spawned as an argv array — never through a shell) and streams
+       * stdout/stderr back via `onOutputChunk`/`onRunStatus` under
+       * `runId = "tooltest:<uuid>"`. Timeout + output cap protect the modal
+       * from a runaway/hanging tool.
+       */
+      runToolTest: {
+        params: { execPath: string; args: string };
+        response: { ok: boolean; runId?: string; error?: string };
+      };
+      /** Kills the in-flight test invocation — called when the modal closes on a running command. */
+      cancelToolTest: {
+        params: { runId: string };
+        response: { ok: boolean };
       };
       draftCommandFields: {
         params: {
@@ -1101,6 +1211,11 @@ export type ClideRPC = {
         params: { project?: string };
         response: VfsLocation[];
       };
+      /** Project-scoped locations across every registered project, tagged by project name (ticket 132). */
+      listAllProjectVfsLocations: {
+        params: Record<string, never>;
+        response: { location: VfsLocation; projectName: string }[];
+      };
       addVfsLocation: {
         params: { location: VfsLocation };
         response: { ok: boolean; error?: string };
@@ -1125,6 +1240,11 @@ export type ClideRPC = {
       vfsStat: {
         params: { locationId: string; path: string; project?: string };
         response: VfsStatResult | null;
+      };
+      /** Resolve a location+path to a self-contained provider URI (ticket 134: Report file members store a bare uri, like RunArtifact). */
+      vfsResolveUri: {
+        params: { locationId: string; path: string; project?: string };
+        response: { uri: string | null };
       };
       vfsSearch: {
         params: { locationId: string; query: string; project?: string };
@@ -1205,6 +1325,19 @@ export type ClideRPC = {
         response: { ok: boolean; workflow?: Workflow; error?: string };
       };
 
+      // Reports (ticket 134) ---------------------------------------------------
+      listReports: { params: { project: string }; response: Report[] };
+      saveReport: {
+        params: { project: string; report: Report };
+        response: { ok: boolean; error?: string };
+      };
+      deleteReport: { params: { project: string; id: string }; response: void };
+      /** Renders the report's Markdown and writes it to `<project>/reports/exports/`. */
+      exportReportMarkdown: {
+        params: { project: string; id: string };
+        response: { ok: boolean; path?: string; error?: string };
+      };
+
       /** Calendar workflow scheduling (ticket 117) — mirrors the task schedule RPCs below. */
       getScheduledWorkflows: {
         params: { project: string };
@@ -1233,6 +1366,11 @@ export type ClideRPC = {
         params: { project: string; id: string };
         response: { ok: boolean };
       };
+      /** Delete a single occurrence of a recurring scheduled workflow run rather than the whole series (ticket 129). */
+      deleteScheduledWorkflowOccurrence: {
+        params: { project: string; id: string; occurrenceAt: string };
+        response: { ok: boolean };
+      };
 
       setPinned: {
         params: { runId: string; pinned: boolean };
@@ -1255,6 +1393,11 @@ export type ClideRPC = {
         response: { ok: boolean };
       };
       runScheduledNow: { params: { runId: string }; response: { ok: boolean } };
+      /** Delete a single occurrence of a recurring scheduled task run rather than the whole series (ticket 129). */
+      deleteOccurrence: {
+        params: { runId: string; occurrenceAt: string };
+        response: { ok: boolean };
+      };
       getLayout: {
         params: { projectSlug: string };
         response: ProjectLayout;
@@ -1284,9 +1427,20 @@ export type ClideRPC = {
         params: { projectName: string; slugs: string[] };
         response: { ok: boolean; error?: string };
       };
+      /** Starter-workflow catalog + install-into-project (ticket 127). */
+      listStarterWorkflows: { params: Record<string, never>; response: StarterWorkflow[] };
+      installStarterWorkflows: {
+        params: { projectName: string; ids: string[] };
+        response: { ok: boolean; error?: string };
+      };
       chooseDirectory: {
         params: { startingFolder?: string };
         response: string | null;
+      };
+      /** In-app fallback for creating a folder from the directory picker (ticket 130). */
+      createDirectory: {
+        params: { parent: string; name: string };
+        response: { ok: boolean; path?: string; error?: string };
       };
       openFolder: {
         params: { path: string };
@@ -1351,6 +1505,20 @@ export type ClideRPC = {
         params: { recordingId: string };
         response: { ok: boolean; events?: RecordedEvent[]; error?: string };
       };
+
+      // Voice companion (ticket 138) ------------------------------------------
+      /** Called once on main-window boot: ensures the companion window exists/shows when enabled, returns whether/what to greet with. */
+      initCompanion: {
+        params: Record<string, never>;
+        response: { shouldGreet: boolean; greeting: string };
+      };
+      showCompanion: { params: null; response: void };
+      hideCompanion: { params: null; response: void };
+      setCompanionMuted: { params: { muted: boolean }; response: void };
+      /** Relays a speechSynthesis lifecycle event from the main window's utterance to the companion's waveform. */
+      relayCompanionSpeechPhase: { params: CompanionSpeechEvent; response: void };
+      relayCompanionTranscriptLine: { params: CompanionTranscriptLine; response: void };
+      relayCompanionListening: { params: { listening: boolean }; response: void };
     };
     messages: {
       logToBun: { msg: string; type?: "info" | "warn" | "error" | "debug" };
@@ -1367,6 +1535,59 @@ export type ClideRPC = {
       onMenuAction: { action: string };
       /** Live workflow-run state push (ticket 89/94): full run record on every step transition. */
       onWorkflowRunUpdate: { run: WorkflowRun };
+      /** Companion enabled/muted can change from the companion window's own UI too — keeps Settings in sync (ticket 138). */
+      onCompanionEnabledChanged: { enabled: boolean };
+      onCompanionMutedChanged: { muted: boolean };
+    };
+  }>;
+};
+
+// Voice companion (ticket 138) ------------------------------------------------
+// A second, small chromeless "Jarvis" window. It owns no speech APIs of its
+// own — the main window's existing speechSynthesis/SpeechRecognition usage
+// (tickets 123/137) stays the single source of truth, and its lifecycle
+// events are relayed here over bun IPC purely to drive the companion's
+// procedural waveform and transcript.
+
+/** speechSynthesis utterance lifecycle, relayed from the main window's speech.ts calls. */
+export type CompanionSpeechPhase = "start" | "boundary" | "end";
+
+export interface CompanionSpeechEvent {
+  phase: CompanionSpeechPhase;
+  /** charIndex from the SpeechSynthesisEvent (boundary phase only) — used to vary the waveform per word. */
+  charIndex?: number;
+}
+
+/** One line in the companion's expanded transcript. */
+export interface CompanionTranscriptLine {
+  id: string;
+  role: "user" | "clide";
+  text: string;
+  timestamp: string;
+  kind?: "greeting" | "summary" | "error" | "heard";
+}
+
+export type ClideCompanionRPC = {
+  bun: RPCSchema<{
+    requests: {
+      /** Companion app asks for its initial mute state on mount. */
+      companionReady: { params: Record<string, never>; response: { muted: boolean } };
+      setCompanionMuted: { params: { muted: boolean }; response: void };
+      /** User dismissed the companion from its own UI — hides the window and persists the choice. */
+      hideCompanion: { params: null; response: void };
+      /** Compact ⇄ expanded toggle resizes the actual OS window, not just in-page layout. */
+      resizeCompanion: { params: { width: number; height: number }; response: void };
+    };
+    messages: {
+      logToBun: { msg: string; type?: "info" | "warn" | "error" | "debug" };
+    };
+  }>;
+  webview: RPCSchema<{
+    requests: Record<string, never>;
+    messages: {
+      onCompanionSpeechPhase: CompanionSpeechEvent;
+      onCompanionTranscriptLine: CompanionTranscriptLine;
+      onCompanionListening: { listening: boolean };
     };
   }>;
 };

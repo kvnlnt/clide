@@ -204,19 +204,19 @@ Completed implementation tickets are archived in [`tickets/done/`](done/). Open 
 | 123 | Speech Mode                           | Wave icon toggles voice mode: speak commands through the command surface, app speaks results      | ✅ Done¹³     |
 | 124 | Diagnostics Screen                    | App/machine/workload health: memory, CPU, disk, running work, scheduler/watcher status, copy      | ✅ Done¹⁴     |
 | 125 | Transparency Reveal                   | All collected user data in one folder with a generated manifest and a Reveal-in-Finder button     | ✅ Done¹⁵     |
-| 126 | Sidebar Project Status Rows           | Two-line project rows: type-split unread badges (✓/✗), recency, explicit clear, unread bolding    | ⬜ Open       |
-| 127 | Seed Example Workflows                | Starter catalog + all five dev profiles seed real workflows (incl. recurring for calendar demo)   | ⬜ Open       |
-| 128 | Calendar Views                        | Day/Week/Month/Agenda switcher, Today + keyboard paging, +N overflow, filters, drag-reschedule    | ⬜ Open       |
-| 129 | Recurring Series Model                | Real series concept: delete one occurrence vs. delete the series (standard calendar pattern)      | ⬜ Open       |
-| 130 | File Picker New Folder                | chooseDirectory can create folders (native option or in-app fallback) — no Finder round-trip      | ⬜ Open       |
-| 131 | Package Manager Controls              | Real enable/disable toggle, preference via order, drag-and-drop reorder replaces arrow buttons    | ⬜ Open       |
-| 132 | App Files Project Toggle              | App-level Files view can include project locations (grouped); confirm/surface app-level task I/O  | ⬜ Open       |
-| 133 | Compact Tabs, Toolbars & V-Labels     | Compact mode reaches view tabs/toolbars (icon-only + tooltips); full-width tabs; vertical dates   | ⬜ Open       |
-| 134 | Reports                               | Epic: curated collections of tasks/workflows/files exported to PDF for sharing progress           | ⬜ Open       |
-| 135 | AI Service Model Dropdown             | AIServiceEditor reuses ServiceModelPicker: live model list instead of free-text override          | ⬜ Open       |
-| 136 | Tool Test Modal                       | Per-tool Test button: consent-gated REPL-style run surface with the tool's docs alongside         | ⬜ Open       |
-| 137 | Speech Settings & Push-to-Talk        | Speech section in Settings (status, voice, tests, persisted prefs); key press gates each listen   | ⬜ Open       |
-| 138 | Voice Companion Window                | Epic: floating chromeless "Jarvis" circle — animated waveform, greeting, talk-back, transcript    | ⬜ Open       |
+| 126 | Sidebar Project Status Rows           | Two-line project rows: type-split unread badges (✓/✗), recency, explicit clear, unread bolding    | ✅ Done¹⁶     |
+| 127 | Seed Example Workflows                | Starter catalog + all five dev profiles seed real workflows (incl. recurring for calendar demo)   | ✅ Done¹⁷     |
+| 128 | Calendar Views                        | Day/Week/Month/Agenda switcher, Today + keyboard paging, +N overflow, filters, drag-reschedule    | ✅ Done¹⁸     |
+| 129 | Recurring Series Model                | Real series concept: delete one occurrence vs. delete the series (standard calendar pattern)      | ✅ Done¹⁹     |
+| 130 | File Picker New Folder                | chooseDirectory can create folders (native option or in-app fallback) — no Finder round-trip      | ✅ Done²⁰     |
+| 131 | Package Manager Controls              | Real enable/disable toggle, preference via order, drag-and-drop reorder replaces arrow buttons    | ✅ Done²¹     |
+| 132 | App Files Project Toggle              | App-level Files view can include project locations (grouped); confirm/surface app-level task I/O  | ✅ Done²²     |
+| 133 | Compact Tabs, Toolbars & V-Labels     | Compact mode reaches view tabs/toolbars (icon-only + tooltips); full-width tabs; vertical dates   | ✅ Done²³     |
+| 134 | Reports                               | Epic: curated collections of tasks/workflows/files exported to PDF for sharing progress           | ✅ Done²⁴     |
+| 135 | AI Service Model Dropdown             | AIServiceEditor reuses ServiceModelPicker: live model list instead of free-text override          | ✅ Done       |
+| 136 | Tool Test Modal                       | Per-tool Test button: consent-gated REPL-style run surface with the tool's docs alongside         | ✅ Done       |
+| 137 | Speech Settings & Push-to-Talk        | Speech section in Settings (status, voice, tests, persisted prefs); key press gates each listen   | ✅ Done       |
+| 138 | Voice Companion Window                | Epic: floating chromeless "Jarvis" circle — animated waveform, greeting, talk-back, transcript    | ✅ Done²⁵     |
 | 139 | Workflow Apps                         | Branded workflow bundles opening as a hyperfocused surface/window (builds on 138's plumbing)      | ⬜ Open       |
 
 ¹ Ticket 54: create flow (all 4 steps) is complete; reopening the wizard to
@@ -278,6 +278,48 @@ a persisted Compact mode toggle (`UIState.compactMode`) — one systemic
 mechanism instead of a per-component boolean. No before/after
 screenshots produced (no way to drive the running app visually from
 this environment).
+
+²⁴ Ticket 134: landed model + builder + Markdown export per the ticket's own
+scope guard, splitting PDF polish to a follow-up rather than building it
+speculatively. New `Report` entity (`src/shared/types.ts`) — `id`/`name`/
+`description`/ordered `members`/timestamps — with four member kinds (task,
+workflow, file, note), each carrying a stable `id` for reordering plus an
+optional free-text section note; task/workflow members store specific
+`runIds` (empty = "most recent run" at export time) rather than copying run
+data, and file members store a bare self-contained `uri` (same shape as
+`RunArtifact.uri`) instead of a `{locationId, path}` pair so a report keeps
+working even if the VFS location is later renamed/removed — resolved via a
+new `vfsResolveUri` RPC at pick time. `src/bun/reports/store.ts` mirrors
+`workflows/store.ts`'s "id is identity, filename follows slugified name"
+pattern one-for-one but skips its disk-format-translation layer entirely —
+Report has no legacy on-disk shape to reconcile, being a brand-new entity.
+`src/bun/reports/export.ts` renders Markdown fresh from current data on
+every export (task runs via `db/history.ts`, workflow runs via
+`workflows/runStore.ts`, both surfacing ticket-98 AI summaries where
+present; file members get a best-effort inline text preview for
+text/JSON-mime files under 2KB via the VFS provider's own `read()`), writing
+to `<project>/reports/exports/<slug>-<timestamp>.md` — no new dependency
+needed, confirming the ticket's own hunch that Markdown is "cheap
+insurance." RPCs/UI follow the Workflows precedent throughout: `ReportsPage`
+is a `ProjectSurface` page-tab (⌘⇧R, `ProjectToolbar` button) per tickets
+39/120's page-vs-takeover convention, while the single `ReportEditor` (one
+component handles both create and edit, unlike Workflow's separate
+wizard/editor split — Reports needs no AI-drafting step) is a `reportEditor`
+full-window takeover in `AppContext`, guarded into the same `overlayOpen`
+checks as `workflowEditor`. `AppContext`'s "new" mode carries a concrete,
+once-generated blank `Report` (via a small standalone `reportUtils.ts`
+rather than importing across the `AppContext`↔`ReportEditor` boundary) —
+first draft generated it inline in JSX on every render, which desynced the
+editor's dirty-check against a fresh `initial` object each time and would've
+falsely warned "unsaved changes" on an untouched new report; caught and
+fixed before verification. `FilePickerModal`/`RunsPickerModal` are new,
+trimmed-down single-purpose pickers (not reuses of the full `FilesPage`
+browser, which carries search/multi-location/remove affordances a one-shot
+picker doesn't need). Verified via `tsc --noEmit` (clean) and a Vite preview
+boot with no console errors; same native-Electrobun-bridge limitation as
+tickets 118/121/123-133 kept the Reports/Workflows surfaces themselves from
+being click-tested live (they require an active project via the native
+bridge, unreachable from a plain browser preview).
 ¹⁰ Ticket 120: dropped `mx-auto` (the actual centering mechanism) and
 widened the content cap on Settings/Project Settings/Profile Interview/
 workflow editor page bodies. `FirstRunAIWizard` deliberately kept
@@ -330,3 +372,254 @@ actually collected. Settings' new "Transparency" row calls
 RPC. Verified via `tsc --noEmit` and the Vite preview (clean boot, no
 console errors); the Reveal button itself needs an active project to
 reach, so not eyes-on click-tested.
+¹⁶ Ticket 126: `Sidebar.tsx`'s per-project rollup now splits into
+`unreadSuccess`/`unreadError` counts plus a `latest` timestamp (no new
+RPC — pure local aggregation over runs already loaded); a
+`formatRecency()` helper renders "Nm/h/d ago". A "needs attention"
+third bucket was considered but `RunStatus` has no partial/timeout
+state distinct from success/error, so it's skipped per the ticket's own
+escape hatch. `SidebarProject.tsx` is now two lines: name, then chips +
+recency + a hover-revealed "mark all read" check button. Clearing reuses
+the existing `markRunsRead` RPC — `AppContext`'s new
+`markProjectRunsRead(projectName)` resolves unread run ids from
+`tasksBySlug` and batches them, so `history.ts` needed no changes.
+`SubmissionAccordionRow.tsx` bolds the summary text for unread rows,
+returning to normal weight once read. This is an Electrobun-bridged
+desktop view (RPC calls only work under the native shell), so a plain
+Vite preview can't exercise it; verified via `tsc --noEmit` only.
+¹⁷ Ticket 127: new `workflows/seed.ts` mirrors `tasks/seed.ts`'s starter
+catalog — two workflows ("System Report", a decision; "Directory Loop",
+a loop) composing the existing `list-files`/`system-info` starter
+tasks — exposed as `listStarterWorkflows`/`installStarterWorkflows`
+(RPC + client wrapper, parallel to the task variants; not yet wired
+into `FirstRunWelcome`'s onboarding checklist, which was out of this
+ticket's file list). The loop needed a real list to iterate, so
+`system-info` gained a `checks` named output (ticket 86 output
+definitions) in both `tasks/seed.ts` and the independently-duplicated
+`seed-profile.ts` template. All five dev-profile fixtures now seed
+workflow entities scaled to their persona (none for newbie; one
+decision workflow for beginner; a decision + loop workflow per regular
+project with a weekly-recurring `ScheduledWorkflowRun` on the first;
+the same pair plus stacked schedules on power's three heavy-treatment
+projects; edge adds a workflow with a dangling task reference and an
+orphaned schedule pointing at a deleted workflow id). Scheduling reuses
+`schedules.ts`'s disk format but through a new `seedScheduledWorkflowRun`
+that skips `scheduleWorkflowRun`'s `arm()` — that sets a real
+`setTimeout`, which would've hung the one-shot seeder the same way
+ticket 114's bug did. Verified via `tsc --noEmit`, all five `bun run
+seed:profile` runs (one per `CLIDE_PROFILE`) completing and exiting
+cleanly, and a scratch script confirming `installStarterWorkflows`
+round-trips through `saveWorkflow`/`listWorkflows` with the expected
+disk `formSlug` translation.
+¹⁸ Ticket 128: `CalendarPage.tsx` becomes a thin shell over four new
+subcomponents in `src/mainview/components/calendar/` — `MonthView`
+(the old grid, extracted), `TimeGrid` (a shared 24-hour axis reused by
+new `DayView`/`WeekView`), and `AgendaView` (a flat chronological list
+spanning a rolling 90-day window, grouped by date, every row — real or
+projected occurrence — clickable and "Repeats daily/weekly"-labeled,
+satisfying the original "list of all recurring tasks/workflows" ask
+directly). `calendarUtils.ts` holds the shared `Chip`/date/range
+helpers, including a `buildChipsByDay`/`buildAgendaChips` split and an
+`endOfDay` range-end fix so single-day/week ranges don't silently drop
+afternoon occurrences (the old month-only grid math never hit this
+because month ranges always ended at a grid boundary day, not a real
+period edge). View choice persists via a new `calendarView` field on
+`UIState` (mirrors `compactMode`'s existing load/save wiring in
+`AppContext.tsx`); Today and `[`/`]`/arrow-key period paging are
+view-aware and follow the same overlay-guard convention as `App.tsx`'s
+global shortcuts (inert while the composer or a schedule-detail modal
+is open, or focus is in a text field). Month's "+N more" now drills
+into Day view anchored on that date instead of just being inert text —
+the ticket's own suggested resolution once Day view existed. A
+Tasks/Workflows filter legend (local component state, not persisted)
+gates the chip set in every grid/list view. Drag-to-reschedule shipped
+rather than being split out: real (non-projected) chips are
+HTML5-draggable, dropped either on a Month day cell (keeps the chip's
+original time-of-day) or a Day/Week hour cell (adopts the exact slot);
+both paths reuse the existing `updateScheduledRun`/`rescheduleWorkflowRun`
+RPCs with a past-time guard before committing. `CalendarComposer.tsx`
+gained an optional `initialTime` prop so Day/Week empty-slot clicks
+prefill the exact clicked hour instead of the existing 09:00/next-hour
+heuristic (Month/Agenda day-clicks pass no time and keep that
+heuristic unchanged). Verified via `tsc --noEmit` and a clean Vite
+preview boot (no console errors); Calendar itself needs an active
+project via the native Electrobun bridge, so the new views weren't
+click-tested live from this environment — same limitation noted on
+tickets 118/121/123-126.
+¹⁹ Ticket 129: series/skip-list design chosen over a full recurrence-rule
+rewrite — a run/`ScheduledWorkflowRun` keeps its `repeatInterval` as the
+cadence and gains `skipDates: string[]`, exact ISO instants excluded
+from that series' projection. "Delete this occurrence" branches on
+whether the clicked chip is the item's own pending fire time or a
+projected (dashed) future date: the former advances `scheduledAt` to
+the next non-skipped occurrence in place (new `deleteOccurrence` in
+`scheduler.ts`, `deleteWorkflowOccurrence` in `workflows/schedules.ts`
+— both share an `advanceOccurrence` helper with `fire()`'s existing
+"skip past missed occurrences" loop, now also skipping `skipDates`);
+the latter just appends to `skipDates` and leaves the pending row
+untouched. `skipDates` (filtered to still-future entries) carries
+forward whenever a task's fire creates its next row or a workflow's
+fire advances in place, so a skip made three cycles out survives the
+rows in between. `skip_dates` is an additive nullable `runs` column
+(disk-format-firewall: absent/null reads back as `[]`, no migration of
+existing schedules needed); the workflow JSON side normalizes missing
+`skipDates` the same way on read. Frontend `projectOccurrences` takes
+the series' `skipDates` and excludes any generated instant present in
+it — same `addDays`-stepping algorithm as the backend's
+`nextOccurrence`, so a projected chip's `toISOString()` and the
+backend's recomputed instant line up exactly when the click round-trips
+through the `deleteOccurrence`/`deleteScheduledWorkflowOccurrence` RPCs.
+`ScheduleDetail`'s single "Cancel" button splits into "Delete this
+occurrence"/"Delete the series" only when `repeatInterval !== "none"`;
+non-recurring entries keep the original single confirm copy verbatim.
+Verified via `tsc --noEmit`; same native-bridge limitation as ticket
+128 kept this from being click-tested live.
+²⁰ Ticket 130: confirmed Electrobun's `openFileDialog` FFI call takes no
+can-create-directories flag (five fixed args, straight through to the
+native panel), so this went the in-app-fallback route rather than a
+native option. New `createDirectory` RPC (`{ parent, name }`, sanitizes
+the name against slashes/`.`/`..`, mkdir via the existing `ensureDir`
+helper, rejects if the target already exists) backs a single shared
+`useDirectoryPicker` hook (`src/mainview/hooks/useDirectoryPicker.ts`)
+that wraps `api.chooseDirectory`: after a parent folder is picked, a
+new `prompt()` primitive on `UIFeedback` (mirrors the existing
+`confirm()` — same imperative context, a `PromptDialog` alongside
+`ConfirmDialog`) offers an optional "New folder" name; blank/cancelled
+just uses the picked folder as-is, so the common case costs one
+dismissible dialog rather than a hard extra step. `FilesPage.tsx`,
+`NewProjectModal.tsx`, and `WelcomeScreen.tsx` all swap their direct
+`api.chooseDirectory()` call for this one hook — no per-site duplication.
+Verified via `tsc --noEmit` only; same native-bridge limitation as
+tickets 118/121/123-129 (the picker and mkdir both require the native
+Electrobun shell, not exercisable from a plain Vite preview).
+²¹ Ticket 131: `PackageManagersSection.tsx`'s enabled/disabled label
+became a real checkbox wired through the existing
+`savePackageManagers`/`packageManagers.ts` cache round-trip (same
+persisted shape as before — no migration). Preference reuses list
+order rather than adding a second "preferred" flag: a new
+`getOrderedEnabledAdapters()` in `packageManagers.ts` reads the merged
+cache+builtin list, filters to `enabled !== false`, and preserves that
+order — `searchPackageManagers` now iterates this filtered/ordered set
+instead of the raw builtin array (so disabled managers drop out of
+catalog search and results surface in preference order), and
+`installPackage` rejects with "Package manager is disabled" if the
+requested `managerId` isn't in that set (closes the gap where a
+disabled manager was still directly installable by id).
+`resolvePackageBinaries` is left ungated since it only runs after an
+install already succeeded. The row-level up/down arrows are replaced
+by HTML5 drag-and-drop (`draggable`, `onDragStart`/`onDragOver`/`onDrop`
+on each row, a `GripVertical` handle) calling the same
+`savePackageManagers` persistence; the arrows survive as a
+low-opacity secondary affordance (`aria-label`s, revealed on
+hover/focus) and rows are keyboard-reorderable via focus +
+ArrowUp/ArrowDown. The top enabled row gets a small "Preferred" badge
+for clarity. Verified via `tsc --noEmit` only; same native-bridge
+limitation as tickets 118/121/123-130 (the package-manager RPCs
+degrade to no-ops outside the Electrobun shell, so drag/toggle
+behavior wasn't click-tested live from this environment).
+
+²² Ticket 132: `FilesPage.tsx`'s app-scoped instance gained an "Include
+project files" checkbox that additionally fetches a new
+`listAllProjectVfsLocations` RPC (`registry.listAllProjectLocations()`,
+iterating `listProjects()` + each project's `vfs.json`) and renders it
+grouped under per-project headers alongside the app-scoped list — every
+sidebar row is now a `{ location, projectName? }` pair so the `vfs*` RPC
+calls for a *project*-owned location shown in the app view pass that
+location's own project instead of the app view's (always-undefined) one,
+which they need to resolve at all. Second half of the ticket — whether
+app-level locations already work end-to-end for task/workflow I/O — was
+investigated and then verified by exercising the real
+`addLocation`/`getLocation`/`snapshotAssociatedLocations`/`diffSnapshots`
+code path under a throwaway `CLIDE_PROFILE` (no real app data touched):
+confirmed no gap, `getLocation` already checks app scope first regardless
+of the project passed in. A different, unrelated gap turned up while
+checking task/workflow "location pickers": no UI anywhere sets
+`task.fileAssociations` for *any* scope (it's meta.json-only, read by
+`artifacts.ts` but never written from `src/mainview`) — flagged as a
+follow-up rather than built speculatively, since it's a new editor
+surface with its own UX, not an app/project-scope gap. Verified via
+`tsc --noEmit` plus the standalone script above; the Files-view toggle
+itself wasn't click-tested live from this environment (same native-bridge
+limitation as tickets 118/121/123-131).
+
+²³ Ticket 133: extended the ticket 119 `.clide-compact` root-class pattern
+from CSS-variable density tokens to full Tailwind rules via arbitrary
+variants (`[.clide-compact_&]:px-3`, compiling to `.clide-compact .el`),
+so `ViewTabs`/`ViewToolbar`/`ProjectToolbar`/`Toolbar` tighten in compact
+mode with no JS branching on `compactMode`. Toolbar text labels wrap in
+`<span className="[.clide-compact_&]:hidden">` for icon-only collapse —
+every button already had a `title`, so the tooltip requirement was
+already met. View tabs dropped their `max-w-[200px]`/`max-w-[120px]`
+caps in favor of `flex-1` + `min-w-0` + `truncate`, so tabs share the row
+width and only truncate under real pressure. Added a reusable
+`.clide-vertical-label` utility (`order: -1`, `writing-mode: vertical-rl`,
+`rotate(180deg)`, scoped under `.clide-compact`) and applied it to the
+timestamp in `SubmissionAccordionRow.tsx` only — left off the summary
+text per the ticket's "structural, not primary content" guidance; the
+class is generic enough for the ticket's named follow-ups (day-group
+headers, dense table columns) to reuse directly. Verified via
+`tsc --noEmit` and, unusually, by inspecting the live dev server's
+compiled `document.styleSheets` to confirm the arbitrary-selector syntax
+produced the intended `.clide-compact .el` rules rather than silently
+no-op'ing — stronger than the tsc-only checks on recent tickets, but the
+dev session available here was mid-onboarding with no seeded project, so
+the actual tab/toolbar/row layout in compact mode wasn't eyeballed live;
+worth a look on `dev:regular`.
+
+²⁵ Ticket 138: landed (a)-(c) of the ticket's own suggested sequencing —
+window shell, both states, and talk-back — with (d) animation kept
+intentionally simple (procedural CSS bars, not the "real design time"
+polish the ticket flags as a stretch goal). New second `BrowserWindow`
+(`src/bun/index.ts`'s `ensureCompanionWindow`/`companionRpc`) is frameless,
+transparent, always-on-top, ~220×220, positioned from and persisting to a
+new `UIState.companionPosition` (debounced on the native `move` event);
+dragging needed no custom mouse tracking — Electrobun already ships a
+native drag-region primitive (`electrobun-webkit-app-region-drag`, the same
+class the main window's own title bar uses) that the companion's whole
+compact face opts into. Compact⇄expanded is one window resizing via a new
+`resizeCompanion` RPC, not two windows. The companion owns no speech APIs
+itself: the main window's existing `speechSynthesis`/`SpeechRecognition`
+calls (tickets 123/137) stay the single source of truth, and
+`speech.ts`'s `speak()` gained an optional `onPhase` callback
+(start/boundary/end) that `AppContext`'s new `speakToCompanion` relays over
+bun IPC (`relayCompanionSpeechPhase`/`relayCompanionTranscriptLine`) to
+drive the companion's waveform and transcript — bar heights are
+randomized per `boundary` event rather than sampled, since WebKit exposes
+no audio buffer to analyze. Greets once per app launch (bun-side
+`companionGreetedThisSession` guard survives React StrictMode's double-
+mount in dev); task-run completions and errors are narrated the same way
+through the existing ticket-98 `onRunStatus` summary, deferring to ticket
+123's speech mode if that's already talking so the two features never
+overlap. Workflow-run completions are **not** narrated — the ticket's own
+text points at "ticket 98's AI run summaries" specifically (task runs),
+and `WorkflowRun` has no equivalent single-line summary to read; a
+follow-up would need to add one. Muted talk-back still posts to the
+transcript and pulses the compact face instead of speaking. Recognized
+voice commands (ticket 123's push-to-talk) now also show up as "heard"
+lines in the transcript, and the mic-open state relays live so the face
+shows a listening ring. Enabled/muted persist in `UIState.companionEnabled`
+/`companionMuted`, with a new Settings section (`CompanionSettingsSection`)
+alongside toggles reachable from either the companion's own hide/mute
+buttons or Settings — both paths funnel through one bun-side function per
+flag, and push `onCompanionEnabledChanged`/`onCompanionMutedChanged` back
+to the main window so the two stay in sync regardless of which side
+changed it. Fixed a latent bug surfaced while adding these fields: the
+generic `saveUIState` RPC handler overwrote the whole `UIState` file with
+whatever the renderer's known fields were, which would have silently
+dropped `companionPosition` on the next unrelated settings change — it now
+reads-merges-writes. The renderer build is now genuinely two pages: Vite's
+`root` widened from `src/mainview` to `src`, with `vite.config.ts` declaring
+both `src/mainview/index.html` and a new `src/companion/index.html` as
+`rollupOptions.input`; `electrobun.config.ts`'s copy step lands the
+companion's build output as `companion.html` inside the existing
+`views/mainview/` host (rather than a second host) so it shares the one
+copied `assets/` folder instead of needing a duplicate. Verified via
+`tsc --noEmit`, a clean `vite build` (confirms the multi-page output/asset
+paths resolve as `views://mainview/...` expects), and click-testing the
+companion's React app directly in the Vite dev server (state transitions,
+mute toggle, compact/expanded layout, waveform — RPC calls no-op
+gracefully outside Electrobun, same degrade-gracefully pattern as
+`mainview/rpc.ts`). The actual second `BrowserWindow` — real OS-level
+transparency/always-on-top/native dragging, and the main window actually
+speaking on launch — needs the native Electrobun shell to see, the same
+limitation noted on nearly every ticket since 118.

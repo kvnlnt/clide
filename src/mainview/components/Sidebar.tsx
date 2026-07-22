@@ -3,8 +3,22 @@ import { useMemo } from "react";
 import { useApp } from "../context/AppContext";
 import SidebarProject from "./SidebarProject";
 
+/** Coarse "latest Nm ago" note for the sidebar row's second line (ticket 126). */
+function formatRecency(iso: string | null): string | null {
+  if (!iso) return null;
+  const deltaMs = Date.now() - new Date(iso).getTime();
+  if (deltaMs < 0) return "just now";
+  const minutes = Math.floor(deltaMs / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 export default function Sidebar() {
-  const { tasks, projects, runs, activeProject, setActiveProject, openNewProject } = useApp();
+  const { tasks, projects, runs, activeProject, setActiveProject, openNewProject, markProjectRunsRead } = useApp();
 
   // Map each task slug to its project so we can attribute runs to projects.
   const slugToProject = useMemo(() => {
@@ -13,19 +27,26 @@ export default function Sidebar() {
     return m;
   }, [tasks]);
 
-  // Unread terminal runs per project (ticket 97): red if any unread error, green otherwise, zero → no badge.
+  // Type-split unread rollup per project (ticket 126): separate success/error
+  // counts instead of one number whose color flips on hasError. A third
+  // "needs attention" bucket (partial success/timeout) was considered but
+  // RunStatus only distinguishes success/error/in-flight states, so there's
+  // nothing cheap to split out — skipped per ticket 126 §1.
+  // Also tracks the most recent run's timestamp for the "latest Nm ago" note.
   const counts = useMemo(() => {
-    const map = new Map<string, { unreadCount: number; hasError: boolean }>();
+    const map = new Map<string, { unreadSuccess: number; unreadError: number; latest: string | null }>();
     for (const run of runs) {
       const project = slugToProject.get(run.taskSlug);
       if (!project) continue;
+      const entry = map.get(project) ?? { unreadSuccess: 0, unreadError: 0, latest: null };
+      const runTime = run.finishedAt ?? run.startedAt;
+      if (!entry.latest || runTime > entry.latest) entry.latest = runTime;
       // Only count terminal runs (success or error) that are unread
       if ((run.status === "success" || run.status === "error") && !run.readAt) {
-        const entry = map.get(project) ?? { unreadCount: 0, hasError: false };
-        entry.unreadCount += 1;
-        if (run.status === "error") entry.hasError = true;
-        map.set(project, entry);
+        if (run.status === "error") entry.unreadError += 1;
+        else entry.unreadSuccess += 1;
       }
+      map.set(project, entry);
     }
     return map;
   }, [runs, slugToProject]);
@@ -60,17 +81,19 @@ export default function Sidebar() {
           {projects.length === 0 && <div className="px-2 py-2 text-[13px] text-white/30">No projects yet</div>}
           {projects.map((project) => {
             const c = counts.get(project);
-            const badgeCount = c?.unreadCount ?? 0;
-            const badgeColor = c?.hasError ? "red" : "green";
+            const unreadSuccess = c?.unreadSuccess ?? 0;
+            const unreadError = c?.unreadError ?? 0;
             return (
               <SidebarProject
                 key={project}
                 name={project}
                 active={activeProject === project}
-                badgeCount={badgeCount}
-                badgeColor={badgeColor}
+                unreadSuccess={unreadSuccess}
+                unreadError={unreadError}
+                recency={formatRecency(c?.latest ?? null)}
                 hasRunning={hasRunning.get(project) ?? false}
                 onClick={() => setActiveProject(activeProject === project ? null : project)}
+                onMarkRead={unreadSuccess + unreadError > 0 ? () => void markProjectRunsRead(project) : undefined}
               />
             );
           })}

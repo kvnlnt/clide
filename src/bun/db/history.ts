@@ -20,6 +20,7 @@ interface RunRow {
   read_at: string | null;
   summary: string | null;
   form_version: number;
+  skip_dates: string | null;
 }
 
 /** projectPath -> open Database. */
@@ -82,6 +83,15 @@ function rowToRecord(row: RunRow): RunRecord {
       triggeredBy = null;
     }
   }
+  let skipDates: string[] = [];
+  if (row.skip_dates) {
+    try {
+      const parsed = JSON.parse(row.skip_dates);
+      if (Array.isArray(parsed)) skipDates = parsed.filter((d): d is string => typeof d === "string");
+    } catch {
+      skipDates = [];
+    }
+  }
   return {
     id: row.id,
     taskSlug: row.form_slug, // Disk: form_slug → Memory: taskSlug
@@ -94,6 +104,7 @@ function rowToRecord(row: RunRow): RunRecord {
     pinned: row.pinned === 1,
     scheduledAt: row.scheduled_at,
     repeatInterval: (row.repeat_interval as RepeatInterval | null) ?? null,
+    skipDates,
     command,
     readAt: row.read_at,
     triggeredBy,
@@ -111,6 +122,8 @@ export interface CreateRunInput {
   outputPath?: string | null;
   scheduledAt?: string | null;
   repeatInterval?: RepeatInterval | null;
+  /** Future occurrence ISO timestamps excluded from this series' projection (ticket 129), carried forward across fires. */
+  skipDates?: string[];
   triggeredBy?: unknown;
   /** When not null, the run is created pre-read (ticket 97). */
   readAt?: string | null;
@@ -120,8 +133,8 @@ export interface CreateRunInput {
 
 export function createRun(projectPath: string, input: CreateRunInput): RunRecord {
   getDb(projectPath).run(
-    `INSERT INTO runs (id, form_slug, inputs, status, started_at, output_path, scheduled_at, repeat_interval, pinned, triggered_by, read_at, form_version)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+    `INSERT INTO runs (id, form_slug, inputs, status, started_at, output_path, scheduled_at, repeat_interval, pinned, triggered_by, read_at, form_version, skip_dates)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
     [
       input.id,
       input.taskSlug, // Memory: taskSlug → Disk: form_slug column
@@ -134,6 +147,7 @@ export function createRun(projectPath: string, input: CreateRunInput): RunRecord
       input.triggeredBy ? JSON.stringify(input.triggeredBy) : null,
       input.readAt ?? null,
       input.taskVersion ?? 1, // Memory: taskVersion → Disk: form_version column
+      JSON.stringify(input.skipDates ?? []),
     ],
   );
   runIndex.set(input.id, projectPath);
@@ -165,6 +179,13 @@ export function updateRunSchedule(id: string, scheduledAt: string, repeatInterva
     repeatInterval,
     id,
   ]);
+}
+
+/** Persist a recurring run's set of excluded future occurrence timestamps (ticket 129). */
+export function setSkipDates(id: string, skipDates: string[]): void {
+  const projectPath = runIndex.get(id);
+  if (!projectPath) return;
+  getDb(projectPath).run(`UPDATE runs SET skip_dates = ? WHERE id = ?`, [JSON.stringify(skipDates), id]);
 }
 
 export function setOutputPath(id: string, outputPath: string): void {

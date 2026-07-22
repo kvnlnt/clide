@@ -39,12 +39,18 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+/** Disk format firewall (ticket 129): older entries predate `skipDates` — default to none. */
+function normalizeSchedule(item: ScheduledWorkflowRun): ScheduledWorkflowRun {
+  if (Array.isArray(item.skipDates)) return item;
+  return { ...item, skipDates: [] };
+}
+
 async function readSchedules(projectPath: string): Promise<ScheduledWorkflowRun[]> {
   try {
     const file = Bun.file(projectScheduledWorkflowsPath(projectPath));
     if (!(await file.exists())) return [];
     const parsed = JSON.parse(await file.text());
-    return Array.isArray(parsed) ? parsed.filter(isScheduledWorkflowRun) : [];
+    return Array.isArray(parsed) ? parsed.filter(isScheduledWorkflowRun).map(normalizeSchedule) : [];
   } catch {
     return [];
   }
@@ -60,6 +66,17 @@ function nextOccurrence(from: Date, interval: RepeatInterval): Date {
   if (interval === "daily") d.setDate(d.getDate() + 1);
   else if (interval === "weekly") d.setDate(d.getDate() + 7);
   return d;
+}
+
+/** Steps forward from `base` past any occurrence that's already due or explicitly skipped (ticket 129). */
+function advanceOccurrence(base: Date, interval: RepeatInterval, skipDates: string[]): Date {
+  let next = nextOccurrence(base, interval);
+  let guard = 0;
+  while (guard < 1000 && (next.getTime() <= Date.now() || skipDates.includes(next.toISOString()))) {
+    next = nextOccurrence(next, interval);
+    guard++;
+  }
+  return next;
 }
 
 function clearTimer(id: string): void {
@@ -104,9 +121,13 @@ async function fire(projectPath: string, projectName: string, item: ScheduledWor
 
   const list = await readSchedules(projectPath);
   if (item.repeatInterval !== "none") {
-    let next = nextOccurrence(new Date(item.scheduledAt), item.repeatInterval);
-    while (next.getTime() <= Date.now()) next = nextOccurrence(next, item.repeatInterval);
-    const advanced: ScheduledWorkflowRun = { ...item, scheduledAt: next.toISOString() };
+    const next = advanceOccurrence(new Date(item.scheduledAt), item.repeatInterval, item.skipDates);
+    const advanced: ScheduledWorkflowRun = {
+      ...item,
+      scheduledAt: next.toISOString(),
+      // Carry forward still-future skips (ticket 129) — past ones are moot once their date has gone by.
+      skipDates: item.skipDates.filter((d) => new Date(d).getTime() > Date.now()),
+    };
     await writeSchedules(
       projectPath,
       list.map((s) => (s.id === item.id ? advanced : s)),
@@ -128,7 +149,7 @@ export async function scheduleWorkflowRun(
   repeatInterval: RepeatInterval,
 ): Promise<string> {
   const id = crypto.randomUUID();
-  const item: ScheduledWorkflowRun = { id, workflowId, workflowName, params, scheduledAt, repeatInterval };
+  const item: ScheduledWorkflowRun = { id, workflowId, workflowName, params, scheduledAt, repeatInterval, skipDates: [] };
   const list = await readSchedules(projectPath);
   await writeSchedules(projectPath, [...list, item]);
   arm(projectPath, projectName, item);
@@ -140,6 +161,46 @@ export async function cancelScheduledWorkflowRun(projectPath: string, id: string
   clearTimer(id);
   const list = await readSchedules(projectPath);
   await writeSchedules(projectPath, list.filter((s) => s.id !== id));
+}
+
+/**
+ * Delete one occurrence of a recurring scheduled workflow run rather than
+ * the whole series (ticket 129) — mirrors `deleteOccurrence` in
+ * scheduler.ts. If `occurrenceAt` is the item's own pending fire time, it's
+ * advanced to its next occurrence instead of removed. Otherwise
+ * `occurrenceAt` names a not-yet-materialized future occurrence; it's
+ * recorded in `skipDates` so the projector stops offering it. Returns false
+ * if the item isn't a pending recurring schedule.
+ */
+export async function deleteWorkflowOccurrence(
+  projectPath: string,
+  projectName: string,
+  id: string,
+  occurrenceAt: string,
+): Promise<boolean> {
+  const list = await readSchedules(projectPath);
+  const idx = list.findIndex((s) => s.id === id);
+  if (idx === -1) return false;
+  const item = list[idx]!;
+  if (item.repeatInterval === "none") return false;
+
+  if (new Date(occurrenceAt).getTime() === new Date(item.scheduledAt).getTime()) {
+    clearTimer(id);
+    const next = advanceOccurrence(new Date(item.scheduledAt), item.repeatInterval, item.skipDates);
+    const advanced: ScheduledWorkflowRun = { ...item, scheduledAt: next.toISOString() };
+    const nextList = [...list];
+    nextList[idx] = advanced;
+    await writeSchedules(projectPath, nextList);
+    arm(projectPath, projectName, advanced);
+    return true;
+  }
+
+  const skipDates = item.skipDates.includes(occurrenceAt) ? item.skipDates : [...item.skipDates, occurrenceAt];
+  const updated: ScheduledWorkflowRun = { ...item, skipDates };
+  const nextList = [...list];
+  nextList[idx] = updated;
+  await writeSchedules(projectPath, nextList);
+  return true;
 }
 
 /** Change a pending schedule's fire time/repeat and re-arm its timer. Returns false if it no longer exists. */
@@ -174,6 +235,20 @@ export async function runScheduledWorkflowRunNow(projectPath: string, projectNam
 
 export async function getScheduledWorkflows(projectPath: string): Promise<ScheduledWorkflowRun[]> {
   return readSchedules(projectPath);
+}
+
+/**
+ * Persist a scheduled workflow run without arming a live timer (ticket 127).
+ * For dev-profile fixtures (scripts/seed-profile.ts): the seeder is a
+ * one-shot script that must exit promptly, and `scheduleWorkflowRun`'s
+ * `arm()` would set a real `setTimeout`, keeping the process alive until it
+ * fires (the same class of hang ticket 114 fixed for the task scheduler).
+ * The running app picks these up normally via `initWorkflowSchedules` on
+ * next launch.
+ */
+export async function seedScheduledWorkflowRun(projectPath: string, item: ScheduledWorkflowRun): Promise<void> {
+  const list = await readSchedules(projectPath);
+  await writeSchedules(projectPath, [...list, item]);
 }
 
 /** Initialise the workflow scheduler: load pending schedules from every project and arm timers. */

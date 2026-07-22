@@ -117,10 +117,10 @@ export default function ViewToolbar({ view }: Props) {
       <button
         onClick={openRunPicker}
         title="Run a task (⌘K)"
-        className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] text-white/50 transition-colors hover:bg-white/5 hover:text-white"
+        className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] text-white/50 transition-colors hover:bg-white/5 hover:text-white [.clide-compact_&]:px-1.5 [.clide-compact_&]:py-1"
       >
         <Play size={13} />
-        Run
+        <span className="[.clide-compact_&]:hidden">Run</span>
       </button>
 
       <div className="mx-1 h-4 w-px shrink-0 bg-white/10" />

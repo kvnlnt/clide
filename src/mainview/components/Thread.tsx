@@ -85,6 +85,7 @@ export default function Thread() {
                 pinned: false,
                 scheduledAt: null,
                 repeatInterval: null,
+                skipDates: [],
                 readAt: null,
                 taskVersion: folder.meta.version,
               };

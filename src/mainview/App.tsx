@@ -22,6 +22,8 @@ import ViewsPage from "./components/ViewsPage";
 import ViewToolbar from "./components/ViewToolbar";
 import WelcomeScreen from "./components/WelcomeScreen";
 import WindowControls from "./components/WindowControls";
+import ReportEditor from "./components/reports/ReportEditor";
+import ReportsPage from "./components/reports/ReportsPage";
 import NewWorkflowWizard from "./components/workflow/NewWorkflowWizard";
 import WorkflowEditor from "./components/workflow/WorkflowEditor";
 import WorkflowsPage from "./components/workflow/WorkflowsPage";
@@ -61,6 +63,8 @@ function Workspace() {
     closeViewSettings,
     workflowEditor,
     closeWorkflowEditor,
+    reportEditor,
+    closeReportEditor,
     onboardingActive,
     profileInterview,
     openProfileInterview,
@@ -94,6 +98,7 @@ function Workspace() {
         aiWizardOpen ||
         onboardingActive ||
         workflowEditor !== null ||
+        reportEditor !== null ||
         profileInterview !== null;
       if (overlayOpen || !activeProject) return;
       const now = Date.now();
@@ -133,6 +138,7 @@ function Workspace() {
       aiWizardOpen,
       onboardingActive,
       workflowEditor,
+      reportEditor,
       profileInterview,
       activeProject,
       openRunPicker,
@@ -159,10 +165,11 @@ function Workspace() {
         aiWizardOpen ||
         onboardingActive ||
         workflowEditor !== null ||
+        reportEditor !== null ||
         profileInterview !== null;
       if (overlayOpen || !activeProject) return;
 
-      // ⌘P Tasks, ⌘⇧C Calendar, ⌘⇧V Views, ⌘⇧U Workflows, ⌘, Settings.
+      // ⌘P Tasks, ⌘⇧C Calendar, ⌘⇧V Views, ⌘⇧U Workflows, ⌘⇧R Reports, ⌘, Settings.
       if (e.ctrlKey || e.metaKey) {
         const key = e.key.toLowerCase();
         const act = (action: string) => {
@@ -173,6 +180,7 @@ function Workspace() {
         if (key === "c" && e.shiftKey) return act("view:calendar");
         if (key === "v" && e.shiftKey) return act("view:views");
         if (key === "u" && e.shiftKey) return act("view:workflows");
+        if (key === "r" && e.shiftKey) return act("view:reports");
         if (key === ",") return act("view:project-settings");
         if (key === "k") return act("view:run-picker");
       }
@@ -208,6 +216,7 @@ function Workspace() {
     aiWizardOpen,
     onboardingActive,
     workflowEditor,
+    reportEditor,
     profileInterview,
     activeProject,
     isMac,
@@ -242,6 +251,7 @@ function Workspace() {
                 {projectSurface === "tasks" && <TasksPanel />}
                 {projectSurface === "views" && <ViewsPage />}
                 {projectSurface === "workflows" && <WorkflowsPage />}
+                {projectSurface === "reports" && <ReportsPage />}
                 {projectSurface === "calendar" && <CalendarPage />}
                 {projectSurface === "files" && (
                   <div className="flex-1 overflow-hidden">
@@ -322,6 +332,17 @@ function Workspace() {
               {...(workflowEditor.focusName ? { focusName: true } : {})}
             />
           )}
+        </div>
+      )}
+
+      {/* Report builder (ticket 134) — same full-window takeover mechanic as
+          the workflow editor above. */}
+      {reportEditor && (
+        <div className="absolute inset-0 z-50 flex flex-col bg-clide-bg clide-takeover-transition">
+          <div className="flex electrobun-webkit-app-region-drag">
+            <TrafficLights />
+          </div>
+          <ReportEditor initial={reportEditor.report} onClose={closeReportEditor} />
         </div>
       )}
 
